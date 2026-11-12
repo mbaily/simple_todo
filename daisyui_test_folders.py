@@ -8,10 +8,22 @@ from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
+from helpers import create_journal_entry, get_or_create_hashtag, parse_hashtags
 from models import Folder, List
 from daisyui_test_http import wants_fragment
 
 MAX_NAME = 255
+MAX_TAG = 100
+
+
+def hidden_by_tag_filters(folder, include, exclude, *, top_level):
+    """Whether the global tag filters hide this folder row on the default overview.
+
+    Hide rules apply at every depth; Only rules apply to the top-level rows, so the
+    subfolders of a folder that is shown stay reachable.
+    """
+    names = {tag.name for tag in folder.hashtags}
+    return bool(names & exclude) or bool(top_level and include and not names & include)
 
 
 def folders_view(request):
@@ -144,6 +156,21 @@ def attach_folder_routes(router, *, templates, get_db, actions, feedback, succes
             value = clean_name(name)
             actions["rename"](request=request, folder_id=folder_id, new_name=value, db=db)
             return "Folder renamed."
+        return respond(request, db, call)
+
+    @router.post("/folders/{folder_id}/tags", response_class=HTMLResponse)
+    def tags(request: Request, folder_id: int, hashtags: str = Form(""), db: Session = Depends(get_db)):
+        def call():
+            folder = existing(db, folder_id)
+            names = parse_hashtags(hashtags)
+            if any(len(name) > MAX_TAG for name in names):
+                raise HTTPException(400, f"Tags can be at most {MAX_TAG} characters.")
+            if set(names) == {tag.name for tag in folder.hashtags}:
+                return "Folder tags unchanged."
+            folder.hashtags = [get_or_create_hashtag(db, name) for name in names]
+            create_journal_entry(db, "Updated Folder Tags", f"Tags for folder '{folder.name}': {', '.join(names) or 'none'}", "folder", folder.id)
+            db.commit()
+            return "Folder tags updated." if names else "Folder tags removed."
         return respond(request, db, call)
 
     @router.post("/folders/{folder_id}/order/{direction}", response_class=HTMLResponse)

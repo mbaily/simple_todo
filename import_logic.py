@@ -64,20 +64,28 @@ def _import_error(collection, item, error):
 
 
 def _import_folders(db, items, stats):
+    """Import folders; returns {folder id: tag records} to attach once the tags themselves are imported."""
     parent_updates = {}
+    folder_tags = {}
     for item in items:
         try:
             values = dict(item)
             supplied_parent = 'parent_id' in values
             parent_id = values.pop('parent_id', None)
+            tags = values.pop('hashtags', None)
+            values.pop('hashtag_ids', None)
+            if tags is not None and not (isinstance(tags, list) and all(isinstance(tag, dict) for tag in tags)):
+                raise ValueError('Folder tags must be a list of tag records.')
             folder = process_entity(db, Folder, values, stats)
             if supplied_parent:
                 parent_updates[folder.id] = parent_id
+            if tags is not None:
+                folder_tags[folder.id] = tags
         except Exception as error:
             raise _import_error('folders', item, error) from error
     db.flush()
     if not items:
-        return
+        return folder_tags
 
     # Create every folder first so a parent can appear later in an export.
     parents = dict(db.query(Folder.id, Folder.parent_id).all())
@@ -103,6 +111,7 @@ def _import_folders(db, items, stats):
     for folder_id, parent_id in parent_updates.items():
         db.get(Folder, folder_id).parent_id = parent_id
     db.flush()
+    return folder_tags
 
 
 def _import_records(db: Session, json_data: dict, *, restore_history: bool = False) -> dict:
@@ -126,7 +135,7 @@ def _import_records(db: Session, json_data: dict, *, restore_history: bool = Fal
                             for a in db.query(BillAdjustment).all()}
     
     # --- FOLDERS ---
-    _import_folders(db, data.get('folders', []), stats)
+    folder_tags = _import_folders(db, data.get('folders', []), stats)
 
     # --- CATEGORIES ---
     for item in data.get("categories", []):
@@ -152,6 +161,14 @@ def _import_records(db: Session, json_data: dict, *, restore_history: bool = Fal
             process_entity(db, Hashtag, item, stats)
         except Exception as e:
             raise _import_error('hashtags', item, e) from e
+
+    db.flush()
+
+    for folder_id, tags in folder_tags.items():
+        try:
+            db.get(Folder, folder_id).hashtags = list({tag.id: tag for tag in map(lambda record: resolve_hashtag(db, record), tags) if tag}.values())
+        except Exception as e:
+            raise _import_error('folders', {'id': folder_id}, e) from e
 
     db.flush()
 

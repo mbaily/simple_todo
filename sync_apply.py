@@ -223,6 +223,12 @@ def apply_folders(db: Session, items: List[Dict[str, Any]], id_map: Dict[str, in
                 if not resolved_pid or not causes_cycle(db, obj.id, resolved_pid):
                     obj.parent_id = resolved_pid
 
+        # Tags (same convention as lists: an empty selection leaves them unchanged)
+        if 'hashtag_ids' in data:
+            new_ids = [rid for rid in (_resolve_id(h_id, id_map) for h_id in data['hashtag_ids']) if rid]
+            if new_ids:
+                obj.hashtags = db.query(Hashtag).filter(Hashtag.id.in_(new_ids)).all()
+
     db.flush()
 
 def apply_list(db: Session, data: Dict[str, Any], id_map: Dict[str, int]):

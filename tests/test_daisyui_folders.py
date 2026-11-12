@@ -1,7 +1,7 @@
 """Folder management in the daisyUI frontend."""
 from playwright.sync_api import expect
 
-from models import Folder, JournalEntry, List, UserSettings
+from models import Folder, Hashtag, JournalEntry, List, UserSettings
 from test_daisyui_test import HX, prototype, prototype_server
 
 Q = '?view=folders'
@@ -338,3 +338,69 @@ def test_browser_drill_into_folders_from_the_overview(prototype_server, page):
     page.locator('summary[aria-label="Actions for Garden"]').click()
     assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
     assert not errors
+
+
+def test_folder_tags_are_edited_shown_filtered_exported_and_removed(prototype):
+    db, client, ids = prototype
+    ids = tree(db, ids)
+    url = f'/app/folders/{ids["folder"]}/tags{Q}'
+    # Tags are entered with or without a #, reuse existing tags and are shown on the folder row.
+    response = client.post(url, headers=HX, data={'hashtags': '#personal, work'})
+    assert response.status_code == 200 and 'Folder tags updated.' in response.text
+    db.expire_all()
+    folder = db.get(Folder, ids['folder'])
+    assert [tag.name for tag in folder.hashtags] == ['personal', 'work'] and folder.hashtags[0].id == ids['tag']
+    assert db.query(JournalEntry).filter_by(action='Updated Folder Tags', entity_id=folder.id).count() == 1
+    assert 'Folder tags unchanged.' in client.post(url, headers=HX, data={'hashtags': 'work personal'}).text
+    assert db.query(JournalEntry).filter_by(action='Updated Folder Tags').count() == 1
+    for page in (client.get('/app/folders').text, client.get('/app').text):
+        row = page.split(f'data-item-key="folder:{ids["folder"]}"')[1].split('row-actions')[0]
+        assert f'/app/hashtag/{ids["tag"]}">personal</a>' in row and '>work</a>' in row
+        assert f'id="folder-tags-{ids["folder"]}"' in page and 'value="personal work"' in page
+    assert client.post(url, headers=HX, data={'hashtags': 'x' * 101}).status_code == 400
+    assert client.post(f'/app/folders/9999/tags{Q}', headers=HX, data={'hashtags': 'a'}).status_code == 404
+    # The tag's page and the tag index list the folder.
+    tagged = client.get(f'/app/hashtag/{ids["tag"]}')
+    assert [f.id for f in tagged.context['tagged_folders']] == [ids['folder']] and 'id="results-folders-heading"' in tagged.text
+    assert client.get('/app/hashtags').context['folder_counts'][ids['tag']] == 1 and '<span>1 folder</span>' in client.get('/app/hashtags').text
+    # Hide filters remove tagged folders at every depth of the default overview; an opened folder is not filtered.
+    work = db.query(Hashtag).filter_by(name='work').one()
+    db.get(Folder, ids['child']).hashtags = [work]
+    db.get(Folder, ids['folder']).hashtags = [db.get(Hashtag, ids['tag'])]
+    settings = db.query(UserSettings).first() or UserSettings()
+    db.add(settings)
+    settings.filter_exc_hashtags = 'work'
+    db.commit()
+    home = client.get('/app')
+    assert [f.id for f in home.context['subfolders']] == [ids['folder'], ids['admin']] and home.context['hidden_folder_ids'] == {ids['child']}
+    assert f'data-item-key="folder:{ids["child"]}"' not in home.text
+    assert [f.id for f in client.get(f'/app?folder_id={ids["folder"]}').context['subfolders']] == [ids['child']]
+    assert f'data-item-key="folder:{ids["child"]}"' in client.get('/app/folders').text
+    # Only filters keep the top-level folders that carry the tag, and leave their subfolders reachable.
+    settings.filter_exc_hashtags, settings.filter_inc_hashtags = '', 'personal'
+    db.commit()
+    home = client.get('/app')
+    assert [f.id for f in home.context['subfolders']] == [ids['folder']] and home.context['hidden_folder_ids'] == set()
+    assert [f.id for f in client.get('/app?folder_id=0').context['subfolders']] == [ids['folder'], ids['admin']]
+    # Export carries folder tags, and import restores them; folders exported without tags keep theirs.
+    from import_logic import _import_records
+    from serializers import serialize_folder
+    exported = serialize_folder(db.get(Folder, ids['child']))
+    assert exported['hashtags'] == [{'id': work.id, 'name': 'work'}] and exported['hashtag_ids'] == [work.id]
+    db.get(Folder, ids['child']).hashtags = []
+    db.commit()
+    legacy = {key: value for key, value in serialize_folder(db.get(Folder, ids['folder'])).items() if 'hashtag' not in key}
+    _import_records(db, {'data': {'folders': [exported, legacy, {'name': 'Fresh', 'hashtags': [{'name': 'brand_new'}]}]}})
+    db.commit()
+    db.expire_all()
+    assert [tag.name for tag in db.get(Folder, ids['child']).hashtags] == ['work']
+    assert [tag.name for tag in db.get(Folder, ids['folder']).hashtags] == ['personal']
+    assert [tag.name for tag in db.query(Folder).filter_by(name='Fresh').one().hashtags] == ['brand_new']
+    # Clearing the field removes the tags; deleting a tag or a folder removes the links without touching the other.
+    assert 'Folder tags removed.' in client.post(f'/app/folders/{ids["child"]}/tags{Q}', headers=HX, data={'hashtags': ''}).text
+    assert client.post(f'/app/hashtag/{ids["tag"]}/delete?view=hashtags', headers=HX).status_code == 200
+    db.expire_all()
+    assert db.get(Folder, ids['folder']).hashtags == [] and db.get(Folder, ids['child']).hashtags == []
+    fresh = db.query(Folder).filter_by(name='Fresh').one()
+    assert client.post(f'/app/folders/{fresh.id}/delete{Q}', headers=HX).status_code == 200
+    assert db.query(Hashtag).filter_by(name='brand_new').count() == 1

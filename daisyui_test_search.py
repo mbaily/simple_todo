@@ -79,6 +79,7 @@ def attach_search_routes(router, *, templates, get_db, actions, feedback, succes
             page_url=base + path + "?" + urlencode(navigation), page_title=title + "",
             results_page=True, results_kind=kind, workspace_template="daisyui_test/_results_workspace.html",
             q=q, hashtag=hashtag, hashtag_options=HASHTAG_OPTIONS,
+            tagged_folders=sorted(hashtag.folders, key=lambda folder: folder.path_name.lower()) if hashtag else [],
             lists=results["lists"], todos=todos, events=results["events"],
             sort=sort, current_folder_id=folder_id, folder_param=folder_id, edit_back="results",
             uncompleted_counts=actions["uncompleted_counts"](db),

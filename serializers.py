@@ -81,6 +81,8 @@ def serialize_folder(f):
         "sort_order": f.sort_order,
         "is_collapsed": f.is_collapsed,
         "created_at": f.created_at.isoformat() if f.created_at else None,
+        "hashtag_ids": [h.id for h in f.hashtags],
+        "hashtags": [{"id": h.id, "name": h.name} for h in f.hashtags],
     }
 
 

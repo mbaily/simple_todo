@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from helpers import parse_hashtags
-from models import Hashtag, calendar_event_hashtags, list_hashtags, todo_hashtags
+from models import Hashtag, calendar_event_hashtags, folder_hashtags, list_hashtags, todo_hashtags
 from daisyui_test_http import wants_fragment
 
 MAX_NAME = 100
@@ -32,7 +32,7 @@ def attach_hashtag_routes(router, *, templates, get_db, actions, feedback, succe
             page_title="Tags", page_url=base + "/hashtags",
             hashtags=db.query(Hashtag).order_by(func.lower(Hashtag.name)).all(),
             list_counts=usage(db, list_hashtags), todo_counts=usage(db, todo_hashtags),
-            event_counts=usage(db, calendar_event_hashtags),
+            event_counts=usage(db, calendar_event_hashtags), folder_counts=usage(db, folder_hashtags),
             message=message, is_error=status_code >= 400,
         )
         partial = wants_fragment(request)

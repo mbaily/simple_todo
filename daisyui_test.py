@@ -16,7 +16,8 @@ from models import Folder, List, Todo, Note, ListDatetimeHeader
 from daisyui_test_list import attach_list_routes, detail_id, detail_selection
 from daisyui_test_edit import attach_edit_routes
 from daisyui_test_search import attach_search_routes, results_kind, results_location
-from daisyui_test_folders import attach_folder_routes, folders_view
+from daisyui_test_folders import attach_folder_routes, folders_view, hidden_by_tag_filters
+from helpers import parse_hashtags
 from daisyui_test_smart import attach_smart_routes
 from daisyui_test_hashtags import attach_hashtag_routes, hashtags_view
 from daisyui_test_calendar import attach_calendar_routes, calendar_view, navigation as calendar_navigation
@@ -129,8 +130,18 @@ def create_router(*, templates, get_db, home_context, create_list, toggle_list, 
         current_folder = db.get(Folder, context["current_folder_id"]) if context.get("current_folder_id") else None
         subfolders = (db.query(Folder).filter(Folder.parent_id == (current_folder.id if current_folder else None))
                       .order_by(Folder.sort_order, Folder.name).all())
+        # The global tag filters hide folders in the default view only, as they do for lists.
+        hidden_folder_ids = set()
+        if folder_id is None:
+            settings = folder_actions["settings"](db)
+            include = set(parse_hashtags(settings.filter_inc_hashtags or ""))
+            exclude = set(parse_hashtags(settings.filter_exc_hashtags or ""))
+            if include or exclude:
+                subfolders = [folder for folder in subfolders if not hidden_by_tag_filters(folder, include, exclude, top_level=True)]
+                hidden_folder_ids = {folder.id for folder in db.query(Folder).all()
+                                     if hidden_by_tag_filters(folder, include, exclude, top_level=False)}
         context.update(
-            current_folder=current_folder, subfolders=subfolders,
+            current_folder=current_folder, subfolders=subfolders, hidden_folder_ids=hidden_folder_ids,
             prototype_url=request.scope.get("root_path", "") + "/app",
             query="?" + urlencode(params),
             folder_param=folder_id,

@@ -2,7 +2,7 @@
 {% from 'daisyui_test/_rows.html' import row with context %}
 {% set rp = request.scope.root_path %}
 {% set searching = results_kind == 'search' %}
-{% set total = lists|length + todos|length + events|length %}
+{% set total = tagged_folders|length + lists|length + todos|length + events|length %}
 {% set nav_query = '?sort=' ~ sort ~ ('&folder_id=' ~ folder_param if folder_param is not none else '') %}
 <div id="daisy-workspace" data-scope="{{ results_kind }}:{{ q if searching else hashtag.id }}" data-results="{{ results_kind }}" data-edit-query="{{ query }}&amp;back=results" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" data-folder="{{ folder_param if folder_param is not none else '' }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
     <div class="page-heading">
@@ -38,6 +38,10 @@
     {% elif not total %}
     <div class="empty-state"><h3>{% if searching %}Nothing matches “{{ q }}”.{% else %}Nothing is tagged {{ hashtag.name }}{% if not hashtag.show_completed %} that is still open{% endif %}.{% endif %}</h3></div>
     {% else %}
+    {% if tagged_folders %}
+    <section class="section-panel" aria-labelledby="results-folders-heading"><header class="section-heading"><div><h2 id="results-folders-heading">{{ icon('folder', 19) }} Folders <span class="section-count">{{ tagged_folders|length }}</span></h2></div></header><ul class="list">{% for folder in tagged_folders %}
+        <li class="list-row item-row"><span class="folder-symbol">{{ icon('folder', 16) }}</span><div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}?sort=user&amp;folder_id={{ folder.id }}">{{ folder.name }}</a>{% if folder.parent %}<span class="item-context">in {{ folder.parent.path_name }}</span>{% endif %}</div></div></li>{% endfor %}</ul></section>
+    {% endif %}
     {% if lists %}
     <section class="section-panel" aria-labelledby="results-lists-heading"><header class="section-heading"><div><h2 id="results-lists-heading">{{ icon('list', 19) }} Lists <span class="section-count">{{ lists|length }}</span></h2></div></header><ul class="list">{% for item in lists %}{{ row(item) }}{% endfor %}</ul></section>
     {% endif %}

@@ -29,7 +29,7 @@
             <a class="item-title" href="{{ prototype_url }}?sort=user&amp;folder_id={{ folder.id }}" title="Open {{ folder.name }} in the overview">{{ folder.name }}</a>
             {% if is_default %}<span class="badge badge-outline badge-sm default-badge">Default view</span>{% endif %}
             <span class="item-context">{{ child_lists|length }} {{ 'list' if child_lists|length == 1 else 'lists' }}{% if folder.children %} · {{ folder.children|length }} {{ 'subfolder' if folder.children|length == 1 else 'subfolders' }}{% endif %}</span>
-        </div></div>
+        </div>{% if folder.hashtags %}<div class="item-tags folder-tags">{% for tag in folder.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">{{ tag.name }}</a>{% endfor %}</div>{% endif %}</div>
         <div class="row-actions">
             {{ folder_menu(folder, siblings, is_default) }}
         </div>

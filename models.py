@@ -104,6 +104,13 @@ todo_hashtags = Table(
     Column('hashtag_id', Integer, ForeignKey('hashtags.id'), primary_key=True)
 )
 
+folder_hashtags = Table(
+    'folder_hashtags',
+    Base.metadata,
+    Column('folder_id', Integer, ForeignKey('folders.id'), primary_key=True),
+    Column('hashtag_id', Integer, ForeignKey('hashtags.id'), primary_key=True)
+)
+
 calendar_event_hashtags = Table(
     'calendar_event_hashtags',
     Base.metadata,
@@ -359,6 +366,7 @@ class Hashtag(Base):
     lists = relationship("List", secondary=list_hashtags, back_populates="hashtags")
     todos = relationship("Todo", secondary=todo_hashtags, back_populates="hashtags")
     calendar_events = relationship("CalendarEvent", secondary=calendar_event_hashtags, back_populates="hashtags")
+    folders = relationship("Folder", secondary=folder_hashtags, back_populates="hashtags")
     named_searches = relationship("NamedSearch", secondary=named_search_hashtags, back_populates="hashtags")
     excluded_from_named_searches = relationship(
         "NamedSearch",
@@ -611,6 +619,7 @@ class Folder(Base):
     
     parent = relationship("Folder", remote_side=[id], backref=backref("children", order_by="[Folder.sort_order, Folder.name]"))
     lists = relationship("List", back_populates="folder")
+    hashtags = relationship("Hashtag", secondary=folder_hashtags, back_populates="folders", order_by="Hashtag.name")
 
     @property
     def path_name(self) -> str:
