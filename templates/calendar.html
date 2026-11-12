@@ -422,7 +422,7 @@
             {% if ev.note or ev.notes %}<a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit{% if row.occurrence_at %}?occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{% endif %}" class="note-icon" title="Edit event (note)">📝</a>{%
             endif %}
             {% for h in ev.hashtags %}
-            <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+            <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">{{ h.name }}</a>
             {% endfor %}
         </span>
     </div>

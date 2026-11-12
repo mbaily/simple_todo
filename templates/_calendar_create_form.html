@@ -13,13 +13,13 @@
             </select>
         </label>
         <br>
-        <label>Hashtags: <input type="text" id="hashtags-create" name="hashtags" placeholder="#example #tags"
+        <label>Tags: <input type="text" id="hashtags-create" name="hashtags" placeholder="example tags"
                 style="width: 200px;"></label>
         {% if all_hashtags %}
         <select onchange="addHashtagFromSelect(this, 'hashtags-create')">
             <option value="">Add existing...</option>
             {% for h in all_hashtags %}
-            <option value="{{ h.name }}">#{{ h.name }}</option>
+            <option value="{{ h.name }}">{{ h.name }}</option>
             {% endfor %}
         </select>
         {% endif %}

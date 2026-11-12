@@ -109,7 +109,7 @@ def test_jump_lists_every_place_with_favourites_first(prototype):
     assert '<!DOCTYPE html>' not in text and 'Put away' not in text
     assert text.index('Weekend projects') < text.index('A place to start') < text.index('>Garden<')
     assert 'data-name="projects &gt; garden weekend projects"' in text
-    assert 'data-name="hashtag #personal"' in text and '/app/calendar' in text and 'data-jump-search="/app/search"' in text
+    assert 'data-name="tag personal"' in text and '/app/calendar' in text and 'data-jump-search="/app/search"' in text
 
 
 def test_browser_strip_star_and_jump(prototype_server, page):

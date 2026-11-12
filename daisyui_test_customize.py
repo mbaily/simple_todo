@@ -92,8 +92,8 @@ def attach_customize_routes(router, *, templates, get_db, actions, feedback):
         for field, target in (("keep_include", include), ("keep_exclude", exclude)):
             target.extend(name for name in parse_hashtags(" ".join(form.getlist(field))) if name not in target)
         settings = actions["settings"](db)
-        settings.filter_inc_hashtags = " ".join("#" + name for name in include)
-        settings.filter_exc_hashtags = " ".join("#" + name for name in exclude)
+        settings.filter_inc_hashtags = " ".join(include)
+        settings.filter_exc_hashtags = " ".join(exclude)
         db.commit()
         summary = []
         if include:

@@ -7,7 +7,7 @@
     <title>Edit List</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
-    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261113" crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -21,15 +21,15 @@
             <input type="text" name="name" value="{{ list.name }}" required>
         </label><br><br>
 
-        <label>Hashtags:<br>
+        <label>Tags:<br>
             <input type="text" id="hashtags-edit" name="hashtags"
-                value="{% for h in list.hashtags %}#{{ h.name }} {% endfor %}" placeholder="#example #tags">
+                value="{% for h in list.hashtags %}{{ h.name }} {% endfor %}" placeholder="example tags">
         </label>
         {% if all_hashtags %}
         <select onchange="addHashtagFromSelect(this, 'hashtags-edit')">
             <option value="">Add existing...</option>
             {% for h in all_hashtags %}
-            <option value="{{ h.name }}">#{{ h.name }}</option>
+            <option value="{{ h.name }}">{{ h.name }}</option>
             {% endfor %}
         </select>
         {% endif %}

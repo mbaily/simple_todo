@@ -191,7 +191,7 @@
                 <span class="dates" style="margin-left: 3px;">{{ uncompleted_counts.get(lst.id, 0) }}</span>
                 {% if lst.category %}<span class="dates" style="margin-left: 4px;">[{{ lst.category }}]</span>{% endif %}
                 {% for hashtag in lst.hashtags %}
-                <span class="pill">#{{ hashtag.name }}</span>
+                <span class="pill">{{ hashtag.name }}</span>
                 {% endfor %}
             </div>
             {% endfor %}

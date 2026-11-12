@@ -100,10 +100,10 @@ function addHashtagFromSelect(selectElement, inputId) {
 
     const input = document.getElementById(inputId);
     const currentValue = input.value.trim();
-    const hashtag = '#' + selectedValue;
+    const hashtag = selectedValue;
 
-    // Check if hashtag already exists in input
-    if (!currentValue.includes(hashtag)) {
+    // Check if the tag is already in the input (with or without a leading #)
+    if (!currentValue.split(/[\s,;]+/).map(word => word.replace(/^#/, '')).includes(hashtag)) {
         if (currentValue) {
             input.value = currentValue + ' ' + hashtag;
         } else {
@@ -1064,7 +1064,7 @@ function applyHashtags() {
         return;
     }
     if (ids.length > 1) {
-        alert('Edit Hashtags can only be applied to one todo at a time');
+        alert('Edit Tags can only be applied to one todo at a time');
         return;
     }
 
@@ -1087,7 +1087,7 @@ function applyHashtags() {
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error updating hashtags');
+            alert('Error updating tags');
         });
 }
 

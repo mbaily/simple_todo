@@ -37,15 +37,15 @@
         <h3>Global Filters</h3>
         <p class="dates">These filters apply to the Home page and all List views.</p>
 
-        <label for="inc_hashtags" style="display:block; margin-bottom:5px;">Include Hashtags (Whitelist)</label>
+        <label for="inc_hashtags" style="display:block; margin-bottom:5px;">Include Tags (Whitelist)</label>
         <input type="text" id="inc_hashtags" name="filter_inc_hashtags" value="{{ settings.filter_inc_hashtags or '' }}"
             placeholder="e.g. work, important" style="margin-bottom: 15px;">
-        <p class="dates" style="margin-top:-10px; margin-bottom:15px;">Only show items containing these hashtags.</p>
+        <p class="dates" style="margin-top:-10px; margin-bottom:15px;">Only show items containing these tags.</p>
 
-        <label for="exc_hashtags" style="display:block; margin-bottom:5px;">Exclude Hashtags (Blacklist)</label>
+        <label for="exc_hashtags" style="display:block; margin-bottom:5px;">Exclude Tags (Blacklist)</label>
         <input type="text" id="exc_hashtags" name="filter_exc_hashtags" value="{{ settings.filter_exc_hashtags or '' }}"
             placeholder="e.g. archived, someday" style="margin-bottom: 15px;">
-        <p class="dates" style="margin-top:-10px; margin-bottom:15px;">Hide items containing these hashtags.</p>
+        <p class="dates" style="margin-top:-10px; margin-bottom:15px;">Hide items containing these tags.</p>
 
         <button type="submit">Save Changes</button>
     </form>

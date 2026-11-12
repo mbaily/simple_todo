@@ -10,7 +10,7 @@
     {% endif %}
     {% if ev.note %}<span class="dates">- {{ ev.note }}</span>{% endif %}
     {% for h in ev.hashtags %}
-    <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+    <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">{{ h.name }}</a>
     {% endfor %}
     <a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit" class="note-icon" title="Edit event">📝</a>
     <a href="{{ request.scope.root_path }}/calendar" class="note-icon" title="Go to Calendar">📅</a>

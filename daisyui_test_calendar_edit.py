@@ -89,7 +89,7 @@ def event_values(event, day=None):
         title=event.title, start_at=event.start_at.strftime("%Y-%m-%d"),
         start_time="" if event.all_day else event.start_at.strftime("%H:%M"),
         duration_minutes=str(event.duration_minutes or ""), note=event.note or "",
-        hashtags=" ".join("#" + tag.name for tag in event.hashtags), color=event.color or "",
+        hashtags=" ".join(tag.name for tag in event.hashtags), color=event.color or "",
         use_color=bool(event.color), event_group_id=str(event.event_group_id or ""),
         important_if_late=bool(event.important_if_late), **rule_values(event.rrule),
     )

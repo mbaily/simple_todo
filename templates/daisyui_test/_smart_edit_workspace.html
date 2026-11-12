@@ -34,12 +34,12 @@
         </section>
 
         <details class="section-panel rule-panel" data-persist="smart-hashtags" {% if values.hashtags %}open{% endif %}>
-            <summary class="capture-summary">{{ icon('hash', 16) }} Hashtags <span class="section-count">{{ values.hashtags|length }} rules</span><small>No included tags means every item is considered.</small>{{ icon('down', 14) }}</summary>
+            <summary class="capture-summary">{{ icon('hash', 16) }} Tags <span class="section-count">{{ values.hashtags|length }} rules</span><small>No included tags means every item is considered.</small>{{ icon('down', 14) }}</summary>
             {% if all_hashtags %}
             <ul class="list rule-list">{% for tag in all_hashtags %}{% set rule = values.hashtags.get(tag.id, {}) %}
-                <li class="list-row rule-row"><span class="rule-name">#{{ tag.name }}</span>{{ mode_select('hashtag_mode_' ~ tag.id, rule.mode, 'Rule for #' ~ tag.name) }}{{ check('subtodos_' ~ tag.id, 'Also subtasks', rule.subtodos) }}{{ check('list_items_' ~ tag.id, 'Tasks in tagged lists', rule.list_items) }}</li>
+                <li class="list-row rule-row"><span class="rule-name">{{ tag.name }}</span>{{ mode_select('hashtag_mode_' ~ tag.id, rule.mode, 'Rule for tag ' ~ tag.name) }}{{ check('subtodos_' ~ tag.id, 'Also subtasks', rule.subtodos) }}{{ check('list_items_' ~ tag.id, 'Tasks in tagged lists', rule.list_items) }}</li>
             {% endfor %}</ul>
-            {% else %}<p class="section-empty">No hashtags yet.</p>{% endif %}
+            {% else %}<p class="section-empty">No tags yet.</p>{% endif %}
         </details>
 
         <details class="section-panel rule-panel" data-persist="smart-folders" {% if values.folders %}open{% endif %}>

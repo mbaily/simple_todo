@@ -7,7 +7,7 @@
     <title>{{ t('app_title') }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
-    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261113" crossorigin="anonymous"></script>
     <script>
         // Force unregister any zombie service workers that might be causing Safari fetch errors
         if ('serviceWorker' in navigator) {
@@ -52,7 +52,7 @@
             title="{{ t('tip_edit_event_note') }}">📝</a>{%
         endif %}
         {% for hashtag in ev.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
     </div>
     {% for note in ev.notes %}
@@ -181,7 +181,7 @@
         <select name="hashtag_ids" multiple size="1"
             style="min-width: 150px; max-width: 200px; padding: 4px; font-size: 0.9rem;">
             {% for h in all_hashtags %}
-            <option value="{{ h.id }}">#{{ h.name }}</option>
+            <option value="{{ h.id }}">{{ h.name }}</option>
             {% endfor %}
         </select>
         {% endif %}
@@ -195,12 +195,12 @@
         {% endif %}
         <label>{{ t('label_name') }}: <input type="text" name="name" required></label>
         <label>{{ t('label_hashtags') }}: <input type="text" id="hashtags-create" name="hashtags"
-                placeholder="#example #tags"></label>
+                placeholder="example tags"></label>
         {% if all_hashtags %}
         <select onchange="addHashtagFromSelect(this, 'hashtags-create')">
             <option value="">Add existing...</option>
             {% for h in all_hashtags %}
-            <option value="{{ h.name }}">#{{ h.name }}</option>
+            <option value="{{ h.name }}">{{ h.name }}</option>
             {% endfor %}
         </select>
         {% endif %}
@@ -226,7 +226,7 @@
         <span class="dates">({{ t('text_alarm_set') }}: {{ todo.alarm_start | datetime_format }}{% if todo.alarm_end !=
             todo.alarm_start %} - {{ todo.alarm_end.strftime('%H:%M') }}{% endif %})</span>
         {% for hashtag in todo.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
         {{ list_icon() }} <a
             href="{{ request.scope.root_path }}/list/{{ todo.list_id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
@@ -255,7 +255,7 @@
             list.name }}</a>
         <span class="dates">({{ t('text_was_deferred_until') }} {{ list.delayed_until | date_format }})</span>
         {% for hashtag in list.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
     </div>
     {% endfor %}
@@ -275,7 +275,7 @@
         endif %}
         <span class="dates">({{ t('text_was_deferred_until') }} {{ todo.delayed_until | date_format }})</span>
         {% for hashtag in todo.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
         {{ list_icon() }} <a
             href="{{ request.scope.root_path }}/list/{{ todo.list_id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
@@ -307,7 +307,7 @@
         {% if row.is_important %}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{% endif %}
         {% if ev.note or ev.notes %}<a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit{% if row.occurrence_at %}?occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{% endif %}" class="note-icon" title="{{ t('tip_edit_event_note', 'Edit Note') }}">📝</a>{% endif %}
         {% for hashtag in ev.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
     </div>
     {% endfor %}
@@ -338,7 +338,7 @@
             data-uncompleted-count="{{ uncompleted_counts.get(list.id, 0) }}">{{ uncompleted_counts.get(list.id, 0)
             }}</span>
         {% for hashtag in list.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
     </div>
     {% endfor %}
@@ -358,7 +358,7 @@
         endif %}
         {{ render_links(todo.links) }}
         {% for hashtag in todo.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
         {{ list_icon() }} <a
             href="{{ request.scope.root_path }}/list/{{ todo.list_id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
@@ -400,7 +400,7 @@
             data-uncompleted-count="{{ uncompleted_counts.get(list.id, 0) }}">{{ uncompleted_counts.get(list.id, 0)
             }}</span>
         {% for hashtag in list.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
     </div>
     {% endmacro %}
@@ -496,7 +496,7 @@
             data-uncompleted-count="{{ uncompleted_counts.get(list.id, 0) }}">{{ uncompleted_counts.get(list.id, 0)
             }}</span>
         {% for hashtag in list.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
     </div>
     {% endfor %}
@@ -516,7 +516,7 @@
         endif %}
         {{ render_links(todo.links) }}
         {% for hashtag in todo.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
         {{ list_icon() }} <a
             href="{{ request.scope.root_path }}/list/{{ todo.list_id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{

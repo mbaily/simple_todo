@@ -4,10 +4,10 @@
 <head>
     {% include "_page_render_start.html" %}
     <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
-    <title>#{{ hashtag.name }}</title>
+    <title>{{ hashtag.name }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
-    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261113" crossorigin="anonymous"></script>
     <style>
         h1,
         h2,
@@ -25,7 +25,7 @@
     {% from "macros.html" import render_links, nav_bar with context %}
     {{ nav_bar() }}
 
-    <h1>#{{ hashtag.name }}</h1>
+    <h1>{{ hashtag.name }}</h1>
     <p>
         <label>
             <input type="checkbox" {% if hashtag.show_completed %}checked{% endif %}
@@ -46,7 +46,7 @@
         {% endif %}
         {% if ev.note %}<span class="dates">- {{ ev.note }}</span>{% endif %}
         {% for h in ev.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">{{ h.name }}</a>
         {% endfor %}
         <a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit" class="note-icon" title="Edit event">📝</a>
     </div>
@@ -66,12 +66,12 @@
         <a href="{{ request.scope.root_path }}/list/{{ list.id }}">{{ list.name }}</a>
         {{ render_links(list.links, "inherit") }}
         {% for h in list.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">{{ h.name }}</a>
         {% endfor %}
     </div>
     {% endfor %}
     {% else %}
-    <p>No lists with this hashtag.</p>
+    <p>No lists with this tag.</p>
     {% endif %}
 
     <h3>Todos</h3>
@@ -81,7 +81,7 @@
     {% if todo_tree and (todo_tree.lists or todo_tree.folder_nodes) %}
     {{ render_tree_node(todo_tree) }}
     {% else %}
-    <p>No todos with this hashtag.</p>
+    <p>No todos with this tag.</p>
     {% endif %}
 
     {% if lists or (todo_tree and (todo_tree.lists or todo_tree.folder_nodes)) %}

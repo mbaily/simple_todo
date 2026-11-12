@@ -71,7 +71,7 @@ def attach_edit_routes(router, *, templates, get_db, actions, render_destination
         if kind == "note":
             values["text"] = plain_note_text(item.text)
         else:
-            values.update(hashtags=" ".join("#" + tag.name for tag in item.hashtags),
+            values.update(hashtags=" ".join(tag.name for tag in item.hashtags),
                           is_delayed=bool(item.delayed_until),
                           delayed_until=item.delayed_until.strftime("%Y-%m-%d") if item.delayed_until else "")
         if kind == "todo":

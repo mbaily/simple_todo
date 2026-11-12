@@ -19,7 +19,7 @@
 
 {% macro task_row(todo, depth=0, ancestors=[]) %}
 {% if todo.id not in ancestors %}
-<li id="todo-row-{{ todo.id }}" class="list-row item-row task-row {{ 'is-completed' if todo.completed else '' }} {{ 'highlighted-task' if todo.id == highlight_id else '' }}" data-item-key="todo:{{ todo.id }}" data-task-title="{{ todo.title }}" data-hashtags="{{ todo.hashtags|map(attribute='name')|join(' #') }}" data-deferred="{{ todo.delayed_until.strftime('%Y-%m-%d') if todo.delayed_until else '' }}" data-alarm-start="{{ todo.alarm_start.strftime('%Y-%m-%dT%H:%M') if todo.alarm_start else '' }}" data-alarm-end="{{ todo.alarm_end.strftime('%Y-%m-%dT%H:%M') if todo.alarm_end else '' }}" style="--depth: {{ depth }}">
+<li id="todo-row-{{ todo.id }}" class="list-row item-row task-row {{ 'is-completed' if todo.completed else '' }} {{ 'highlighted-task' if todo.id == highlight_id else '' }}" data-item-key="todo:{{ todo.id }}" data-task-title="{{ todo.title }}" data-hashtags="{{ todo.hashtags|map(attribute='name')|join(' ') }}" data-deferred="{{ todo.delayed_until.strftime('%Y-%m-%d') if todo.delayed_until else '' }}" data-alarm-start="{{ todo.alarm_start.strftime('%Y-%m-%dT%H:%M') if todo.alarm_start else '' }}" data-alarm-end="{{ todo.alarm_end.strftime('%Y-%m-%dT%H:%M') if todo.alarm_end else '' }}" style="--depth: {{ depth }}">
     {{ selection(todo, 'todo') }}
     <form class="completion-form" action="{{ prototype_url }}/complete/todo/{{ todo.id }}{{ query }}" method="post" hx-post="{{ prototype_url }}/complete/todo/{{ todo.id }}{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find input">
         <input class="checkbox checkbox-sm completion-checkbox" type="checkbox" name="completed" value="true" {% if todo.completed %}checked{% endif %} aria-label="Mark {{ todo.title }} {{ 'incomplete' if todo.completed else 'complete' }}"><noscript><button type="submit">Save</button></noscript>
@@ -27,7 +27,7 @@
     <div class="item-content">
         <div class="item-title-line">{% if todo.pinned %}<span class="row-marker" title="Pinned">{{ icon('pin', 14) }}</span>{% endif %}<span class="item-title" {% if todo.color and todo.color|lower not in ['#000000', '#ffffff', '#000', 'black'] %}style="color: {{ todo.color }}"{% endif %}>{{ todo.title }}</span>{% if todo.alarm_start %}<span title="Alarm: {{ todo.alarm_start | datetime_format }}" class="row-marker">{{ icon('bell', 14) }}</span>{% endif %}{% if todo.delayed_until %}<span class="item-context">Deferred {{ todo.delayed_until | date_format }}</span>{% endif %}</div>
         {% if todo.list_id != list.id %}<a class="item-context" href="{{ prototype_url }}/list/{{ todo.list_id }}{{ navigation_query }}&amp;highlight={{ todo.id }}">{{ icon('list', 13) }} {{ todo.list.name }}</a>{% endif %}
-        {% if todo.hashtags %}<div class="item-tags">{% for tag in todo.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">#{{ tag.name }}</a>{% endfor %}</div>{% endif %}
+        {% if todo.hashtags %}<div class="item-tags">{% for tag in todo.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">{{ tag.name }}</a>{% endfor %}</div>{% endif %}
         {% if todo.note %}<div class="legacy-task-note">{{ todo.note }}</div>{% endif %}
     </div>
     <div class="row-actions">

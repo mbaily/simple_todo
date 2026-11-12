@@ -29,7 +29,7 @@ def attach_hashtag_routes(router, *, templates, get_db, actions, feedback, succe
         context = dict(
             request=request, prototype_url=base, query="?view=hashtags", hashtags_page=True,
             workspace_template="daisyui_test/_hashtags_workspace.html",
-            page_title="Hashtags", page_url=base + "/hashtags",
+            page_title="Tags", page_url=base + "/hashtags",
             hashtags=db.query(Hashtag).order_by(func.lower(Hashtag.name)).all(),
             list_counts=usage(db, list_hashtags), todo_counts=usage(db, todo_hashtags),
             event_counts=usage(db, calendar_event_hashtags),
@@ -50,31 +50,31 @@ def attach_hashtag_routes(router, *, templates, get_db, actions, feedback, succe
     def rename(request: Request, hashtag_id: int, name: str = Form(""), db: Session = Depends(get_db)):
         tag = db.get(Hashtag, hashtag_id)
         if tag is None:
-            return feedback(request, db, "user", None, "This hashtag no longer exists.", 404)
+            return feedback(request, db, "user", None, "This tag no longer exists.", 404)
         parsed = parse_hashtags(name)
         # Accept exactly one tag, written with or without a leading '#'.
         if len(parsed) != 1 or parsed[0] != name.strip().lstrip("#"):
-            return feedback(request, db, "user", None, "Use one hashtag made of letters, numbers and underscores.")
+            return feedback(request, db, "user", None, "Use one tag made of letters, numbers and underscores.")
         new_name = parsed[0]
         if len(new_name) > MAX_NAME:
-            return feedback(request, db, "user", None, f"Hashtags can be at most {MAX_NAME} characters.")
+            return feedback(request, db, "user", None, f"Tags can be at most {MAX_NAME} characters.")
         if new_name == tag.name:
-            return success(request, db, "user", None, "Hashtag unchanged.")
+            return success(request, db, "user", None, "Tag unchanged.")
         if db.query(Hashtag).filter(Hashtag.name == new_name, Hashtag.id != tag.id).first():
-            return feedback(request, db, "user", None, f"#{new_name} already exists. Choose another name.", 409)
+            return feedback(request, db, "user", None, f"A tag named {new_name} already exists. Choose another name.", 409)
         old_name = tag.name
         tag.name = new_name
-        actions["journal"](db, "Renamed Hashtag", f"Renamed hashtag '#{old_name}' to '#{new_name}'", "hashtag", tag.id)
+        actions["journal"](db, "Renamed Tag", f"Renamed tag '{old_name}' to '{new_name}'", "hashtag", tag.id)
         db.commit()
-        return success(request, db, "user", None, f"Renamed #{old_name} to #{new_name}.")
+        return success(request, db, "user", None, f"Renamed {old_name} to {new_name}.")
 
     @router.post("/hashtag/{hashtag_id}/delete", response_class=HTMLResponse)
     def delete(request: Request, hashtag_id: int, db: Session = Depends(get_db)):
         tag = db.get(Hashtag, hashtag_id)
         if tag is None:
-            return feedback(request, db, "user", None, "This hashtag no longer exists.", 404)
+            return feedback(request, db, "user", None, "This tag no longer exists.", 404)
         name = tag.name
         actions["delete"](hashtag_id=hashtag_id, db=db)
-        return success(request, db, "user", None, f"Deleted #{name}. Tagged items were kept.")
+        return success(request, db, "user", None, f"Deleted the tag {name}. Tagged items were kept.")
 
     return render_hashtags

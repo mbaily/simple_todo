@@ -65,7 +65,7 @@ def test_create_matches_original_and_returns_results(prototype):
     # The excluded child is filtered by the query, but nesting shows children of matching parents.
     assert (ids['todo'], 0) in rows and (ids['child'], 1) in rows and (ids['weekend'], 0) in rows
     assert [group['path'] for group in page.context['groups'] if group['list'].id == ids['other']] == ['Projects']
-    assert 'Pack a thermos' in page.text and 'not #skip' in page.text
+    assert 'Pack a thermos' in page.text and 'not skip' in page.text
 
 
 def test_editor_round_trip_validation_and_folder_rules(prototype):
@@ -147,7 +147,7 @@ def test_browser_smart_folder_workflow(prototype_server, page):
     page.get_by_role('link', name='New smart folder').first.click()
     page.get_by_role('textbox', name='Name').fill('Personal')
     page.locator('summary', has_text='rules').first.click()
-    page.get_by_role('combobox', name='Rule for #personal').select_option('include')
+    page.get_by_role('combobox', name='Rule for tag personal').select_option('include')
     page.get_by_role('button', name='Create smart folder').click()
     expect(page.get_by_role('heading', name='Personal', exact=True)).to_be_visible()
     expect(page.get_by_text('Weekend tagged task')).to_be_visible()

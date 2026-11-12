@@ -70,9 +70,9 @@ def attach_search_routes(router, *, templates, get_db, actions, feedback, succes
         else:
             hashtag = actions["load_hashtag"](db, mutation["hashtag_id"])
             if hashtag is None:
-                raise HTTPException(404, "Hashtag not found")
+                raise HTTPException(404, "Tag not found")
             results = actions["hashtag"](db, hashtag)
-            title = f"#{hashtag.name}"
+            title = hashtag.name
         todos = sorted(results["todos"], key=lambda todo: todo.modified_at, reverse=True)
         context = dict(
             request=request, prototype_url=base, query="?" + urlencode(mutation),
@@ -107,16 +107,16 @@ def attach_search_routes(router, *, templates, get_db, actions, feedback, succes
                        sort: str = "user", folder_id: int | None = None, db: Session = Depends(get_db)):
         item = actions["load_hashtag"](db, hashtag_id)
         if item is None:
-            return feedback(request, db, sort, folder_id, "This hashtag no longer exists.", 404)
+            return feedback(request, db, sort, folder_id, "This tag no longer exists.", 404)
         if name not in HASHTAG_OPTIONS:
-            return feedback(request, db, sort, folder_id, "Choose a valid hashtag option.")
+            return feedback(request, db, sort, folder_id, "Choose a valid tag option.")
         # Set the requested state so a retried request cannot flip it back.
         if bool(getattr(item, name)) != enabled:
             setattr(item, name, enabled)
             if name == "show_completed":
-                actions["journal"](db, "Toggled Hashtag Show Completed",
-                                   f"Toggled show completed for hashtag '#{item.name}' to {enabled}", "hashtag", item.id)
+                actions["journal"](db, "Toggled Tag Show Completed",
+                                   f"Toggled show completed for tag '{item.name}' to {enabled}", "hashtag", item.id)
             db.commit()
-        return success(request, db, sort, folder_id, "Hashtag view updated.")
+        return success(request, db, sort, folder_id, "Tag view updated.")
 
     return render_results

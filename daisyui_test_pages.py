@@ -12,7 +12,7 @@ from daisyui_test_http import wants_fragment
 JOURNAL_PAGE = 100
 JOURNAL_TYPES = {
     "list": "Lists", "todo": "Tasks", "note": "Notes", "folder": "Folders", "smart_folder": "Smart folders",
-    "hashtag": "Hashtags", "calendar_event": "Calendar events", "calendar_day": "Calendar days", "bill": "Bills",
+    "hashtag": "Tags", "calendar_event": "Calendar events", "calendar_day": "Calendar days", "bill": "Bills",
     "expense": "Expenses", "ingredient_group": "Ingredients",
 }
 

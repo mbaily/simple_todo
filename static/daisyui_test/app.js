@@ -267,7 +267,7 @@
             state.targets.set(panel.id, caption.textContent);
             form.querySelectorAll('[name="parent_id"], [name="todo_id"]').forEach(input => { input.value = key.split(':')[1]; });
             form.querySelectorAll('input[name="items"]').forEach(input => { input.value = key; });
-            if (name === 'hashtags') form.elements.hashtags.value = row.dataset.hashtags ? '#' + row.dataset.hashtags : '';
+            if (name === 'hashtags') form.elements.hashtags.value = row.dataset.hashtags || '';
             if (name === 'defer') form.elements.delayed_until.value = row.dataset.deferred;
             if (name === 'alarm') {
                 form.elements.alarm_mode.value = row.dataset.alarmStart ? 'range' : 'none';
@@ -406,8 +406,8 @@
     document.addEventListener('change', event => {
         if (event.target.matches('[data-add-tag]') && event.target.value) {
             const input = event.target.closest('form').querySelector('input[name="hashtags"]');
-            const tag = '#' + event.target.value;
-            if (!input.value.split(/\s+/).includes(tag)) input.value = (input.value.trim() + ' ' + tag).trim();
+            const tag = event.target.value;
+            if (!input.value.split(/[\s,;]+/).map(word => word.replace(/^#/, '')).includes(tag)) input.value = (input.value.trim() + ' ' + tag).trim();
             event.target.value = '';
         }
         if (event.target.matches('[data-colour-toggle]')) {

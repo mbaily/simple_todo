@@ -7,7 +7,7 @@
     <title>{{ t('title_search') }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
-    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261113" crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -51,7 +51,7 @@
         <a href="{{ request.scope.root_path }}/list/{{ list.id }}">{{ list.name }}</a>
         {{ render_links(list.links, "inherit") }}
         {% for hashtag in list.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
     </div>
     {% endfor %}
@@ -71,7 +71,7 @@
         {% endif %}
         {% if ev.note %}<span class="dates">- {{ ev.note }}</span>{% endif %}
         {% for h in ev.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">{{ h.name }}</a>
         {% endfor %}
         <a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit" class="note-icon" title="{{ t('tip_edit_event') }}">📝</a>
         <a href="{{ request.scope.root_path }}/classic/calendar" class="note-icon" title="{{ t('tip_go_to_calendar') }}">📅</a>

@@ -22,17 +22,17 @@
         <header class="section-heading"><div><h2>{{ icon('hash', 17) }} Global filters</h2><p>Apply to the overview and every list view. “Only” shows just items with at least one of those tags; “Hide” removes items with any of them.</p></div><button type="submit" class="btn btn-primary btn-sm">{{ icon('check', 14) }} Save filters</button></header>
         {% if hashtags %}
         <ul class="list rule-list filter-list">{% for tag in hashtags %}{% set mode = tag_modes.get(tag.name, '') %}
-            <li class="list-row rule-row"><span class="rule-name">#{{ tag.name }}</span>
-                <div class="join" role="radiogroup" aria-label="Filter for #{{ tag.name }}">
+            <li class="list-row rule-row"><span class="rule-name">{{ tag.name }}</span>
+                <div class="join" role="radiogroup" aria-label="Filter for {{ tag.name }}">
                     {% for value, label in [('', 'Any'), ('include', 'Only'), ('exclude', 'Hide')] %}<input class="join-item btn btn-xs filter-choice {{ 'filter-' ~ (value or 'any') }}" type="radio" name="tag_{{ tag.id }}" value="{{ value }}" aria-label="{{ label }}" {% if mode == value %}checked{% endif %}>{% endfor %}
                 </div>
             </li>
         {% endfor %}</ul>
-        {% else %}<p class="section-empty">No hashtags yet, so there is nothing to filter by.</p>{% endif %}
+        {% else %}<p class="section-empty">No tags yet, so there is nothing to filter by.</p>{% endif %}
         {% if unknown_include or unknown_exclude %}
         <div class="unknown-tags"><span>Saved filters for tags that do not exist yet; they apply once the tag is used:</span>
-            {% for name in unknown_include %}<label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="keep_include" value="{{ name }}" checked> Only #{{ name }}</label>{% endfor %}
-            {% for name in unknown_exclude %}<label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="keep_exclude" value="{{ name }}" checked> Hide #{{ name }}</label>{% endfor %}
+            {% for name in unknown_include %}<label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="keep_include" value="{{ name }}" checked> Only {{ name }}</label>{% endfor %}
+            {% for name in unknown_exclude %}<label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="keep_exclude" value="{{ name }}" checked> Hide {{ name }}</label>{% endfor %}
         </div>
         {% endif %}
     </form>

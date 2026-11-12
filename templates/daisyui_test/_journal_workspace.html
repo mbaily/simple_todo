@@ -8,7 +8,7 @@
 {%- elif entry.entity_type == 'note' %}<a href="{{ prototype_url }}/note/{{ id }}/edit?back=home">Edit note</a>
 {%- elif entry.entity_type == 'calendar_event' %}<a href="{{ prototype_url }}/calendar/event/{{ id }}/edit">Edit event</a>
 {%- elif entry.entity_type == 'smart_folder' %}<a href="{{ prototype_url }}/smart-folder/{{ id }}">Open smart folder</a>
-{%- elif entry.entity_type == 'hashtag' %}<a href="{{ prototype_url }}/hashtag/{{ id }}">Open hashtag</a>
+{%- elif entry.entity_type == 'hashtag' %}<a href="{{ prototype_url }}/hashtag/{{ id }}">Open tag</a>
 {%- elif entry.entity_type == 'folder' %}<a href="{{ prototype_url }}/folders">Folders</a>
 {%- elif entry.entity_type == 'bill' %}<a href="{{ prototype_url }}/bills/{{ id }}">Open bill</a>
 {%- endif -%}

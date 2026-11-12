@@ -7,7 +7,7 @@
     <title>{{ list.name }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
-    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261113" crossorigin="anonymous"></script>
     {% from "macros.html" import folder_icon, dokuwiki_icon, dokuwiki_page_icon, render_links, collation_dot %}
 </head>
 
@@ -72,7 +72,7 @@
         {% endif %}
         {% if list.hashtags %}
         {% for hashtag in list.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill" style="vertical-align:middle;">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill" style="vertical-align:middle;">{{ hashtag.name }}</a>
         {% endfor %}
         {% endif %}
     </div>
@@ -104,7 +104,7 @@
             <select id="quick-todo-hashtags" multiple size="1"
                 style="min-width: 150px; max-width: 200px; padding: 4px; font-size: 0.9rem;">
                 {% for h in all_hashtags %}
-                <option value="{{ h.id }}" data-name="{{ h.name }}">#{{ h.name }}</option>
+                <option value="{{ h.id }}" data-name="{{ h.name }}">{{ h.name }}</option>
                 {% endfor %}
             </select>
             {% endif %}
@@ -120,12 +120,12 @@
                 <label>{{ t('label_title') }}: <input type="text" id="reactive-todo-title" name="title"
                         required></label>
                 <label>{{ t('label_hashtags') }}: <input type="text" id="hashtags-create" name="hashtags"
-                        placeholder="#example #tags"></label>
+                        placeholder="example tags"></label>
                 {% if all_hashtags %}
                 <select onchange="addHashtagFromSelect(this, 'hashtags-create')">
                     <option value="">{{ t('opt_add_existing') }}</option>
                     {% for h in all_hashtags %}
-                    <option value="{{ h.name }}">#{{ h.name }}</option>
+                    <option value="{{ h.name }}">{{ h.name }}</option>
                     {% endfor %}
                 </select>
                 {% endif %}
@@ -160,7 +160,7 @@
 
         function renderTodoRow(todo) {
             const hashtagsHtml = (todo.hashtags || []).map(h =>
-                `<a href="{{ request.scope.root_path }}/hashtag/${h.id}" class="pill">#${escapeHtml(h.name)}</a>`
+                `<a href="{{ request.scope.root_path }}/hashtag/${h.id}" class="pill">${escapeHtml(h.name)}</a>`
             ).join('');
 
             return `
@@ -191,7 +191,7 @@
             let hashtagsStr = '';
             if (hashtagsSelect) {
                 const selectedOptions = Array.from(hashtagsSelect.selectedOptions);
-                hashtagsStr = selectedOptions.map(opt => '#' + opt.dataset.name).join(' ');
+                hashtagsStr = selectedOptions.map(opt => opt.dataset.name).join(' ');
             }
 
             const payload = {
@@ -552,7 +552,7 @@
                 list_icon() }}</a>
             {% endif %}
             {% for hashtag in todo.hashtags %}
-            <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+            <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
             {% endfor %}
         </div>
     </div>
@@ -662,7 +662,7 @@
                 onclick="toggleTodoInCollation({{ list.id }}, {{ todo.id }})"></button>
         </span>
         {% for hashtag in todo.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
         <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}"
             title="in {{ todo.list.name }}{% if todo.parent %} > {{ todo.parent.title }}{% endif %}"
@@ -815,13 +815,13 @@
     <!-- Inline Edit Hashtags Form -->
     <div id="inline-hashtags-form"
         style="display: none; margin-top: 10px; border: 1px solid #ccc; padding: 10px; border-radius: 4px;">
-        <strong>Edit Hashtags:</strong><br>
-        <input type="text" id="hashtags-edit-viewlist" placeholder="#example #tags" style="width: 300px;">
+        <strong>Edit Tags:</strong><br>
+        <input type="text" id="hashtags-edit-viewlist" placeholder="example tags" style="width: 300px;">
         {% if all_hashtags %}
         <select onchange="addHashtagFromSelect(this, 'hashtags-edit-viewlist')">
             <option value="">Add existing...</option>
             {% for h in all_hashtags %}
-            <option value="{{ h.name }}">#{{ h.name }}</option>
+            <option value="{{ h.name }}">{{ h.name }}</option>
             {% endfor %}
         </select>
         {% endif %}

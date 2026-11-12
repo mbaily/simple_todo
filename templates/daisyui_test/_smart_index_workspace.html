@@ -2,8 +2,8 @@
 {% macro summary(folder) %}
 {%- set parts = [] -%}
 {%- if folder.show_lists and folder.show_todos %}{% set _ = parts.append('Lists and tasks') %}{% elif folder.show_lists %}{% set _ = parts.append('Lists') %}{% else %}{% set _ = parts.append('Tasks') %}{% endif -%}
-{%- for assoc in folder.include_hashtags_assoc %}{% set _ = parts.append('#' ~ assoc.hashtag.name) %}{% endfor -%}
-{%- for assoc in folder.exclude_hashtags_assoc %}{% set _ = parts.append('not #' ~ assoc.hashtag.name) %}{% endfor -%}
+{%- for assoc in folder.include_hashtags_assoc %}{% set _ = parts.append(assoc.hashtag.name) %}{% endfor -%}
+{%- for assoc in folder.exclude_hashtags_assoc %}{% set _ = parts.append('not ' ~ assoc.hashtag.name) %}{% endfor -%}
 {%- if folder.lists %}{% set _ = parts.append(folder.lists|length ~ (' list' if folder.lists|length == 1 else ' lists')) %}{% endif -%}
 {%- if folder.include_folders or folder.exclude_folders or folder.include_root_folder or folder.exclude_root_folder %}{% set _ = parts.append('folder filter') %}{% endif -%}
 {%- if folder.uncompleted_only %}{% set _ = parts.append('open only') %}{% endif -%}
@@ -34,6 +34,6 @@
         </ul>
     </section>
     {% else %}
-    <div class="empty-state"><h3>No smart folders yet. Save a view that collects tasks and lists by hashtag, folder or date.</h3><a class="btn btn-primary" href="{{ prototype_url }}/smart-folders/new">{{ icon('plus', 17) }} New smart folder</a></div>
+    <div class="empty-state"><h3>No smart folders yet. Save a view that collects tasks and lists by tag, folder or date.</h3><a class="btn btn-primary" href="{{ prototype_url }}/smart-folders/new">{{ icon('plus', 17) }} New smart folder</a></div>
     {% endif %}
 </div>

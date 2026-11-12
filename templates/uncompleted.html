@@ -7,7 +7,7 @@
     <title>Uncompleted Items</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
-    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261113" crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -33,7 +33,7 @@
             endif %}
             {{ render_links(todo.links, "inherit") }}
             {% for hashtag in todo.hashtags %}
-            <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+            <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
             {% endfor %}
         </div>
     </div>

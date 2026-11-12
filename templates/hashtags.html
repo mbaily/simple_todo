@@ -4,10 +4,10 @@
 <head>
     {% include "_page_render_start.html" %}
     <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
-    <title>Hashtags</title>
+    <title>Tags</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
-    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261113" crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -21,15 +21,15 @@
     <div>
         <a href="{{ request.scope.root_path }}/search/{{ search.id }}">{{ search.name }}</a>
         {% if search.uncompleted_only %}(uncompleted only){% endif %}
-        - Hashtags:
+        - Tags:
         {% if search.hashtags %}
-        {% for h in search.hashtags %}<a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a> {% endfor %}
+        {% for h in search.hashtags %}<a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">{{ h.name }}</a> {% endfor %}
         {% else %}
         <span class="dates">All items</span>
         {% endif %}
         {% if search.excluded_hashtags %}
         - Excluding:
-        {% for h in search.excluded_hashtags %}<span class="pill">NOT #{{ h.name }}</span> {% endfor %}
+        {% for h in search.excluded_hashtags %}<span class="pill">NOT {{ h.name }}</span> {% endfor %}
         {% endif %}
         | <form action="{{ request.scope.root_path }}/search/{{ search.id }}/delete" method="post" style="display:inline;">
             <button type="submit">Delete</button>
@@ -44,20 +44,20 @@
         <label>Create Search: <input type="text" name="name" required></label><br>
         <label><input type="checkbox" name="uncompleted_only" value="true"> Uncompleted items only</label>
 
-        <p>Select hashtags for this search:</p>
+        <p>Select tags for this search:</p>
         {% if hashtags %}
         <label>
             <input type="checkbox" name="all_items" value="true">
             <strong>All items</strong>
         </label>
         <p class="dates" style="margin-top:4px; margin-bottom:8px;">
-            Tip: choose "All items" and then use NOT to exclude hashtags.
+            Tip: choose "All items" and then use NOT to exclude tags.
         </p>
         {% for hashtag in hashtags %}
         <div>
             <label>
                 <input type="checkbox" name="hashtag_ids" value="{{ hashtag.id }}">
-                #{{ hashtag.name }}
+                {{ hashtag.name }}
             </label>
             <span style="display:inline-block; width: 12px;"></span>
             <label>
@@ -67,7 +67,7 @@
         </div>
         {% endfor %}
         {% else %}
-        <p>No hashtags available.</p>
+        <p>No tags available.</p>
         {% endif %}
         <br>
         <button type="submit">Create Named Search</button>
@@ -80,7 +80,7 @@
         <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill hashtag-link" data-id="{{ hashtag.id }}"
             data-name="{{ hashtag.name }}" data-inc-list-items="{{ 'true' if hashtag.include_list_items else 'false' }}"
             data-hide-completed-list-items="{{ 'true' if hashtag.hide_completed_list_items else 'false' }}"
-            onclick="return handleHashtagClick(event, this)">#{{ hashtag.name }}</a>
+            onclick="return handleHashtagClick(event, this)">{{ hashtag.name }}</a>
         {% endfor %}
     </div>
 
@@ -94,7 +94,7 @@
                 inc. list items
             </label>
             <div class="dates" style="margin-top:4px;">
-                Automatically include all todos from lists tagged with this hashtag.
+                Automatically include all todos from lists tagged with this tag.
             </div>
             <label style="display:block; margin-top:8px;">
                 <input type="checkbox" name="hide_completed_list_items" id="custom-hide-completed-list-items">
@@ -109,7 +109,7 @@
         </form>
     </div>
     {% else %}
-    <p>No hashtags yet.</p>
+    <p>No tags yet.</p>
     {% endif %}
 
     <div style="margin-top: 10px;">
@@ -164,7 +164,7 @@
 
             if (currentMode === 'delete') {
                 event.preventDefault();
-                if (confirm('Delete this hashtag? #' + name)) {
+                if (confirm('Delete this tag? ' + name)) {
                     var form = document.createElement('form');
                     form.method = 'POST';
                     form.action = '{{ request.scope.root_path }}/hashtag/' + id + '/delete';

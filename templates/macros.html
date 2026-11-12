@@ -4,7 +4,7 @@
     <a href="{{ rp }}/classic" class="nav-icon" title="{{ t('title_home') }}">🏠</a>
     <a href="{{ rp }}/search" class="nav-icon" title="{{ t('title_search', 'Search') }}">🔍</a>
     <a href="{{ rp }}/classic/calendar" class="nav-icon" title="{{ t('title_calendar', 'Calendar') }}">📅</a>
-    <a href="{{ rp }}/hashtags" class="nav-icon" title="{{ t('title_hashtags', 'Hashtags') }}">#️⃣</a>
+    <a href="{{ rp }}/hashtags" class="nav-icon" title="{{ t('title_hashtags', 'Tags') }}">#️⃣</a>
     <a href="{{ rp }}/smart-folders" class="nav-icon" title="{{ t('title_smart_folders', 'Smart Folders') }}"
         style="position: relative;">📁<span
             style="position: absolute; bottom: -2px; right: -2px; font-size: 0.6em;">⚙️</span></a>
@@ -123,7 +123,7 @@
     {{ render_links(todo.links, "inherit") }}
 
     {% for h in todo.hashtags %}
-    <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+    <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">{{ h.name }}</a>
     {% endfor %}
     <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}?highlight={{ todo.id }}" style="text-decoration: none;"
         title="{{ todo.list.name }}{% if todo.parent %} > {{ todo.parent.title }}{% endif %}">

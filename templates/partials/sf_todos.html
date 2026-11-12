@@ -23,7 +23,7 @@
             style="text-decoration: none;">{{ dokuwiki_page_icon('#3498db') }}</a>
         {% endif %}
         {% for hashtag in todo.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
         {% if not folder.group_todos_by_list %}
         <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}" title="{{ todo.list.name }}" style="text-decoration:none;">📂</a>
@@ -78,7 +78,7 @@
             style="text-decoration: none;">{{ dokuwiki_page_icon('#3498db') }}</a>
         {% endif %}
         {% for hashtag in todo.hashtags %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
         {% endfor %}
         <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}" title="{{ todo.list.name }}" style="text-decoration:none;">📂</a>
     </div>
@@ -136,7 +136,7 @@
         style="text-decoration: none;">{{ dokuwiki_page_icon('#3498db') }}</a>
     {% endif %}
     {% for hashtag in todo.hashtags %}
-    <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+    <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
     {% endfor %}
     <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}" title="{{ todo.list.name }}" style="text-decoration:none;">📂</a>
 </div>

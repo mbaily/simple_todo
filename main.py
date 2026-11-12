@@ -4858,7 +4858,7 @@ def view_hashtag_items(request: Request, hashtag_id: int, db: Session = Depends(
     """View all items with a specific hashtag"""
     hashtag = load_hashtag_for_results(db, hashtag_id)
     if not hashtag:
-        raise HTTPException(status_code=404, detail="Hashtag not found")
+        raise HTTPException(status_code=404, detail="Tag not found")
     results = find_hashtag_results(db, hashtag)
 
     from grouping_service import organize_todos_into_tree
@@ -4883,7 +4883,7 @@ def update_hashtag(
 ):
     hashtag = db.query(Hashtag).filter(Hashtag.id == hashtag_id).first()
     if not hashtag:
-        raise HTTPException(status_code=404, detail="Hashtag not found")
+        raise HTTPException(status_code=404, detail="Tag not found")
         
     hashtag.include_list_items = include_list_items
     hashtag.hide_completed_list_items = hide_completed_list_items
@@ -5624,7 +5624,7 @@ async def api_update_hashtags_todo(todo_id: int, request: Request, db: Session =
     if todo.list:
         todo.list.modified_at = utcnow()
     
-    create_journal_entry(db, "Updated Hashtags", f"Updated hashtags for todo '{todo.title}'", "todo", todo.id)
+    create_journal_entry(db, "Updated Tags", f"Updated tags for todo '{todo.title}'", "todo", todo.id)
     db.commit()
     
     return JSONResponse({
@@ -5739,10 +5739,10 @@ def toggle_hashtag_show_completed(hashtag_id: int, db: Session = Depends(get_db)
     """Toggle show_completed setting for a hashtag (AJAX)"""
     hashtag = db.query(Hashtag).filter(Hashtag.id == hashtag_id).first()
     if not hashtag:
-        return JSONResponse({"error": "Hashtag not found"}, status_code=404)
+        return JSONResponse({"error": "Tag not found"}, status_code=404)
     
     hashtag.show_completed = not hashtag.show_completed
-    create_journal_entry(db, "Toggled Hashtag Show Completed", f"Toggled show completed for hashtag '#{hashtag.name}' to {hashtag.show_completed}", "hashtag", hashtag.id)
+    create_journal_entry(db, "Toggled Tag Show Completed", f"Toggled show completed for tag '{hashtag.name}' to {hashtag.show_completed}", "hashtag", hashtag.id)
     db.commit()
     return JSONResponse({"show_completed": hashtag.show_completed})
 
@@ -5752,9 +5752,9 @@ def delete_hashtag(hashtag_id: int, db: Session = Depends(get_db)):
     """Delete a hashtag - removes from all items"""
     hashtag = db.query(Hashtag).filter(Hashtag.id == hashtag_id).first()
     if not hashtag:
-        raise HTTPException(status_code=404, detail="Hashtag not found")
+        raise HTTPException(status_code=404, detail="Tag not found")
     
-    create_journal_entry(db, "Deleted Hashtag", f"Deleted hashtag '#{hashtag.name}'", "hashtag", hashtag_id)
+    create_journal_entry(db, "Deleted Tag", f"Deleted tag '{hashtag.name}'", "hashtag", hashtag_id)
     db.delete(hashtag)
     db.commit()
     return RedirectResponse(url="/hashtags", status_code=303)
@@ -6797,7 +6797,7 @@ def api_hashtags_data(db: Session = Depends(get_db)):
 def api_hashtag_view_data(hashtag_id: int, db: Session = Depends(get_db)):
     hashtag = db.query(Hashtag).filter(Hashtag.id == hashtag_id).first()
     if not hashtag:
-        raise HTTPException(status_code=404, detail="Hashtag not found")
+        raise HTTPException(status_code=404, detail="Tag not found")
     
     if hashtag.show_completed:
         lists = sorted(hashtag.lists, key=lambda x: x.modified_at, reverse=True)

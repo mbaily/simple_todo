@@ -7,7 +7,7 @@
     <title>Smart Folders</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
-    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261113" crossorigin="anonymous"></script>
     <script src="{{ request.scope.root_path }}/static/smart_folder_ui.js?v=20251231"></script>
 </head>
 
@@ -16,7 +16,7 @@
     {{ nav_bar() }}
 
     <h2 style="margin:0;">Smart Folders</h2>
-    <p class="dates" style="margin-top:4px;">Saved views for lists and todos (with include/exclude hashtags, list scope,
+    <p class="dates" style="margin-top:4px;">Saved views for lists and todos (with include/exclude tags, list scope,
         completion, and date filters).</p>
 
     {% if folders %}
@@ -31,8 +31,8 @@
             {% if f.uncompleted_only %} | uncompleted only{% endif %}
             {% if f.include_archived_lists %} | includes archived lists{% endif %}
             {% if f.lists %} | {{ f.lists|length }} list(s){% endif %}
-            {% if f.include_hashtags_assoc %} | +{{ f.include_hashtags_assoc|length }} hashtag(s){% endif %}
-            {% if f.exclude_hashtags_assoc %} | -{{ f.exclude_hashtags_assoc|length }} hashtag(s){% endif %}
+            {% if f.include_hashtags_assoc %} | +{{ f.include_hashtags_assoc|length }} tag(s){% endif %}
+            {% if f.exclude_hashtags_assoc %} | -{{ f.exclude_hashtags_assoc|length }} tag(s){% endif %}
         </span>
     </div>
     {% endfor %}
@@ -139,7 +139,7 @@
                         {{ lst.name }}
                     </label>
                     {% for h in lst.hashtags %}
-                    <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+                    <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">{{ h.name }}</a>
                     {% endfor %}
                 </div>
                 {% endfor %}
@@ -149,27 +149,27 @@
             </details>
 
             <details style="margin-top: 12px;" open>
-                <summary><strong>Hashtag filters</strong></summary>
+                <summary><strong>Tag filters</strong></summary>
                 {% if hashtags %}
                 <div>
                     <label>
                         <input type="checkbox" name="all_items" value="true">
                         <strong>All items</strong>
                     </label>
-                    <span class="dates">(ignore include-hashtag selection)</span>
+                    <span class="dates">(ignore include-tag selection)</span>
                 </div>
                 <div class="dates" style="margin-top:4px; margin-bottom:8px;">
-                    Select include hashtags and/or exclude hashtags (NOT). NOT wins if both are checked.
+                    Select include tags and/or exclude tags (NOT). NOT wins if both are checked.
                     <br>
                     Check "w/ subtodos" to apply the filter to subtodos of matching parents.
                     <br>
-                    Check "inc. list items" to include all items from lists matching the hashtag.
+                    Check "inc. list items" to include all items from lists matching the tag.
                 </div>
                 {% for hashtag in hashtags %}
                 <div style="margin-bottom: 4px;">
                     <label>
                         <input type="checkbox" name="hashtag_ids" value="{{ hashtag.id }}">
-                        #{{ hashtag.name }}
+                        {{ hashtag.name }}
                     </label>
                     <label class="dates" style="font-size: 0.85em;">
                         <input type="checkbox" name="include_subtodos_{{ hashtag.id }}" value="true">
@@ -193,7 +193,7 @@
                 </div>
                 {% endfor %}
                 {% else %}
-                <p class="dates">No hashtags available.</p>
+                <p class="dates">No tags available.</p>
                 {% endif %}
             </details>
 

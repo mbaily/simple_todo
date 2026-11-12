@@ -21,7 +21,7 @@ SHOWN_RECENT = 8
 PLACE = re.compile(r"/app(?:/(list|smart-folder|hashtag)/(\d+))?/?$")
 PAGES = [
     ("", "home", "Overview"), ("/calendar", "calendar", "Calendar"), ("/search", "search", "Search"),
-    ("/folders", "folder", "Folders"), ("/smart-folders", "smart", "Smart folders"), ("/hashtags", "hash", "Hashtags"),
+    ("/folders", "folder", "Folders"), ("/smart-folders", "smart", "Smart folders"), ("/hashtags", "hash", "Tags"),
     ("/uncompleted", "check", "Open tasks"), ("/categories", "list", "Categories"),
     ("/collations", "layers", "Collations"), ("/archived", "archive", "Archived"), ("/bills", "money", "Bills"),
     ("/expenses", "list", "Quick expenses"), ("/journal", "book", "Journal"), ("/customization", "settings", "Customize"),
@@ -79,7 +79,7 @@ def place(kind, item, base):
         return dict(key=key, kind=kind, icon="list", label=item.name, context=folder, url=f"{base}/list/{item.id}")
     if kind == "smart":
         return dict(key=key, kind=kind, icon="smart", label=item.name, context="Smart folder", url=f"{base}/smart-folder/{item.id}")
-    return dict(key=key, kind=kind, icon="hash", label="#" + item.name, context="Hashtag", url=f"{base}/hashtag/{item.id}")
+    return dict(key=key, kind=kind, icon="hash", label=item.name, context="Tag", url=f"{base}/hashtag/{item.id}")
 
 
 def resolve(db, keys, base):

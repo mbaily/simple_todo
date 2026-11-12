@@ -55,15 +55,15 @@
         <button type="submit" onclick="return prepareRRuleForSubmit(this.form)">Save Changes</button>
         <br><br>
 
-        <label>Hashtags:<br>
+        <label>Tags:<br>
             <input type="text" id="hashtags-edit" name="hashtags"
-                value="{% for h in event.hashtags %}#{{ h.name }} {% endfor %}" placeholder="example tags (or #tags)">
+                value="{% for h in event.hashtags %}{{ h.name }} {% endfor %}" placeholder="example tags">
         </label>
         {% if all_hashtags %}
         <select onchange="addHashtagFromSelect(this, 'hashtags-edit')">
             <option value="">Add existing...</option>
             {% for h in all_hashtags %}
-            <option value="{{ h.name }}">#{{ h.name }}</option>
+            <option value="{{ h.name }}">{{ h.name }}</option>
             {% endfor %}
         </select>
         {% endif %}

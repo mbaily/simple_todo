@@ -22,7 +22,7 @@ def test_filters_save_round_trip_and_apply_to_overview(prototype):
     response = client.post('/app/customization/filters?view=customize', headers=HX,
                            data={f'tag_{ids["tag"]}': 'exclude', f'tag_{work.id}': ''})
     assert response.status_code == 200 and 'Filters saved: hiding 1.' in response.text
-    assert settings(db).filter_exc_hashtags == '#personal' and settings(db).filter_inc_hashtags == ''
+    assert settings(db).filter_exc_hashtags == 'personal' and settings(db).filter_inc_hashtags == ''
     # The original overview applies the stored filter: the #personal task is hidden.
     assert ids['todo'] not in [item.id for item in client.get('/classic').context['pinned_todos_recent']]
     assert client.get('/customization').status_code == 200
@@ -40,12 +40,12 @@ def test_unknown_saved_tags_are_kept_until_removed(prototype):
     db.commit()
     page = client.get('/app/customization')
     assert page.context['tag_modes'] == {'personal': 'include', 'someday': 'include'}
-    assert page.context['unknown_include'] == ['someday'] and 'Only #someday' in page.text
+    assert page.context['unknown_include'] == ['someday'] and 'Only someday' in page.text
     client.post('/app/customization/filters?view=customize', headers=HX,
                 data={f'tag_{ids["tag"]}': 'include', 'keep_include': 'someday'})
-    assert settings(db).filter_inc_hashtags == '#personal #someday'
+    assert settings(db).filter_inc_hashtags == 'personal someday'
     client.post('/app/customization/filters?view=customize', headers=HX, data={f'tag_{ids["tag"]}': 'include'})
-    assert settings(db).filter_inc_hashtags == '#personal'
+    assert settings(db).filter_inc_hashtags == 'personal'
 
 
 def test_import_success_and_failure_redirect_with_messages(prototype):
@@ -77,11 +77,11 @@ def test_browser_customize_filters(prototype_server, page):
     page.goto(origin + '/app')
     page.locator('summary[aria-label="More navigation"]').click()
     page.get_by_role('link', name='Customize').click()
-    group = page.get_by_role('radiogroup', name='Filter for #personal')
+    group = page.get_by_role('radiogroup', name='Filter for personal')
     group.get_by_role('radio', name='Hide').check()
     page.get_by_role('button', name='Save filters').click()
     expect(page.locator('#page-feedback')).to_contain_text('Filters saved: hiding 1.')
-    expect(page.get_by_role('radiogroup', name='Filter for #personal').get_by_role('radio', name='Hide')).to_be_checked()
+    expect(page.get_by_role('radiogroup', name='Filter for personal').get_by_role('radio', name='Hide')).to_be_checked()
     expect(page.get_by_role('link', name='Export all data (JSON)')).to_be_visible()
     assert not errors
 

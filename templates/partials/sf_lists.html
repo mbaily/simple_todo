@@ -20,7 +20,7 @@
         style="text-decoration: none;">{{ dokuwiki_page_icon('#3498db') }}</a>
     {% endif %}
     {% for hashtag in list.hashtags %}
-    <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+    <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">{{ hashtag.name }}</a>
     {% endfor %}
 </div>
 {% endfor %}

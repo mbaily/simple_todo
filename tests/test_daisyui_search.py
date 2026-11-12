@@ -44,7 +44,7 @@ def test_hashtag_results_and_options_match_original(prototype):
     ids = add_results_data(db, ids)
     url = f'/app/hashtag/{ids["tag"]}'
     page = client.get(url)
-    assert page.status_code == 200 and page.context['page_title'].startswith('#personal')
+    assert page.status_code == 200 and page.context['page_title'].startswith('personal')
     assert [t.id for t in page.context['todos']] == [ids['todo']]
     assert [item.id for item in page.context['lists']] == [ids['other']]
     query = page.context['query']
@@ -59,7 +59,7 @@ def test_hashtag_results_and_options_match_original(prototype):
     db.expire_all()
     tag = db.get(Hashtag, ids['tag'])
     assert tag.show_completed and tag.include_list_items
-    assert db.query(JournalEntry).filter_by(action='Toggled Hashtag Show Completed').count() == 1
+    assert db.query(JournalEntry).filter_by(action='Toggled Tag Show Completed').count() == 1
     original = client.get(f'/hashtag/{ids["tag"]}')
     assert {t.id for t in client.get(url).context['todos']} == {
         t.id for group in original.context['todo_tree']['lists'] for t in group['todos']}
@@ -122,10 +122,10 @@ def test_browser_search_complete_edit_and_hashtag(prototype_server, page):
     page.get_by_role('button', name='Save changes').click()
     expect(page).to_have_url(origin + '/app/search?sort=user&q=quiet')
     expect(page.get_by_text('Book a quiet evening', exact=True)).to_be_visible()
-    page.get_by_role('link', name='#personal').first.click()
-    expect(page.get_by_role('heading', name='#personal')).to_be_visible()
+    page.get_by_role('link', name='personal', exact=True).first.click()
+    expect(page.get_by_role('heading', name='personal')).to_be_visible()
     expect(page.get_by_text('Book a quiet evening', exact=True)).to_be_visible()
     page.get_by_role('checkbox', name='Show completed items').uncheck()
-    expect(page.get_by_text('Nothing is tagged #personal that is still open.')).to_be_visible()
+    expect(page.get_by_text('Nothing is tagged personal that is still open.')).to_be_visible()
     page.go_back()
     expect(page.get_by_role('heading', name='Search')).to_be_visible()
