@@ -26,7 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session, aliased, joinedload
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, select
 
 # Load site overrides before modules import configuration constants. Invalid
 # external settings must stop startup rather than silently use other defaults.
@@ -1924,61 +1924,53 @@ def delete_category(
     return RedirectResponse(url="/categories", status_code=303)
 
 
-def find_search_results(db, q):
-    """Return unarchived lists, todos and calendar events matching a search."""
-    q = (q or "").strip()
-    if not q:
-        return {"lists": [], "todos": [], "events": []}
-    pattern = f"%{q}%"
+def find_search_matches(db, q):
+    """Return unarchived lists, todos and calendar events matching every search term.
 
-    # Lists: match list name or hashtag name
+    A term matches an item through its own text, its hashtags or (for todos)
+    the name of its list, so "shopping milk" finds "milk" in the Shopping list.
+    """
+    from search_index import all_terms, index_installed, text_match
+
+    indexed = index_installed(db)
+
+    def tagged(model, term):
+        return model.hashtags.any(Hashtag.name.ilike(f"%{term}%"))
+
     lists = (
         db.query(List)
-        .outerjoin(List.hashtags)
         .filter(
             List.archived == False,
-            or_(
-                List.name.ilike(pattern),
-                Hashtag.name.ilike(pattern),
-            ),
+            all_terms(q, lambda term: or_(text_match(List, term, indexed), tagged(List, term))),
         )
-        .distinct()
         .order_by(List.modified_at.desc())
         .all()
     )
-
-    # Todos: match title, note, list name, or hashtag name
     todos = (
         db.query(Todo)
-        .join(Todo.list)
-        .outerjoin(Todo.hashtags)
-        .filter(
-            or_(
-                Todo.title.ilike(pattern),
-                Todo.note.ilike(pattern),
-                List.name.ilike(pattern),
-                Hashtag.name.ilike(pattern),
-            )
-        )
-        .distinct()
+        .filter(all_terms(q, lambda term: or_(
+            text_match(Todo, term, indexed),
+            Todo.list_id.in_(select(List.id).where(text_match(List, term, indexed))),
+            tagged(Todo, term),
+        )))
         .order_by(Todo.modified_at.desc())
         .all()
     )
-
-    # Calendar Events: match title, note, or hashtag name
-    events_raw = (
+    events = (
         db.query(CalendarEvent)
-        .outerjoin(CalendarEvent.hashtags)
-        .filter(
-            or_(
-                CalendarEvent.title.ilike(pattern),
-                CalendarEvent.note.ilike(pattern),
-                Hashtag.name.ilike(pattern),
-            )
-        )
-        .distinct()
+        .filter(all_terms(q, lambda term: or_(text_match(CalendarEvent, term, indexed), tagged(CalendarEvent, term))))
         .all()
     )
+    return lists, todos, events
+
+
+def find_search_results(db, q):
+    """Return unarchived lists, todos and calendar events matching a search."""
+    from search_index import search_terms
+
+    if not search_terms(q):
+        return {"lists": [], "todos": [], "events": []}
+    lists, todos, events_raw = find_search_matches(db, q)
 
     today = _midnight(datetime.now())
     completion_rows = db.query(CalendarEventCompletion).all()
@@ -6980,43 +6972,14 @@ def api_collations_data(db: Session = Depends(get_db)):
 
 @app.get("/api/data/search")
 def api_search_data(q: str = "", db: Session = Depends(get_db)):
+    from search_index import search_terms
+
     q = q.strip()
     lists = []
     todos = []
 
-    if q:
-        pattern = f"%{q}%"
-        lists = (
-            db.query(List)
-            .outerjoin(List.hashtags)
-            .filter(
-                List.archived == False,
-                or_(
-                    List.name.ilike(pattern),
-                    Hashtag.name.ilike(pattern),
-                ),
-            )
-            .distinct()
-            .order_by(List.modified_at.desc())
-            .all()
-        )
-
-        todos = (
-            db.query(Todo)
-            .join(Todo.list)
-            .outerjoin(Todo.hashtags)
-            .filter(
-                or_(
-                    Todo.title.ilike(pattern),
-                    Todo.note.ilike(pattern),
-                    List.name.ilike(pattern),
-                    Hashtag.name.ilike(pattern),
-                )
-            )
-            .distinct()
-            .order_by(Todo.modified_at.desc())
-            .all()
-        )
+    if search_terms(q):
+        lists, todos, _ = find_search_matches(db, q)
 
     def enrich_todo(t):
         d = serialize_todo(t)

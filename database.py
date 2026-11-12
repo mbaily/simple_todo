@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import quote
 from storage import data_directory, data_path, external_data_enabled
 from entity_history import install_entity_history, thin_entity_history
+from search_index import install_search_index
 
 _engines = {}
 
@@ -44,6 +45,7 @@ def get_engine(user: str):
         run_migrations(engine)
         install_entity_history(engine)
         thin_entity_history(engine)
+        install_search_index(engine)
         _engines[db_url] = engine
 
     return _engines[db_url]
