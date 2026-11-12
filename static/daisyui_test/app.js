@@ -93,6 +93,19 @@
         }
     }
 
+    // Overview folders: which ones show their subfolders is remembered in this browser.
+    const BRANCH_KEY = 'simple-todo-open-folders';
+    function openBranches() {
+        try { return new Set(JSON.parse(localStorage.getItem(BRANCH_KEY) || '[]').map(String)); } catch (error) { return new Set(); }
+    }
+    function setBranch(button, open) {
+        const children = document.getElementById(button.getAttribute('aria-controls'));
+        if (!children) return;
+        children.hidden = !open;
+        button.setAttribute('aria-expanded', String(open));
+        button.setAttribute('aria-label', button.getAttribute('aria-label').replace(/^(Show|Hide)/, open ? 'Hide' : 'Show'));
+    }
+
     function snapshot() {
         const root = workspace();
         if (!root) return;
@@ -134,6 +147,8 @@
             state.taskOptions = null;
         }
         state.scope = scope;
+        const branches = openBranches();
+        root.querySelectorAll('[data-command="toggle-branch"]').forEach(button => setBranch(button, branches.has(button.dataset.branch)));
         root.querySelectorAll('details[data-persist], #create-list-details').forEach(details => {
             const key = details.dataset.persist || details.id;
             if (state.details.has(key)) details.open = state.details.get(key);
@@ -474,6 +489,13 @@
             // One row's own Move button: move just that item, whatever is selected.
             button.closest('details.dropdown')?.removeAttribute('open');
             openMoveDialog(/^(list|folder):/.test(button.dataset.key) ? 'folder' : 'list', [button.dataset.key]);
+        }
+        if (command === 'toggle-branch') {
+            const open = button.getAttribute('aria-expanded') !== 'true';
+            setBranch(button, open);
+            const saved = openBranches();
+            saved[open ? 'add' : 'delete'](button.dataset.branch);
+            try { localStorage.setItem(BRANCH_KEY, JSON.stringify([...saved])); } catch (error) { /* stays open for this page only */ }
         }
         if (command === 'toggle-folder') {
             const children = document.getElementById(button.getAttribute('aria-controls'));

@@ -330,9 +330,13 @@ h2 { font-size: 1rem; letter-spacing: -.1px; font-weight: 600; margin: 0; }
 .folder-toggle:disabled { visibility: hidden; }
 .folder-symbol, .row-symbol { display: inline-flex; align-items: center; height: 1.8462rem; color: var(--muted); flex-shrink: 0; }
 .row-spacer-box { visibility: hidden; pointer-events: none; }
-/* Overview folder rows use the list rows' spacing so the folder and list icons line up. */
-.subfolder-group .folder-row { padding-inline-start: 8px; gap: 8px; }
-@media (max-width: 600px) { .subfolder-group .folder-row { padding-inline-start: 6px; gap: 6px; } }
+/* Overview folder rows use the list rows' spacing so the folder and list icons line up.
+   Subfolders indent one step per level, up to 8 levels; deeper ones still open but stay at that indent. */
+.subfolder-group .folder-row { padding-inline-start: calc(8px + min(var(--depth, 0), 8) * 18px); gap: 8px; }
+.subfolder-group > .folder-tree > .folder-node:first-child > .folder-row { border-top: none; }
+.branch-slot { position: relative; }
+.branch-toggle { position: absolute; top: 50%; left: 50%; margin: 0; transform: translate(-50%, -50%); }
+@media (max-width: 600px) { .subfolder-group .folder-row { padding-inline-start: calc(6px + min(var(--depth, 0), 8) * 12px); gap: 6px; } }
 .is-default-folder .folder-symbol { color: var(--accent); }
 .default-badge { color: var(--accent); border-color: currentColor; font-size: 0.7692rem; }
 .is-completed-title { text-decoration: line-through; color: var(--muted); }

@@ -190,7 +190,11 @@ def test_overview_browses_folders_with_breadcrumbs_and_actions(prototype):
     # Lists under "Your lists" carry a list icon after the checkbox; folder rows reserve the same space.
     lists = root.text.split('id="lists-heading"')[1].split('</section>')[0]
     assert lists.count('class="row-symbol"') == len(root.context['lists']) > 0
-    assert root.text.count('class="folder-symbol row-symbol"') == 2 and root.text.count('row-spacer"') == 4
+    # Subfolders are nested under their parent, closed until its chevron is used; leaf folders have no chevron.
+    assert root.text.count('class="folder-symbol row-symbol"') == 3 and root.text.count('data-command="toggle-branch"') == 1
+    branch = root.text.split(f'id="folder-branch-{ids["folder"]}"')[1].split('</ul>')[0]
+    assert branch.startswith(' class="folder-tree folder-branch" hidden>') and f'data-item-key="folder:{ids["child"]}" style="--depth: 1"' in branch
+    assert f'aria-controls="folder-branch-{ids["folder"]}" aria-expanded="false" aria-label="Show subfolders of Projects"' in root.text
     assert 'class="row-symbol"' not in root.text.split('id="lists-heading"')[0]
     inner = client.get(f'/app?folder_id={ids["child"]}&sort=created')
     assert inner.context['current_folder'].id == ids['child'] and inner.context['subfolders'] == []
@@ -232,6 +236,50 @@ def test_overview_browses_folders_with_breadcrumbs_and_actions(prototype):
     edit = trail(f'/app/todo/{ids["todo"]}/edit')
     assert edit.index('>Shed<') < edit.index(f'/app/list/{ids["list"]}">A place to start<') < edit.index('<li aria-current="page">Edit task</li>')
     assert '<li aria-current="page">Edit list</li>' in trail(f'/app/list/{ids["other"]}/edit')
+
+
+def test_browser_overview_folders_expand_in_place(prototype_server, page):
+    origin, (db, client, ids) = prototype_server
+    ids = tree(db, ids)
+    parent = ids['child']
+    for level in range(10):
+        deeper = Folder(name=f'Level {level + 2}', parent_id=parent)
+        db.add(deeper)
+        db.flush()
+        parent = deeper.id
+    db.commit()
+    left = "name => document.querySelector(`[aria-label='Actions for ${name}']`).closest('.folder-row').querySelector('.row-symbol svg').getBoundingClientRect().left"
+    for width in (1000, 360):
+        page.set_viewport_size({'width': width, 'height': 800})
+        page.goto(origin + '/app?folder_id=0')
+        page.evaluate("localStorage.clear()")
+        page.reload()
+        garden = page.locator('.subfolder-group').get_by_role('link', name='Garden', exact=True)
+        expect(garden).to_be_hidden()
+        page.get_by_role('button', name='Show subfolders of Projects').click()
+        expect(garden).to_be_visible()
+        expect(page.get_by_role('button', name='Hide subfolders of Projects')).to_have_attribute('aria-expanded', 'true')
+        # Top-level folder icons share the list icons' column; each level steps in, up to 8 levels.
+        list_icon = page.evaluate("document.querySelector('.lists-section li.item-row .row-symbol svg').getBoundingClientRect().left")
+        assert abs(page.evaluate(left, 'Projects') - list_icon) < 0.5 and abs(page.evaluate(left, 'Admin') - list_icon) < 0.5
+        for name in ['Garden'] + [f'Level {n}' for n in range(2, 11)]:
+            page.get_by_role('button', name=f'Show subfolders of {name}').click()
+        expect(page.locator('.subfolder-group').get_by_role('link', name='Level 11', exact=True)).to_be_visible()
+        step = page.evaluate(left, 'Garden') - page.evaluate(left, 'Projects')
+        assert step > 10 and abs(page.evaluate(left, 'Level 8') - page.evaluate(left, 'Projects') - 8 * step) < 1
+        assert page.evaluate(left, 'Level 11') == page.evaluate(left, 'Level 8')
+        assert page.evaluate('document.documentElement.scrollWidth') <= width
+        # Open folders are remembered across reloads and workspace updates, and can be closed again.
+        page.reload()
+        expect(page.locator('.subfolder-group').get_by_role('link', name='Level 11', exact=True)).to_be_visible()
+        page.get_by_role('button', name='Hide subfolders of Projects').click()
+        expect(garden).to_be_hidden()
+        page.reload()
+        expect(page.get_by_role('button', name='Show subfolders of Projects')).to_have_attribute('aria-expanded', 'false')
+        # A nested folder's link opens that folder.
+        page.get_by_role('button', name='Show subfolders of Projects').click()
+        garden.click()
+        expect(page.get_by_role('heading', level=1)).to_contain_text('Garden')
 
 
 def test_browser_drill_into_folders_from_the_overview(prototype_server, page):

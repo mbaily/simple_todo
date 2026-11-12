@@ -14,6 +14,22 @@
 </section>
 {% endif %}
 {% endmacro %}
+{# One folder row on the overview with its subfolders nested below, closed until the chevron is clicked.
+   The chevron sits where a list row has its checkbox, so folder and list icons stay in one column. #}
+{% macro folder_node(child, siblings, depth) %}
+{% set list_count = child.lists|rejectattr('archived')|list|length %}
+{% set nested = child.children if depth < 40 else [] %}
+<li class="folder-node">
+    <div class="list-row item-row folder-row {{ 'is-default-folder' if active_folder_id == child.id else '' }}" data-item-key="folder:{{ child.id }}" style="--depth: {{ depth }}">
+        <span class="selection-control row-spacer" aria-hidden="true"><span class="checkbox checkbox-sm selection-checkbox row-spacer-box"></span></span>
+        <span class="completion-form row-spacer branch-slot"><span class="checkbox checkbox-sm completion-checkbox row-spacer-box" aria-hidden="true"></span>{% if nested %}<button type="button" class="btn btn-ghost btn-square btn-xs folder-toggle branch-toggle" data-command="toggle-branch" data-branch="{{ child.id }}" aria-controls="folder-branch-{{ child.id }}" aria-expanded="false" aria-label="Show subfolders of {{ child.name }}">{{ icon('chevron', 14) }}</button>{% endif %}</span>
+        <span class="folder-symbol row-symbol">{{ icon('folder', 17) }}</span>
+        <div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ child.id }}" hx-get="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ child.id }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ child.name }}</a>{% if active_folder_id == child.id %}<span class="badge badge-outline badge-sm default-badge">Default view</span>{% endif %}<span class="item-context">{{ list_count }} {{ 'list' if list_count == 1 else 'lists' }}{% if child.children %} · {{ child.children|length }} {{ 'subfolder' if child.children|length == 1 else 'subfolders' }}{% endif %}</span></div></div>
+        <div class="row-actions">{{ folder_menu(child, siblings, active_folder_id == child.id) }}</div>
+    </div>
+    {% if nested %}<ul id="folder-branch-{{ child.id }}" class="folder-tree folder-branch" hidden>{% for grandchild in nested %}{{ folder_node(grandchild, nested, depth + 1) }}{% endfor %}</ul>{% endif %}
+</li>
+{% endmacro %}
 <div id="daisy-workspace" data-page-title="{{ t('app_title') }}" data-edit-query="{{ query }}&amp;back=home" data-scope="home:{{ folder_param if folder_param is not none else 'default' }}" data-page-url="{{ prototype_url }}{{ query }}" data-sort="{{ sort }}" data-folder="{{ folder_param if folder_param is not none else '' }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
     {{ page_trail(active_folder_name or 'Top level', folder=current_folder.parent if current_folder else None, sort=sort, swap=True) }}
     <div class="page-heading">
@@ -65,14 +81,7 @@
             </div>
         </div>
         {% macro folders_block() %}{% if subfolders %}<header class="lists-toolbar folders-toolbar"><div class="lists-title"><h2 id="folders-heading">Folders</h2><span class="badge badge-ghost">{{ subfolders|length }}</span></div></header>
-        <div class="section-panel list-group subfolder-group" aria-labelledby="folders-heading"><ul class="list">{% for child in subfolders %}{% set list_count = child.lists|rejectattr('archived')|list|length %}
-            <li class="list-row item-row folder-row {{ 'is-default-folder' if active_folder_id == child.id else '' }}" data-item-key="folder:{{ child.id }}">
-                {# Invisible stand-ins for a list row's checkboxes keep the folder icon in line with the list icons. #}
-                <span class="selection-control row-spacer" aria-hidden="true"><span class="checkbox checkbox-sm selection-checkbox row-spacer-box"></span></span><span class="completion-form row-spacer" aria-hidden="true"><span class="checkbox checkbox-sm completion-checkbox row-spacer-box"></span></span>
-                <span class="folder-symbol row-symbol">{{ icon('folder', 17) }}</span>
-                <div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ child.id }}" hx-get="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ child.id }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ child.name }}</a>{% if active_folder_id == child.id %}<span class="badge badge-outline badge-sm default-badge">Default view</span>{% endif %}<span class="item-context">{{ list_count }} {{ 'list' if list_count == 1 else 'lists' }}{% if child.children %} · {{ child.children|length }} {{ 'subfolder' if child.children|length == 1 else 'subfolders' }}{% endif %}</span></div></div>
-                <div class="row-actions">{{ folder_menu(child, subfolders, active_folder_id == child.id) }}</div>
-            </li>{% endfor %}</ul></div>{% endif %}{% endmacro %}
+        <div class="section-panel list-group subfolder-group" aria-labelledby="folders-heading"><ul class="folder-tree">{% for child in subfolders %}{{ folder_node(child, subfolders, 0) }}{% endfor %}</ul></div>{% endif %}{% endmacro %}
         {% if not lists_before_folders(request) %}{{ folders_block() }}{% endif %}
         <header class="lists-toolbar">
             <div class="lists-title"><h2 id="lists-heading">Your lists</h2><span class="badge badge-ghost">{{ lists|length }}</span></div>
