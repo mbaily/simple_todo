@@ -187,6 +187,11 @@ def test_overview_browses_folders_with_breadcrumbs_and_actions(prototype):
     assert [f.id for f in root.context['subfolders']] == [ids['folder'], ids['admin']] and root.context['current_folder'] is None
     assert 'New folder at the top level' in root.text and f'data-item-key="folder:{ids["folder"]}"' in root.text
     assert '0 lists · 1 subfolder' in root.text
+    # Lists under "Your lists" carry a list icon after the checkbox; folder rows reserve the same space.
+    lists = root.text.split('id="lists-heading"')[1].split('</section>')[0]
+    assert lists.count('class="row-symbol"') == len(root.context['lists']) > 0
+    assert root.text.count('class="folder-symbol row-symbol"') == 2 and root.text.count('row-spacer"') == 4
+    assert 'class="row-symbol"' not in root.text.split('id="lists-heading"')[0]
     inner = client.get(f'/app?folder_id={ids["child"]}&sort=created')
     assert inner.context['current_folder'].id == ids['child'] and inner.context['subfolders'] == []
     crumbs = inner.text.split('class="breadcrumbs page-trail"')[1].split('</ul>')[0]

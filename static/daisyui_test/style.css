@@ -199,7 +199,7 @@ h2 { font-size: 1rem; letter-spacing: -.1px; font-weight: 600; margin: 0; }
     .section-heading p { font-size: 0.7692rem; }
     .section-heading .btn { font-size: 0.8462rem; padding: 0 5px; }
     .item-row, .agenda-row { gap: 6px; min-height: 2.6923rem; padding: 2px 6px; }
-    .completion-form, .selection-control { height: 2.3077rem; }
+    .completion-form, .selection-control, .row-symbol { height: 2.3077rem; }
     .item-content, .agenda-content { min-height: 2.3077rem; }
     .row-actions .btn-square, .agenda-row > .btn-square { width: 2.3077rem; height: 2.3077rem; min-height: 2.3077rem; }
     .count-label { display: none; }
@@ -328,7 +328,11 @@ h2 { font-size: 1rem; letter-spacing: -.1px; font-weight: 600; margin: 0; }
 .folder-toggle svg { transition: transform .12s; }
 .folder-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
 .folder-toggle:disabled { visibility: hidden; }
-.folder-symbol { display: inline-flex; align-items: center; height: 1.8462rem; color: var(--muted); flex-shrink: 0; }
+.folder-symbol, .row-symbol { display: inline-flex; align-items: center; height: 1.8462rem; color: var(--muted); flex-shrink: 0; }
+.row-spacer-box { visibility: hidden; pointer-events: none; }
+/* Overview folder rows use the list rows' spacing so the folder and list icons line up. */
+.subfolder-group .folder-row { padding-inline-start: 8px; gap: 8px; }
+@media (max-width: 600px) { .subfolder-group .folder-row { padding-inline-start: 6px; gap: 6px; } }
 .is-default-folder .folder-symbol { color: var(--accent); }
 .default-badge { color: var(--accent); border-color: currentColor; font-size: 0.7692rem; }
 .is-completed-title { text-decoration: line-through; color: var(--muted); }

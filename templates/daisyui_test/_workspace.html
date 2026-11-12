@@ -67,7 +67,9 @@
         {% macro folders_block() %}{% if subfolders %}<header class="lists-toolbar folders-toolbar"><div class="lists-title"><h2 id="folders-heading">Folders</h2><span class="badge badge-ghost">{{ subfolders|length }}</span></div></header>
         <div class="section-panel list-group subfolder-group" aria-labelledby="folders-heading"><ul class="list">{% for child in subfolders %}{% set list_count = child.lists|rejectattr('archived')|list|length %}
             <li class="list-row item-row folder-row {{ 'is-default-folder' if active_folder_id == child.id else '' }}" data-item-key="folder:{{ child.id }}">
-                <span class="folder-symbol">{{ icon('folder', 17) }}</span>
+                {# Invisible stand-ins for a list row's checkboxes keep the folder icon in line with the list icons. #}
+                <span class="selection-control row-spacer" aria-hidden="true"><span class="checkbox checkbox-sm selection-checkbox row-spacer-box"></span></span><span class="completion-form row-spacer" aria-hidden="true"><span class="checkbox checkbox-sm completion-checkbox row-spacer-box"></span></span>
+                <span class="folder-symbol row-symbol">{{ icon('folder', 17) }}</span>
                 <div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ child.id }}" hx-get="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ child.id }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ child.name }}</a>{% if active_folder_id == child.id %}<span class="badge badge-outline badge-sm default-badge">Default view</span>{% endif %}<span class="item-context">{{ list_count }} {{ 'list' if list_count == 1 else 'lists' }}{% if child.children %} · {{ child.children|length }} {{ 'subfolder' if child.children|length == 1 else 'subfolders' }}{% endif %}</span></div></div>
                 <div class="row-actions">{{ folder_menu(child, subfolders, active_folder_id == child.id) }}</div>
             </li>{% endfor %}</ul></div>{% endif %}{% endmacro %}
@@ -82,8 +84,8 @@
             </div>
         </header>
         {% if not lists %}<div class="empty-state"><h3>No lists in this view.</h3><button type="button" class="btn btn-primary" data-command="new-list">{{ icon('plus', 17) }} Create a list</button></div>{% endif %}
-        {% if uncategorized_lists %}<div class="section-panel list-group"><ul class="list">{% for item in uncategorized_lists %}{{ row(item) }}{% endfor %}</ul></div>{% endif %}
-        {% for category in sorted_categories %}<details class="collapse collapse-arrow category-panel" data-persist="category:{{ category }}" open><summary class="collapse-title category-heading"><span>{{ category }}</span><span class="section-count">{{ categorized_lists[category]|length }}</span></summary><div class="collapse-content category-content"><ul class="list">{% for item in categorized_lists[category] %}{{ row(item) }}{% endfor %}</ul></div></details>{% endfor %}
+        {% if uncategorized_lists %}<div class="section-panel list-group"><ul class="list">{% for item in uncategorized_lists %}{{ row(item, symbol=True) }}{% endfor %}</ul></div>{% endif %}
+        {% for category in sorted_categories %}<details class="collapse collapse-arrow category-panel" data-persist="category:{{ category }}" open><summary class="collapse-title category-heading"><span>{{ category }}</span><span class="section-count">{{ categorized_lists[category]|length }}</span></summary><div class="collapse-content category-content"><ul class="list">{% for item in categorized_lists[category] %}{{ row(item, symbol=True) }}{% endfor %}</ul></div></details>{% endfor %}
         {% if lists_before_folders(request) %}{{ folders_block() }}{% endif %}
     </section>
 

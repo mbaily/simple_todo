@@ -1,5 +1,5 @@
 {% from 'daisyui_test/_icons.html' import icon %}
-{% macro row(item, kind='list', marker=None, depth=0) %}
+{% macro row(item, kind='list', marker=None, depth=0, symbol=False) %}
 {% set key = kind ~ ':' ~ item.id %}
 {% set rp = request.scope.root_path %}
 {% set title = item.name if kind == 'list' else item.title %}
@@ -11,6 +11,7 @@
         <input class="checkbox checkbox-sm completion-checkbox" type="checkbox" name="completed" value="true" {% if item.completed %}checked{% endif %} aria-label="Mark {{ title }} {{ 'incomplete' if item.completed else 'complete' }}">
         <noscript><button type="submit">Save</button></noscript>
     </form>
+    {% if symbol %}<span class="row-symbol">{{ icon('list', 17) }}</span>{% endif %}
     <div class="item-content">
         <div class="item-title-line">
             {% if marker or item.pinned %}<span class="row-marker" title="{{ marker or 'Pinned' }}">{{ icon('bell' if marker == 'Alarm' else 'clock' if marker == 'Resuming' else 'pin', 15) }}</span>{% endif %}
