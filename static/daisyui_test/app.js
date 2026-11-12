@@ -726,6 +726,11 @@
     });
 
     document.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && event.target.matches?.('#smart-form [name="new_include"], #smart-form [name="new_exclude"]')) {
+            event.preventDefault();
+            htmx.trigger(document.getElementById('smart-rules'), 'change');
+            return;
+        }
         const dialog = document.querySelector('#jump-dialog[open], #move-dialog[open]');
         if (dialog) {
             const visible = pickItems(dialog).filter(option => !option.hidden);
@@ -771,6 +776,11 @@
             if (input) input.checked = !input.checked;
             if (![400, 404, 422].includes(ctx.response.status) || !ctx.response.headers.get('HX-Retarget')) event.preventDefault();
         } else {
+            // The draft response turns additions into removable chips. Clear the one-use
+            // controls before morphing, which otherwise preserves a focused input's value.
+            if (source?.id === 'smart-rules') {
+                source.querySelectorAll('[name^="add_"], [name="new_include"], [name="new_exclude"]').forEach(input => { input.value = ''; });
+            }
             const form = source?.matches?.('form[data-draft]') ? source : source?.closest?.('form[data-draft]');
             if (form) {
                 delete state.draft[form.id];

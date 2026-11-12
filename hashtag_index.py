@@ -128,6 +128,15 @@ def _refresh_before_commit(session):
         refresh(session.connection())
 
 
+def ensure_index(db):
+    """Index a database opened outside database.get_engine (tests) on first use.
+
+    Call this before the session writes anything: installing opens its own transaction.
+    """
+    if db.bind not in _installed:
+        install_hashtag_index(db.bind)
+
+
 def all_hashtags(db):
     """[(hashtag, {entity type: count})], most used first, then by name."""
     counts = {}

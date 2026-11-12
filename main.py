@@ -6257,7 +6257,8 @@ def smart_folder_results(db, folder):
     todo_sort_desc = bool(folder.todo_sort_desc) if folder.todo_sort_desc is not None else True
 
     matching_lists = SmartFolderService.get_lists(db, folder)
-    matching_todos, todo_tree = SmartFolderService.get_todos(db, folder)
+    matching_ids = set() if folder.strict_nesting else None
+    matching_todos, todo_tree = SmartFolderService.get_todos(db, folder, matching_ids=matching_ids)
     matching_events = SmartFolderService.get_calendar_events(db, folder)
 
     modified_after_display = folder.modified_after.strftime('%Y-%m-%d') if folder.modified_after else None
@@ -6285,10 +6286,6 @@ def smart_folder_results(db, folder):
         else:
             for todo in matching_todos:
                 apply_dokuwiki_links_recursive(todo, date_attr, confirmed_todos)
-
-    matching_ids = None
-    if folder.strict_nesting:
-        matching_ids = {t.id for t in matching_todos}
 
     return {
         "lists": matching_lists,

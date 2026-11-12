@@ -15,18 +15,7 @@
     <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
 
     <div class="rule-chips" aria-label="Smart folder rules">
-        {% for assoc in folder.include_hashtags_assoc %}<a class="badge badge-outline tag" href="{{ prototype_url }}/tag/{{ assoc.hashtag.id }}">{{ assoc.hashtag.name }}{% if assoc.include_subtodos %} + subtasks{% endif %}{% if assoc.include_list_items %} + tagged lists{% endif %}</a>{% endfor %}
-        {% if not folder.include_hashtags_assoc %}<span class="badge badge-ghost">All tags</span>{% endif %}
-        {% for assoc in folder.exclude_hashtags_assoc %}<span class="badge badge-outline exclude-chip">not {{ assoc.hashtag.name }}{% if assoc.include_subtodos %} + subtasks{% endif %}</span>{% endfor %}
-        {% if folder.lists %}<span class="badge badge-ghost">Lists: {{ folder.lists|map(attribute='name')|join(', ') }}</span>{% endif %}
-        {% for item in folder.include_folders %}<span class="badge badge-ghost">In {{ item.path_name }}</span>{% endfor %}
-        {% if folder.include_root_folder and not folder.include_folders %}<span class="badge badge-ghost">Unfiled lists</span>{% endif %}
-        {% for item in folder.exclude_folders %}<span class="badge badge-outline exclude-chip">not in {{ item.path_name }}</span>{% endfor %}
-        {% if folder.exclude_root_folder %}<span class="badge badge-outline exclude-chip">not unfiled</span>{% endif %}
-        {% if folder.uncompleted_only %}<span class="badge badge-ghost">Open only</span>{% endif %}
-        {% if folder.include_archived_lists %}<span class="badge badge-ghost">Includes archived</span>{% endif %}
-        {% if results.modified_after_display %}<span class="badge badge-ghost">Modified from {{ results.modified_after_display }}</span>{% endif %}
-        {% if results.modified_before_display %}<span class="badge badge-ghost">Modified until {{ results.modified_before_display }}</span>{% endif %}
+        {% for text, kind in rules %}<span class="badge {{ 'badge-ghost' if kind == 'plain' else 'badge-outline' }} {{ 'tag' if kind in ['tag', 'hash'] else 'exclude-chip' if kind == 'not' else '' }}">{{ text }}</span>{% endfor %}
     </div>
 
     {% if not sections or (not lists and not task_count and not events) %}

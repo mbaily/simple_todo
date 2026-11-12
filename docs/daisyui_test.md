@@ -61,3 +61,23 @@ where available. Dates use the application's configured formats.
 Verification: `python3 -m pytest tests/test_daisyui_test.py tests/test_daisyui_list.py tests/test_daisyui_edit.py tests/test_list_user_ordering.py tests/test_reverse_proxy.py tests/test_task_moves.py`.
 The prototype tests use an isolated in-memory database and launch their own local
 server for Playwright; they do not require a running development server.
+
+Smart folders at `/app/smart-folders` use the same editor for creation and editing.
+Choose item types, add removable tags or text hashtags to include/exclude, then
+choose folder scope and optional date/completion filters. Included rules match
+any or all of the chosen tags and hashtags; exclusions always win. An empty
+include selection matches everything allowed by the other filters. Text hashtags
+are case insensitive and include notes attached to the matching item. A task's
+notes do not make its list match. Unused hashtags can be typed into the editor.
+Folder scope applies to lists and tasks; calendar events use the tag, hashtag,
+completion and date filters. Layout and sorting are in a separate expandable panel.
+
+The editor posts rule changes to a draft endpoint and shows matching item counts
+and sample names. Drafts are rolled back, including association changes, and do
+not create journal entries. Only Create/Save commits the rules. Schema upgrades
+add hashtag arrays, match mode, event visibility, and inheritance/folder options
+without deleting existing smart folders or their tag associations. Legacy tag
+inheritance is reflected in the editor's common switches when an existing folder
+is edited. Mixed include/exclude folder scopes are retained as exceptions.
+The new fields are included in export/import and sync. Verify with
+`python3 -m pytest tests/test_daisyui_smart.py tests/test_daisyui_texthashtags.py tests/test_import_relationships.py`.

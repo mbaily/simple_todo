@@ -1,15 +1,5 @@
 {% from 'daisyui_test/_icons.html' import icon %}
-{% macro summary(folder) %}
-{%- set parts = [] -%}
-{%- if folder.show_lists and folder.show_todos %}{% set _ = parts.append('Lists and tasks') %}{% elif folder.show_lists %}{% set _ = parts.append('Lists') %}{% else %}{% set _ = parts.append('Tasks') %}{% endif -%}
-{%- for assoc in folder.include_hashtags_assoc %}{% set _ = parts.append(assoc.hashtag.name) %}{% endfor -%}
-{%- for assoc in folder.exclude_hashtags_assoc %}{% set _ = parts.append('not ' ~ assoc.hashtag.name) %}{% endfor -%}
-{%- if folder.lists %}{% set _ = parts.append(folder.lists|length ~ (' list' if folder.lists|length == 1 else ' lists')) %}{% endif -%}
-{%- if folder.include_folders or folder.exclude_folders or folder.include_root_folder or folder.exclude_root_folder %}{% set _ = parts.append('folder filter') %}{% endif -%}
-{%- if folder.uncompleted_only %}{% set _ = parts.append('open only') %}{% endif -%}
-{%- if folder.modified_after or folder.modified_before %}{% set _ = parts.append('date range') %}{% endif -%}
-{{ parts|join(' · ') }}
-{%- endmacro %}
+{% macro summary(folder) %}{% for text, kind in rule_summary(folder) %}{% if kind == 'plain' %}<span>{{ text }}</span>{% else %}<span class="badge badge-outline tag {{ 'exclude-chip' if kind == 'not' else '' }}">{{ text }}</span>{% endif %}{% endfor %}{% endmacro %}
 <div id="daisy-workspace" data-scope="smart-index" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
     <div class="page-heading">
         <div class="page-title"><h1>Smart folders</h1><span class="eyebrow">{{ smart_folders|length }} saved {{ 'view' if smart_folders|length == 1 else 'views' }}</span></div>
@@ -22,7 +12,7 @@
         {% for folder in smart_folders %}
         <li class="list-row item-row smart-row">
             <span class="folder-symbol">{{ icon('smart', 16) }}</span>
-            <div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}/smart-folder/{{ folder.id }}">{{ folder.name }}</a><span class="item-context">{{ summary(folder) }}</span></div></div>
+            <div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}/smart-folder/{{ folder.id }}">{{ folder.name }}</a><span class="item-context rule-summary">{{ summary(folder) }}</span></div></div>
             <div class="row-actions">
                 <a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/smart-folder/{{ folder.id }}/edit" title="Edit smart folder" aria-label="Edit {{ folder.name }}">{{ icon('edit', 16) }}</a>
                 {% for direction, symbol in [('up', '↑'), ('down', '↓')] %}
@@ -34,6 +24,6 @@
         </ul>
     </section>
     {% else %}
-    <div class="empty-state"><h3>No smart folders yet. Save a view that collects tasks and lists by tag, folder or date.</h3><a class="btn btn-primary" href="{{ prototype_url }}/smart-folders/new">{{ icon('plus', 17) }} New smart folder</a></div>
+    <div class="empty-state"><h3>No smart folders yet. Save a view that collects lists, tasks and events by tag, hashtag, folder or date.</h3><a class="btn btn-primary" href="{{ prototype_url }}/smart-folders/new">{{ icon('plus', 17) }} New smart folder</a></div>
     {% endif %}
 </div>

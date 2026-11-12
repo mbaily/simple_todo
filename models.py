@@ -447,6 +447,20 @@ class SmartFolder(Base):
     section_order = Column(String(8), default="LET")
     sort_order = Column(Integer, default=0)
 
+    # Calendar events are shown when they match the tag and hashtag rules.
+    show_events = Column(Boolean, default=True)
+    # Included tags and hashtags: any one is enough, or every one is required.
+    match_all = Column(Boolean, default=False)
+    # Hashtags written in text (lower case, without the #). Tags use the association tables below.
+    include_text_hashtags = Column(JSON, nullable=False, default=list, server_default="[]")
+    exclude_text_hashtags = Column(JSON, nullable=False, default=list, server_default="[]")
+    # A matching task or list also brings its subtasks / its tasks. The tag associations carry
+    # their own copies of these flags; these apply to hashtags and are what the editor shows.
+    include_subtodos = Column(Boolean, default=False)
+    include_list_items = Column(Boolean, default=False)
+    # A chosen folder also covers the folders inside it.
+    include_subfolders = Column(Boolean, default=False)
+
     # DokuWiki integration
     dokuwiki_links_enabled = Column(Boolean, default=False)
     dokuwiki_date_field = Column(String(32), default="created_at")  # "created_at" or "modified_at"

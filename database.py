@@ -406,6 +406,13 @@ MIGRATIONS.append(("smart_folder_include_hashtags", "include_list_items", "BOOLE
 MIGRATIONS.append(("hashtags", "include_list_items", "BOOLEAN DEFAULT 0"))
 MIGRATIONS.append(("hashtags", "hide_completed_list_items", "BOOLEAN DEFAULT 0"))
 MIGRATIONS.append(("smart_folders", "section_order", "VARCHAR(8) DEFAULT 'LET'"))
+MIGRATIONS.append(("smart_folders", "show_events", "BOOLEAN DEFAULT 1"))
+MIGRATIONS.append(("smart_folders", "match_all", "BOOLEAN DEFAULT 0"))
+MIGRATIONS.append(("smart_folders", "include_text_hashtags", "JSON NOT NULL DEFAULT '[]'"))
+MIGRATIONS.append(("smart_folders", "exclude_text_hashtags", "JSON NOT NULL DEFAULT '[]'"))
+MIGRATIONS.append(("smart_folders", "include_subtodos", "BOOLEAN DEFAULT 0"))
+MIGRATIONS.append(("smart_folders", "include_list_items", "BOOLEAN DEFAULT 0"))
+MIGRATIONS.append(("smart_folders", "include_subfolders", "BOOLEAN DEFAULT 0"))
 
 # Recipe mode for lists (2026-01-12)
 MIGRATIONS.append(("lists", "is_recipe", "BOOLEAN DEFAULT 0"))

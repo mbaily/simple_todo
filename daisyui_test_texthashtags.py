@@ -8,7 +8,7 @@ from fastapi import Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from hashtag_index import SOURCES, all_hashtags, extract_hashtags, hashtag_entities, install_hashtag_index, _installed
+from hashtag_index import SOURCES, all_hashtags, ensure_index, extract_hashtags, hashtag_entities
 from models import CalendarEvent, Folder, List, Note, Todo
 from daisyui_test_http import wants_fragment
 
@@ -29,14 +29,9 @@ def attach_text_hashtag_routes(router, *, templates, get_db):
             headers={"Vary": "HX-Request, HX-History-Restore-Request", "Cache-Control": "no-store"},
         )
 
-    def ready(db):
-        # Databases opened outside database.get_engine (tests) are indexed on first use.
-        if db.bind not in _installed:
-            install_hashtag_index(db.bind)
-
     @router.get("/hashtags", response_class=HTMLResponse)
     def hashtags(request: Request, db: Session = Depends(get_db)):
-        ready(db)
+        ensure_index(db)
         return respond(request, db, "daisyui_test/_texthashtags_workspace.html", path="/hashtags",
                        page_title="Hashtags", hashtags=all_hashtags(db), sources=list(SOURCES))
 
@@ -46,7 +41,7 @@ def attach_text_hashtag_routes(router, *, templates, get_db):
             # Tag pages lived at this address before hashtags were added.
             query = "?" + request.url.query if request.url.query else ""
             return RedirectResponse(f"{request.scope.get('root_path', '')}/app/tag/{name}{query}", status_code=308)
-        ready(db)
+        ensure_index(db)
         name = name.lstrip("#").lower()
         found = {kind: db.query(MODELS[kind]).filter(MODELS[kind].id.in_(ids)).all() if ids else []
                  for kind, ids in hashtag_entities(db, name).items() if kind in MODELS}

@@ -433,34 +433,28 @@ def apply_smart_folder(db: Session, data: Dict[str, Any], id_map: Dict[str, int]
         'include_archived_lists', 'list_sort_field', 'list_sort_desc', 
         'todo_sort_field', 'todo_sort_desc', 'dokuwiki_links_enabled', 
         'dokuwiki_date_field', 'include_root_folder', 'exclude_root_folder',
-        'strict_nesting', 'sort_order'
+        'strict_nesting', 'sort_order', 'section_order', 'show_events', 'match_all',
+        'include_subtodos', 'include_list_items', 'include_subfolders',
     ]
     for field in simple_fields:
         if field in data:
             setattr(obj, field, data[field])
 
+    for field in ('include_text_hashtags', 'exclude_text_hashtags'):
+        if isinstance(data.get(field), list):
+            setattr(obj, field, [str(name).lstrip('#').lower() for name in data[field] if str(name).strip('#')])
     if 'modified_after' in data: obj.modified_after = parse_iso(data['modified_after'])
     if 'modified_before' in data: obj.modified_before = parse_iso(data['modified_before'])
     
-    # Relationships like include_hashtags are complex (association model).
-    # For bulk sync, maybe simpler to clear and re-add if provided?
-    # Or just ignore for now as it's complex. 
-    # Let's implement basic List inclusion.
-    if 'lists' in data: # Expected list of dicts with IDs?
-        # Serializer: "lists": [{"id": l.id, "name": l.name} ...]
-        # Or incoming might be just IDs?
-        # Let's assume input might match output structure, i.e. list of dicts.
-        target_ids = []
-        for l_item in data['lists']:
-             if isinstance(l_item, dict):
-                 lid = _resolve_id(l_item.get('id'), id_map)
-             else:
-                 lid = _resolve_id(l_item, id_map)
-             if lid: target_ids.append(lid)
-        
-        if target_ids:
-             lists = db.query(ListModel).filter(ListModel.id.in_(target_ids)).all()
-             obj.lists = lists
+    # Omitted/null selections preserve scope; an explicit array replaces it,
+    # including an empty array that removes a previous restriction.
+    for field, model in (('lists', ListModel), ('include_folders', Folder), ('exclude_folders', Folder)):
+        selection = data.get(field)
+        if isinstance(selection, list):
+            target_ids = [_resolve_id(item.get('id') if isinstance(item, dict) else item, id_map)
+                          for item in selection]
+            target_ids = [item_id for item_id in target_ids if item_id]
+            setattr(obj, field, db.query(model).filter(model.id.in_(target_ids)).all() if target_ids else [])
 
     if 'include_hashtags' in data:
         update_smart_folder_hashtags(db, obj, data['include_hashtags'], True, id_map)

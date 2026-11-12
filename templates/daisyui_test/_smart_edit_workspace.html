@@ -1,58 +1,98 @@
 {% from 'daisyui_test/_icons.html' import icon %}
-{% set folder = smart_folder %}
-{% set action = prototype_url ~ ('/smart-folder/' ~ folder.id ~ '/edit' if folder else '/smart-folders') ~ query %}
-{% set cancel = prototype_url ~ ('/smart-folder/' ~ folder.id if folder else '/smart-folders') %}
-{% macro mode_select(name, current, label) %}
-<select class="select select-xs rule-mode" name="{{ name }}" aria-label="{{ label }}">
-    <option value="" {% if not current %}selected{% endif %}>Ignore</option>
-    <option value="include" {% if current == 'include' %}selected{% endif %}>Include</option>
-    <option value="exclude" {% if current == 'exclude' %}selected{% endif %}>Exclude</option>
-</select>
+{# The editor reads as a sentence: show … that have … in … . The form posts itself on every
+   change (to …/draft), which redraws this page with what the rules match; only Save stores them. #}
+{% set path = prototype_url ~ ('/smart-folder/' ~ smart_folder_id if smart_folder_id else '/smart-folders') %}
+{% set action = path ~ ('/edit' if smart_folder_id else '') ~ query %}
+{% set draft = path ~ '/draft' ~ query %}
+{% set cancel = path %}
+{% macro check(name, label, checked) %}<label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="{{ name }}" value="true" {% if checked %}checked{% endif %}> {{ label }}</label>{% endmacro %}
+{# Chosen items are ticked chips: clicking one unticks it, which removes it. The menu adds one more. #}
+{% macro chips(name, chosen, options, add_label, kind='', empty='') %}
+<div class="chip-picker" role="group" aria-label="{{ add_label }}">
+    {% for key, label in chosen %}<label class="badge badge-outline chip {{ kind }}" title="Remove {{ label }}"><input type="checkbox" name="{{ name }}" value="{{ key }}" checked aria-label="{{ label }} (untick to remove)"><span>{{ label }}</span><span class="chip-x" aria-hidden="true">×</span></label>{% endfor %}
+    {% if not chosen and empty %}<span class="chip-empty">{{ empty }}</span>{% endif %}
+    {% set available = options|map(attribute=1)|map('length')|sum %}
+    {% if available %}<select class="select select-sm chip-add" name="add_{{ name }}" aria-label="{{ add_label }}"><option value="">{{ add_label }}…</option>{% for group, items in options %}{% if items %}{% if group %}<optgroup label="{{ group }}">{% endif %}{% for key, label in items %}<option value="{{ key }}">{{ label }}</option>{% endfor %}{% if group %}</optgroup>{% endif %}{% endif %}{% endfor %}</select>{% endif %}
+</div>
 {% endmacro %}
-{% macro check(name, label, checked, value='true') %}<label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="{{ name }}" value="{{ value }}" {% if checked %}checked{% endif %}> {{ label }}</label>{% endmacro %}
 {% macro sort(prefix, label) %}
 <div class="editor-field"><span>{{ label }}</span><div class="join"><select class="select select-sm join-item" name="{{ prefix }}_sort_field" aria-label="{{ label }} field">{% for value, text in sort_fields.items() %}<option value="{{ value }}" {% if values[prefix ~ '_sort_field'] == value %}selected{% endif %}>{{ text }}</option>{% endfor %}</select><select class="select select-sm join-item" name="{{ prefix }}_sort_dir" aria-label="{{ label }} direction"><option value="desc" {% if values[prefix ~ '_sort_dir'] == 'desc' %}selected{% endif %}>Newest first</option><option value="asc" {% if values[prefix ~ '_sort_dir'] == 'asc' %}selected{% endif %}>Oldest first</option></select></div></div>
 {% endmacro %}
-<div id="daisy-workspace" data-scope="smart-edit:{{ folder.id if folder else 'new' }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+<div id="daisy-workspace" data-scope="smart-edit:{{ smart_folder_id or 'new' }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:replace" hx-indicator:inherited="#workspace-loading">
     <header class="page-heading editor-heading">
-        <div class="page-title"><h1>{{ 'Edit smart folder' if folder else 'New smart folder' }}</h1>{% if folder %}<span class="editor-item-title">{{ folder.name }}</span>{% endif %}</div>
-        <div class="detail-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><button id="smart-save" type="submit" form="smart-form" class="btn btn-primary">{{ icon('check', 16) }} {{ 'Save changes' if folder else 'Create smart folder' }}</button><a class="btn" href="{{ cancel }}">Cancel</a>{% if folder %}<form action="{{ prototype_url }}/smart-folder/{{ folder.id }}/delete?view=smart-index" method="post" hx-post="{{ prototype_url }}/smart-folder/{{ folder.id }}/delete?view=smart-index" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete smart folder “{{ folder.name }}”? Only the saved view is deleted; its lists and tasks are kept."><button class="btn delete-button">{{ icon('trash', 15) }} Delete</button></form>{% endif %}</div>
+        <div class="page-title"><h1>{{ 'Edit smart folder' if smart_folder_id else 'New smart folder' }}</h1>{% if smart_folder_id %}<span class="editor-item-title">{{ smart_folder_name }}</span>{% endif %}</div>
+        <div class="detail-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><button id="smart-save" type="submit" form="smart-form" class="btn btn-primary">{{ icon('check', 16) }} {{ 'Save changes' if smart_folder_id else 'Create smart folder' }}</button><a class="btn" href="{{ cancel }}">Cancel</a>{% if smart_folder_id %}<form action="{{ prototype_url }}/smart-folder/{{ smart_folder_id }}/delete?view=smart-index" method="post" hx-post="{{ prototype_url }}/smart-folder/{{ smart_folder_id }}/delete?view=smart-index" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete smart folder “{{ smart_folder_name }}”? Only the saved view is deleted; its lists and tasks are kept."><button class="btn delete-button">{{ icon('trash', 15) }} Delete</button></form>{% endif %}</div>
     </header>
     <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
 
-    <form id="smart-form" data-draft action="{{ action }}" method="post" hx-post="{{ action }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="#smart-save" class="smart-editor">
-        <section class="section-panel editor-form">
-            <label class="editor-field editor-wide" for="smart-name"><span>Name</span><input id="smart-name" class="input input-sm" name="name" value="{{ values.name }}" required maxlength="255" autocomplete="off"></label>
-            <div class="editor-field"><span>Show</span><div class="option-row">{{ check('show_lists', 'Lists', values.show_lists) }}{{ check('show_todos', 'Tasks', values.show_todos) }}</div></div>
-            <label class="editor-field" for="smart-section-order"><span>Section order</span><select id="smart-section-order" class="select select-sm" name="section_order">{% for value, text in section_orders.items() %}<option value="{{ value }}" {% if values.section_order == value %}selected{% endif %}>{{ text }}</option>{% endfor %}</select></label>
-            <label class="editor-field" for="smart-after"><span>Modified from</span><input id="smart-after" class="input input-sm" type="date" name="modified_after" value="{{ values.modified_after }}"></label>
-            <label class="editor-field" for="smart-before"><span>Modified until</span><input id="smart-before" class="input input-sm" type="date" name="modified_before" value="{{ values.modified_before }}"></label>
-            {{ sort('list', 'Sort lists by') }}
-            {{ sort('todo', 'Sort tasks by') }}
-            <div class="editor-field editor-wide"><span>Options</span><div class="option-row">{% for name, label in flags.items() %}{{ check(name, label, values.flags.get(name)) }}{% endfor %}</div></div>
-            {% if enable_dokuwiki_links %}<div class="editor-field editor-wide"><span>DokuWiki</span><div class="option-row">{{ check('dokuwiki_links_enabled', 'Show dated DokuWiki links', values.dokuwiki_links_enabled) }}<select class="select select-xs" name="dokuwiki_date_field" aria-label="DokuWiki link date">{% for value, text in sort_fields.items() %}<option value="{{ value }}" {% if values.dokuwiki_date_field == value %}selected{% endif %}>{{ text }} date</option>{% endfor %}</select></div></div>{% endif %}
-        </section>
+    <div class="smart-layout">
+    <div class="smart-editor">
+        <form id="smart-form" action="{{ action }}" method="post" hx-post="{{ action }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="#smart-save">
+            <section class="section-panel smart-step"><label class="smart-lead" for="smart-name">Name</label><input id="smart-name" class="input input-sm grow-input" name="name" value="{{ values.name }}" required maxlength="255" autocomplete="off" placeholder="For example: Home jobs"></section>
+            <div id="smart-rules" hx-post="{{ draft }}" hx-trigger="change" hx-include="#smart-form" hx-validate="false" hx-target="#daisy-workspace" hx-swap="outerMorph">
+            <section class="section-panel smart-step" aria-labelledby="smart-show">
+                <span class="smart-lead" id="smart-show">Show</span>
+                <div class="option-row">{{ check('show_lists', 'Lists', values.show_lists) }}{{ check('show_todos', 'Tasks', values.show_todos) }}{{ check('show_events', 'Calendar events', values.show_events) }}</div>
+            </section>
 
-        <details class="section-panel rule-panel" data-persist="smart-hashtags" {% if values.hashtags %}open{% endif %}>
-            <summary class="capture-summary">{{ icon('tag', 16) }} Tags <span class="section-count">{{ values.hashtags|length }} rules</span><small>No included tags means every item is considered.</small>{{ icon('down', 14) }}</summary>
-            {% if all_hashtags %}
-            <ul class="list rule-list">{% for tag in all_hashtags %}{% set rule = values.hashtags.get(tag.id, {}) %}
-                <li class="list-row rule-row"><span class="rule-name">{{ tag.name }}</span>{{ mode_select('hashtag_mode_' ~ tag.id, rule.mode, 'Rule for tag ' ~ tag.name) }}{{ check('subtodos_' ~ tag.id, 'Also subtasks', rule.subtodos) }}{{ check('list_items_' ~ tag.id, 'Tasks in tagged lists', rule.list_items) }}</li>
-            {% endfor %}</ul>
-            {% else %}<p class="section-empty">No tags yet.</p>{% endif %}
-        </details>
+            <section class="section-panel smart-step" aria-labelledby="smart-have">
+                <span class="smart-lead" id="smart-have">that have <select class="select select-xs smart-inline" name="match" aria-label="How many of the chosen tags and hashtags an item needs"><option value="any" {% if values.match == 'any' %}selected{% endif %}>any</option><option value="all" {% if values.match == 'all' %}selected{% endif %}>all</option></select> of</span>
+                {{ chips('include', include_chips, rule_options, 'Add a tag or hashtag', empty='Nothing chosen, so every item counts.') }}
+                <label class="smart-new-hashtag">Another hashtag <input class="input input-sm" name="new_include" value="{{ values.new_include|default('') }}" placeholder="#home" aria-label="Include another hashtag" autocomplete="off"></label>
+                <span class="smart-lead smart-rule-break">but none of</span>
+                {{ chips('exclude', exclude_chips, rule_options, 'Leave out a tag or hashtag', kind='exclude-chip') }}
+                <label class="smart-new-hashtag">Another hashtag <input class="input input-sm" name="new_exclude" value="{{ values.new_exclude|default('') }}" placeholder="#waiting" aria-label="Exclude another hashtag" autocomplete="off"></label>
+                <div class="option-row smart-follow">{{ check('subtodos', 'Also match subtasks of matching tasks', values.subtodos) }}{{ check('list_items', 'Also match tasks in matching lists', values.list_items) }}</div>
+                <p class="page-hint">A tag is attached in an item's Tags field. A hashtag is a #word written in a name, title or note.</p>
+                <p class="page-hint">Type another hashtag and press Enter or leave the field to add it. You can use hashtags that do not appear on any items yet.</p>
+            </section>
 
-        <details class="section-panel rule-panel" data-persist="smart-folders" {% if values.folders %}open{% endif %}>
-            <summary class="capture-summary">{{ icon('folder', 16) }} Folders <span class="section-count">{{ values.folders|length }} rules</span><small>Included folders take precedence over “Unfiled lists”.</small>{{ icon('down', 14) }}</summary>
-            <ul class="list rule-list">
-                <li class="list-row rule-row"><span class="rule-name">Unfiled lists</span>{{ mode_select('folder_mode_root', values.folders.get('root'), 'Rule for unfiled lists') }}</li>
-                {% for item in all_folders %}<li class="list-row rule-row"><span class="rule-name">{{ item.path_name }}</span>{{ mode_select('folder_mode_' ~ item.id, values.folders.get(item.id), 'Rule for folder ' ~ item.path_name) }}</li>{% endfor %}
-            </ul>
-        </details>
+            <section class="section-panel smart-step" aria-labelledby="smart-where">
+                <span class="smart-lead" id="smart-where">in</span>
+                <div class="option-row" role="radiogroup" aria-labelledby="smart-where">{% for value, label in scopes.items() %}<label class="option-checkbox"><input type="radio" class="radio radio-xs" name="scope" value="{{ value }}" {% if values.scope == value %}checked{% endif %}> {{ label }}</label>{% endfor %}</div>
+                {% if values.scope != 'all' %}<input type="hidden" name="scope_shown" value="1">
+                {{ chips('places', place_chips, place_options, 'Add a folder', empty='Choose at least one folder.') }}
+                <div class="option-row">{{ check('subfolders', 'and the folders inside them', values.subfolders) }}</div>{% endif %}
+                {% if values.scope == 'only' %}<span class="smart-lead smart-rule-break">except</span>{{ chips('extra_exclude_places', extra_exclude_chips, extra_exclude_options, 'Exclude a folder', kind='exclude-chip', empty='No exceptions.') }}{% endif %}
+                <span class="smart-lead smart-rule-break">from</span>
+                {{ chips('lists', list_chips, list_options, 'Only certain lists', empty='Any list.') }}
+                <p class="page-hint">Calendar events belong to no folder or list, so these two choices do not narrow them.</p>
+            </section>
 
-        <details class="section-panel rule-panel" data-persist="smart-lists" {% if values.list_ids %}open{% endif %}>
-            <summary class="capture-summary">{{ icon('list', 16) }} Only these lists <span class="section-count">{{ values.list_ids|length }} selected</span><small>Leave empty for all lists.</small>{{ icon('down', 14) }}</summary>
-            <div class="list-picker">{% for item in all_lists %}{{ check('list_ids', item.name, item.id in values.list_ids, item.id) }}{% endfor %}</div>
-        </details>
-    </form>
+            <section class="section-panel smart-step" aria-labelledby="smart-narrow">
+                <span class="smart-lead" id="smart-narrow">and are</span>
+                <div class="option-row">{{ check('uncompleted_only', 'Still open (not completed)', values.uncompleted_only) }}{{ check('include_archived_lists', 'In archived lists too', values.include_archived_lists) }}</div>
+                <div class="option-row"><label class="smart-date">Modified from <input class="input input-sm" type="date" name="modified_after" value="{{ values.modified_after }}"></label><label class="smart-date">until <input class="input input-sm" type="date" name="modified_before" value="{{ values.modified_before }}"></label></div>
+            </section>
+
+            <details class="section-panel rule-panel" data-persist="smart-layout">
+                <summary class="capture-summary">{{ icon('settings', 16) }} Layout and sorting{{ icon('down', 14) }}</summary>
+                <div class="editor-form">
+                    <label class="editor-field" for="smart-subtasks"><span>Subtasks</span><select id="smart-subtasks" class="select select-sm" name="subtasks">{% for value, text in subtask_modes.items() %}<option value="{{ value }}" {% if values.subtasks == value %}selected{% endif %}>{{ text }}</option>{% endfor %}</select></label>
+                    <div class="editor-field"><span>Tasks</span>{{ check('group_todos_by_list', 'Group tasks under their list', values.group_todos_by_list) }}</div>
+                    {{ sort('list', 'Sort lists by') }}
+                    {{ sort('todo', 'Sort tasks by') }}
+                    <label class="editor-field" for="smart-section-order"><span>Section order</span><select id="smart-section-order" class="select select-sm" name="section_order">{% for value, text in section_orders.items() %}<option value="{{ value }}" {% if values.section_order == value %}selected{% endif %}>{{ text }}</option>{% endfor %}</select></label>
+                    {% if enable_dokuwiki_links %}<div class="editor-field"><span>DokuWiki</span><div class="option-row">{{ check('dokuwiki_links_enabled', 'Show dated DokuWiki links', values.dokuwiki_links_enabled) }}<select class="select select-xs" name="dokuwiki_date_field" aria-label="DokuWiki link date">{% for value, text in sort_fields.items() %}<option value="{{ value }}" {% if values.dokuwiki_date_field == value %}selected{% endif %}>{{ text }} date</option>{% endfor %}</select></div></div>{% endif %}
+                </div>
+            </details>
+            </div>
+        </form>
+    </div>
+
+    <aside id="smart-preview" class="section-panel smart-preview" aria-live="polite" aria-labelledby="smart-preview-heading">
+        <header class="section-heading"><div><h2 id="smart-preview-heading">{{ icon('search', 17) }} Matches right now</h2></div></header>
+        {% if problems %}<ul class="smart-problems">{% for problem in problems %}<li>{{ problem }}</li>{% endfor %}</ul>{% endif %}
+        {% if matches %}
+        {% macro sample(shown, count, one, many, names) %}{% if shown %}
+        <div class="preview-group"><h3>{{ count }} {{ one if count == 1 else many }}</h3>{% if names %}<ul>{% for name in names %}<li>{{ caller(name) }}</li>{% endfor %}{% if count > names|length %}<li class="preview-more">and {{ count - names|length }} more</li>{% endif %}</ul>{% endif %}</div>
+        {% endif %}{% endmacro %}
+        {% call(name) sample(values.show_lists, matches.lists, 'list', 'lists', matches.list_names) %}{{ name }}{% endcall %}
+        {% call(name) sample(values.show_todos, matches.todos, 'task', 'tasks', matches.todo_names) %}{{ name[0] }}{% if name[1] %} <small>{{ name[1] }}</small>{% endif %}{% endcall %}
+        {% call(name) sample(values.show_events, matches.events, 'calendar event', 'calendar events', matches.event_names) %}{{ name }}{% endcall %}
+        {% if not (matches.lists or matches.todos or matches.events) %}<p class="section-empty">Nothing matches these rules yet.</p>{% endif %}
+        <p class="page-hint">Updates as you change the rules. Nothing is stored until you save.</p>
+        {% elif not problems %}<p class="section-empty">Choose what to show.</p>{% endif %}
+    </aside>
+    </div>
 </div>

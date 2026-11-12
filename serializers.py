@@ -173,6 +173,13 @@ def serialize_smart_folder(sf):
         "strict_nesting": sf.strict_nesting,
         "section_order": sf.section_order,
         "sort_order": sf.sort_order,
+        "show_events": sf.show_events,
+        "match_all": sf.match_all,
+        "include_text_hashtags": list(sf.include_text_hashtags or []),
+        "exclude_text_hashtags": list(sf.exclude_text_hashtags or []),
+        "include_subtodos": sf.include_subtodos,
+        "include_list_items": sf.include_list_items,
+        "include_subfolders": sf.include_subfolders,
         "created_at": sf.created_at.isoformat() if sf.created_at else None,
         "include_hashtags": [
             {
