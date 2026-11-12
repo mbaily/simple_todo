@@ -233,9 +233,10 @@ def test_overview_browses_folders_with_breadcrumbs_and_actions(prototype):
     assert client.get('/app/calendar').text.count('class="trail-icon"') == 0
     assert 'folder_id=0">Top level<' in trail(f'/app/list/{ids["other"]}')
     assert '<li aria-current="page">Top level</li>' in trail('/app')
-    # The overview's breadcrumb row ends with shortcuts to its folders and lists; other pages have none.
+    # The overview's breadcrumb row starts with shortcuts to its folders and lists; other pages have none.
     home = client.get('/app').text.split('class="trail-jumps"')[1].split('</span>')[0]
     assert home.index('href="#folders-heading"') < home.index('href="#lists-heading"') and 'aria-label="Jump to your lists"' in home
+    assert client.get('/app').text.index('class="trail-jumps"') < client.get('/app').text.index('class="trail-icon"')
     leaf = client.get(f'/app?folder_id={ids["admin"]}').text
     assert 'href="#lists-heading"' in leaf and 'href="#folders-heading"' not in leaf
     assert 'class="trail-jumps"' not in client.get(f'/app/list/{ids["list"]}').text

@@ -725,8 +725,8 @@ h2 { font-size: 1rem; letter-spacing: -.1px; font-weight: 600; margin: 0; }
 /* One breadcrumb position on every page that has one: the top of the workspace. */
 .page-trail { margin: 0 0 6px; min-width: 0; max-width: 100%; }
 .page-trail > ul { flex-wrap: wrap; row-gap: 2px; }
-/* Shortcuts to sections of the page stay at the right end of the breadcrumb row. */
-.trail-jumps { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; padding-left: 8px; flex-shrink: 0; position: sticky; right: 0; background: var(--surface); }
+/* Shortcuts to sections of the page stay at the left end of the breadcrumb row. */
+.trail-jumps { display: inline-flex; align-items: center; gap: 2px; padding-right: 4px; flex-shrink: 0; position: sticky; left: 0; z-index: 1; background: var(--surface); }
 .trail-jumps .btn { color: var(--muted); }
 .trail-jumps .btn:hover { color: var(--accent); }
 #folders-heading, #lists-heading { scroll-margin-top: calc(var(--topbar-height) + 8px); }
