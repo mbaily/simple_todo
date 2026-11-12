@@ -25,7 +25,7 @@
             {% if event.event_group %}<span class="item-context">{{ event.event_group.name }}</span>{% endif %}
         </div>
         {% if event.note %}<div class="item-context event-summary">{{ event.note }}</div>{% endif %}
-        {% if event.hashtags %}<div class="item-tags">{% for tag in event.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">{{ tag.name }}</a>{% endfor %}</div>{% endif %}
+        {% set found = text_hashtags(event.title, event.note) %}{% if event.hashtags or found %}<div class="item-tags">{% for tag in event.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/tag/{{ tag.id }}">{{ tag.name }}</a>{% endfor %}{% for name in found %}<a class="badge badge-outline tag text-hashtag" href="{{ prototype_url }}/hashtag/{{ name|lower|urlencode }}">#{{ name }}</a>{% endfor %}</div>{% endif %}
     </div>
     <a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/calendar/event/{{ event.id }}/edit?occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{{ '&' ~ nav_query if nav_query else '' }}" title="Edit event" aria-label="Edit event {{ event.title }}">{{ icon('edit', 16) }}</a>
 </li>

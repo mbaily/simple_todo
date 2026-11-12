@@ -12,7 +12,7 @@
 <li class="list-row item-row note-row" data-item-key="note:{{ note.id }}" style="--depth: {{ depth }}">
     {{ selection(note, 'note') }}
     <span class="note-marker">{{ icon('note', 16) }}</span>
-    <div class="item-content"><div class="note-text">{% if note.name %}<strong>{{ note.name }}: </strong>{% endif %}{{ note.text | daisy_note }}</div></div>
+    <div class="item-content"><div class="note-text">{% if note.name %}<strong>{{ note.name }}: </strong>{% endif %}{{ note.text | daisy_note }}</div>{% set found = text_hashtags(note.name, note.text) %}{% if found %}<div class="item-tags">{% for name in found %}<a class="badge badge-outline tag text-hashtag" href="{{ prototype_url }}/hashtag/{{ name|lower|urlencode }}">#{{ name }}</a>{% endfor %}</div>{% endif %}</div>
     <div class="row-actions">{{ links(note) }}<a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/note/{{ note.id }}/edit{{ query }}" title="Edit note" aria-label="Edit {{ note.name or 'note' }}">{{ icon('edit', 15) }}</a></div>
 </li>
 {% endmacro %}
@@ -30,7 +30,7 @@
     <div class="item-content">
         <div class="item-title-line">{% if todo.pinned %}<span class="row-marker" title="Pinned">{{ icon('pin', 14) }}</span>{% endif %}<span class="item-title" {% if todo.color and todo.color|lower not in ['#000000', '#ffffff', '#000', 'black'] %}style="color: {{ todo.color }}"{% endif %}>{{ todo.title }}</span>{% if todo.alarm_start %}<span title="Alarm: {{ todo.alarm_start | datetime_format }}" class="row-marker">{{ icon('bell', 14) }}</span>{% endif %}{% if todo.delayed_until %}<span class="item-context">Deferred {{ todo.delayed_until | date_format }}</span>{% endif %}</div>
         {% if todo.list_id != list.id %}<a class="item-context" href="{{ prototype_url }}/list/{{ todo.list_id }}{{ navigation_query }}&amp;highlight={{ todo.id }}">{{ icon('list', 13) }} {{ todo.list.name }}</a>{% endif %}
-        {% if todo.hashtags %}<div class="item-tags">{% for tag in todo.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">{{ tag.name }}</a>{% endfor %}</div>{% endif %}
+        {% set found = text_hashtags(todo.title, todo.note) %}{% if todo.hashtags or found %}<div class="item-tags">{% for tag in todo.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/tag/{{ tag.id }}">{{ tag.name }}</a>{% endfor %}{% for name in found %}<a class="badge badge-outline tag text-hashtag" href="{{ prototype_url }}/hashtag/{{ name|lower|urlencode }}">#{{ name }}</a>{% endfor %}</div>{% endif %}
         {% if todo.note %}<div class="legacy-task-note">{{ todo.note }}</div>{% endif %}
     </div>
     <div class="row-actions">

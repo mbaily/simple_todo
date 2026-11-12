@@ -54,7 +54,7 @@ def results_location(request, kind, sort, folder_id):
         smart_id = results_id(request, "smart_folder_id", "smart folder")
         return f"/smart-folder/{smart_id}", navigation, {**navigation, "view": "smart", "smart_folder_id": smart_id}
     hashtag_id = results_hashtag_id(request)
-    return f"/hashtag/{hashtag_id}", navigation, {**navigation, "view": "hashtag", "hashtag_id": hashtag_id}
+    return f"/tag/{hashtag_id}", navigation, {**navigation, "view": "hashtag", "hashtag_id": hashtag_id}
 
 
 def attach_search_routes(router, *, templates, get_db, actions, feedback, success):
@@ -98,12 +98,12 @@ def attach_search_routes(router, *, templates, get_db, actions, feedback, succes
     def search(request: Request, sort: str = "user", folder_id: int | None = None, db: Session = Depends(get_db)):
         return render_results(request, db, sort, folder_id, kind="search")
 
-    @router.get("/hashtag/{hashtag_id}", response_class=HTMLResponse)
+    @router.get("/tag/{hashtag_id}", response_class=HTMLResponse)
     def hashtag(request: Request, hashtag_id: int, sort: str = "user", folder_id: int | None = None,
                 db: Session = Depends(get_db)):
         return render_results(request, db, sort, folder_id, kind="hashtag")
 
-    @router.post("/hashtag/{hashtag_id}/options/{name}", response_class=HTMLResponse)
+    @router.post("/tag/{hashtag_id}/options/{name}", response_class=HTMLResponse)
     def hashtag_option(request: Request, hashtag_id: int, name: str, enabled: bool = Form(False),
                        sort: str = "user", folder_id: int | None = None, db: Session = Depends(get_db)):
         item = actions["load_hashtag"](db, hashtag_id)

@@ -1,0 +1,27 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{# Every hashtag found in text, most used first. Hashtags are read-only: they change by editing the text. #}
+<div id="daisy-workspace" data-scope="texthashtags" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Hashtags</h1><span class="eyebrow">{{ hashtags|length }} {{ 'hashtag' if hashtags|length == 1 else 'hashtags' }}</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>{% if hashtags|length > 8 %}<label class="input input-sm tag-filter">{{ icon('search', 15) }}<input id="hashtag-filter" type="search" data-row-filter=".hashtag-row" placeholder="Filter hashtags" aria-label="Filter hashtags" autocomplete="off"></label>{% endif %}</div>
+    </div>
+    <p class="page-hint">Hashtags are words written with a # in names, titles and notes, such as “Call the plumber #home”. To attach a label without writing it in the text, use <a class="link" href="{{ prototype_url }}/tags">Tags</a>.</p>
+    {% if hashtags %}
+    <section class="section-panel" aria-label="Hashtags">
+        <ul class="list">
+        {% for name, counts in hashtags %}
+        <li class="list-row item-row hashtag-row" data-name="{{ name }}">
+            <span class="folder-symbol">{{ icon('hash', 15) }}</span>
+            <div class="item-content"><div class="item-title-line">
+                <a class="item-title" href="{{ prototype_url }}/hashtag/{{ name|urlencode }}">#{{ name }}</a>
+                <span class="item-context">{% for kind in sources %}{% if counts.get(kind) %}<span>{{ counts[kind] }} {{ labels[kind][0] if counts[kind] == 1 else labels[kind][1] }}</span>{% endif %}{% endfor %}</span>
+            </div></div>
+        </li>
+        {% endfor %}
+        </ul>
+        <p class="section-empty" id="hashtag-filter-empty" hidden>No hashtags match the filter.</p>
+    </section>
+    {% else %}
+    <div class="empty-state"><h3>No hashtags yet. Write one in a name, title or note, such as #home.</h3></div>
+    {% endif %}
+</div>

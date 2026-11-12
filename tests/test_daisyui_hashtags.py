@@ -19,20 +19,20 @@ def add_tags(db, ids):
 def test_index_documents_counts_and_navigation(prototype):
     db, client, ids = prototype
     add_tags(db, ids)
-    full = client.get('/app/hashtags')
-    fragment = client.get('/app/hashtags', headers=HX)
+    full = client.get('/app/tags')
+    fragment = client.get('/app/tags', headers=HX)
     assert full.status_code == fragment.status_code == 200
     assert '<!DOCTYPE html>' in full.text and '<!DOCTYPE html>' not in fragment.text
     assert [tag.name for tag in full.context['hashtags']] == ['errands', 'personal']
     assert full.context['list_counts'][ids['tag']] == 1 and full.context['todo_counts'][ids['tag']] == 1
     assert 'Unused' in full.text and 'aria-current="page"' in full.text
-    assert 'href="/app/hashtag/' in full.text
+    assert 'href="/app/tag/' in full.text
 
 
 def test_rename_validation_options_and_delete(prototype):
     db, client, ids = prototype
     ids = add_tags(db, ids)
-    url = f'/app/hashtag/{ids["tag"]}/rename{Q}'
+    url = f'/app/tag/{ids["tag"]}/rename{Q}'
     response = client.post(url, headers=HX, data={'name': '#home_life'})
     assert response.status_code == 200 and 'Renamed personal to home_life.' in response.text
     db.expire_all()
@@ -43,20 +43,20 @@ def test_rename_validation_options_and_delete(prototype):
         bad = client.post(url, headers=HX, data={'name': name})
         assert bad.status_code == status and bad.headers['HX-Retarget'] == '#page-feedback'
     assert 'Tag unchanged.' in client.post(url, headers=HX, data={'name': 'home_life'}).text
-    assert client.post(f'/app/hashtag/9999/rename{Q}', headers=HX, data={'name': 'x'}).status_code == 404
+    assert client.post(f'/app/tag/9999/rename{Q}', headers=HX, data={'name': 'x'}).status_code == 404
 
-    option = client.post(f'/app/hashtag/{ids["tag"]}/options/include_list_items{Q}', headers=HX, data={'enabled': 'true'})
+    option = client.post(f'/app/tag/{ids["tag"]}/options/include_list_items{Q}', headers=HX, data={'enabled': 'true'})
     assert option.status_code == 200 and 'Tag view updated.' in option.text and 'Rename' in option.text
     db.expire_all()
     assert db.get(Hashtag, ids['tag']).include_list_items
 
-    deleted = client.post(f'/app/hashtag/{ids["spare"]}/delete{Q}', headers=HX)
+    deleted = client.post(f'/app/tag/{ids["spare"]}/delete{Q}', headers=HX)
     assert deleted.status_code == 200 and 'Deleted the tag errands. Tagged items were kept.' in deleted.text
     db.expire_all()
     assert db.get(Hashtag, ids['spare']) is None
     assert db.query(JournalEntry).filter_by(action='Deleted Tag', entity_id=ids['spare']).count() == 1
-    redirect = client.post(f'/app/hashtag/{ids["tag"]}/delete{Q}', follow_redirects=False)
-    assert redirect.status_code == 303 and redirect.headers['location'] == '/app/hashtags'
+    redirect = client.post(f'/app/tag/{ids["tag"]}/delete{Q}', follow_redirects=False)
+    assert redirect.status_code == 303 and redirect.headers['location'] == '/app/tags'
     db.expire_all()
     assert db.get(Todo, ids['todo']) is not None and not db.get(Todo, ids['todo']).hashtags
 
@@ -70,8 +70,8 @@ def test_browser_hashtag_index(prototype_server, page):
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(origin + '/app')
-    page.locator('.toolbar-navigation').get_by_role('link', name='Tags').click()
-    expect(page).to_have_url(origin + '/app/hashtags')
+    page.locator('.toolbar-navigation').get_by_role('link', name='Tags', exact=True).click()
+    expect(page).to_have_url(origin + '/app/tags')
     page.get_by_role('searchbox', name='Filter tags').fill('#pers')
     expect(page.get_by_role('link', name='errands', exact=True)).to_be_hidden()
     expect(page.get_by_role('link', name='personal', exact=True)).to_be_visible()

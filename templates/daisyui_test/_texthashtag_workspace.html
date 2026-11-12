@@ -1,0 +1,30 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{# Everything whose text contains one hashtag. #}
+{% macro pills(texts) %}{% set names = text_hashtags(*texts) %}{% if names %}<div class="item-tags">{% for other in names %}<a class="badge badge-outline tag text-hashtag" href="{{ prototype_url }}/hashtag/{{ other|lower|urlencode }}" {% if other|lower == name %}aria-current="true"{% endif %}>#{{ other }}</a>{% endfor %}</div>{% endif %}{% endmacro %}
+{% macro section(key, title, symbol) %}{% if found[key] %}
+<section class="section-panel" aria-labelledby="hashtag-{{ key }}-heading"><header class="section-heading"><div><h2 id="hashtag-{{ key }}-heading">{{ icon(symbol, 19) }} {{ title }} <span class="section-count">{{ found[key]|length }}</span></h2></div></header><ul class="list">{{ caller() }}</ul></section>
+{% endif %}{% endmacro %}
+<div id="daisy-workspace" data-scope="texthashtag:{{ name }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>#{{ name }}</h1><span class="eyebrow" id="results-summary">{{ total }} {{ 'result' if total == 1 else 'results' }}</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/hashtags">{{ icon('hash', 16) }} All hashtags</a></div>
+    </div>
+    {% if not total %}
+    <div class="empty-state"><h3>Nothing contains #{{ name }}.</h3></div>
+    {% endif %}
+    {% call section('folders', 'Folders', 'folder') %}{% for folder in found.folders %}
+        <li class="list-row item-row"><span class="folder-symbol">{{ icon('folder', 16) }}</span><div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}?sort=user&amp;folder_id={{ folder.id }}">{{ folder.name }}</a>{% if folder.parent %}<span class="item-context">in {{ folder.parent.path_name }}</span>{% endif %}</div>{{ pills([folder.name]) }}</div></li>
+    {% endfor %}{% endcall %}
+    {% call section('lists', 'Lists', 'list') %}{% for item in found.lists %}
+        <li class="list-row item-row"><span class="folder-symbol">{{ icon('list', 16) }}</span><div class="item-content"><div class="item-title-line"><a class="item-title {{ 'is-completed-title' if item.completed else '' }}" href="{{ prototype_url }}/list/{{ item.id }}">{{ item.name }}</a>{% if item.archived %}<span class="item-context">Archived</span>{% endif %}{% if item.folder %}<span class="item-context">in {{ item.folder.path_name }}</span>{% endif %}</div>{{ pills([item.name]) }}</div></li>
+    {% endfor %}{% endcall %}
+    {% call section('todos', 'Tasks', 'check') %}{% for todo in found.todos %}
+        <li class="list-row item-row"><span class="folder-symbol">{{ icon('check', 16) }}</span><div class="item-content"><div class="item-title-line"><a class="item-title {{ 'is-completed-title' if todo.completed else '' }}" href="{{ prototype_url }}/list/{{ todo.list_id }}?highlight={{ todo.id }}">{{ todo.title }}</a><span class="item-context">{{ todo.list.name }}{% if todo.completed %} · Completed{% endif %}</span></div>{% if todo.note %}<div class="legacy-task-note">{{ todo.note }}</div>{% endif %}{{ pills([todo.title, todo.note]) }}</div></li>
+    {% endfor %}{% endcall %}
+    {% call section('notes', 'Notes', 'note') %}{% for note in found.notes %}
+        <li class="list-row item-row"><span class="folder-symbol">{{ icon('note', 16) }}</span><div class="item-content"><div class="item-title-line"><a class="item-title" href="{% if note.calendar_event_id %}{{ prototype_url }}/calendar/event/{{ note.calendar_event_id }}/edit{% else %}{{ prototype_url }}/list/{{ note.list_id or (note.todo.list_id if note.todo else 0) }}{% if note.todo_id %}?highlight={{ note.todo_id }}{% endif %}{% endif %}">{{ note.name or (note.text|truncate(80, True)) }}</a><span class="item-context">{% if note.calendar_event %}{{ note.calendar_event.title }}{% else %}{% if note.todo %}{{ note.todo.title }} · {% endif %}{{ note.list.name if note.list else (note.todo.list.name if note.todo else '') }}{% endif %}</span></div>{% if note.name %}<div class="legacy-task-note">{{ note.text|truncate(200, True) }}</div>{% endif %}{{ pills([note.name, note.text]) }}</div></li>
+    {% endfor %}{% endcall %}
+    {% call section('calendar_events', 'Calendar events', 'calendar') %}{% for event in found.calendar_events %}
+        <li class="list-row item-row"><span class="folder-symbol">{{ icon('calendar', 16) }}</span><div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}/calendar/event/{{ event.id }}/edit">{{ event.title }}</a><span class="item-context">{{ event.start_at.strftime('%Y-%m-%d') }}{% if event.rrule %} · Recurring{% endif %}</span></div>{% if event.note %}<div class="legacy-task-note">{{ event.note }}</div>{% endif %}{{ pills([event.title, event.note]) }}</div></li>
+    {% endfor %}{% endcall %}
+</div>

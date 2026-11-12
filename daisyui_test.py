@@ -20,6 +20,7 @@ from daisyui_test_folders import attach_folder_routes, folders_view, hidden_by_t
 from helpers import parse_hashtags
 from daisyui_test_smart import attach_smart_routes
 from daisyui_test_hashtags import attach_hashtag_routes, hashtags_view
+from daisyui_test_texthashtags import attach_text_hashtag_routes
 from daisyui_test_calendar import attach_calendar_routes, calendar_view, navigation as calendar_navigation
 from daisyui_test_calendar_edit import attach_calendar_edit_routes
 from daisyui_test_pages import attach_page_routes, page_view
@@ -45,7 +46,7 @@ def create_router(*, templates, get_db, home_context, create_list, toggle_list, 
         if request.query_params.get("view") == "smart-index":
             return request.scope.get("root_path", "") + "/app/smart-folders"
         if hashtags_view(request):
-            return request.scope.get("root_path", "") + "/app/hashtags"
+            return request.scope.get("root_path", "") + "/app/tags"
         if request.query_params.get("view") == "event-groups":
             return request.scope.get("root_path", "") + "/app/calendar/groups"
         if page_view(request):
@@ -290,6 +291,7 @@ def create_router(*, templates, get_db, home_context, create_list, toggle_list, 
     render_smart, render_smart_index = attach_smart_routes(
         router, templates=templates, get_db=get_db, actions=smart_actions, feedback=feedback, success=success,
     )
+    attach_text_hashtag_routes(router, templates=templates, get_db=get_db)
     render_hashtags = attach_hashtag_routes(
         router, templates=templates, get_db=get_db, actions=hashtag_actions, feedback=feedback, success=success,
     )

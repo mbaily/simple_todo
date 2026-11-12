@@ -355,14 +355,14 @@ def test_folder_tags_are_edited_shown_filtered_exported_and_removed(prototype):
     assert db.query(JournalEntry).filter_by(action='Updated Folder Tags').count() == 1
     for page in (client.get('/app/folders').text, client.get('/app').text):
         row = page.split(f'data-item-key="folder:{ids["folder"]}"')[1].split('row-actions')[0]
-        assert f'/app/hashtag/{ids["tag"]}">personal</a>' in row and '>work</a>' in row
+        assert f'/app/tag/{ids["tag"]}">personal</a>' in row and '>work</a>' in row
         assert f'id="folder-tags-{ids["folder"]}"' in page and 'value="personal work"' in page
     assert client.post(url, headers=HX, data={'hashtags': 'x' * 101}).status_code == 400
     assert client.post(f'/app/folders/9999/tags{Q}', headers=HX, data={'hashtags': 'a'}).status_code == 404
     # The tag's page and the tag index list the folder.
-    tagged = client.get(f'/app/hashtag/{ids["tag"]}')
+    tagged = client.get(f'/app/tag/{ids["tag"]}')
     assert [f.id for f in tagged.context['tagged_folders']] == [ids['folder']] and 'id="results-folders-heading"' in tagged.text
-    assert client.get('/app/hashtags').context['folder_counts'][ids['tag']] == 1 and '<span>1 folder</span>' in client.get('/app/hashtags').text
+    assert client.get('/app/tags').context['folder_counts'][ids['tag']] == 1 and '<span>1 folder</span>' in client.get('/app/tags').text
     # Hide filters remove tagged folders at every depth of the default overview; an opened folder is not filtered.
     work = db.query(Hashtag).filter_by(name='work').one()
     db.get(Folder, ids['child']).hashtags = [work]
@@ -398,7 +398,7 @@ def test_folder_tags_are_edited_shown_filtered_exported_and_removed(prototype):
     assert [tag.name for tag in db.query(Folder).filter_by(name='Fresh').one().hashtags] == ['brand_new']
     # Clearing the field removes the tags; deleting a tag or a folder removes the links without touching the other.
     assert 'Folder tags removed.' in client.post(f'/app/folders/{ids["child"]}/tags{Q}', headers=HX, data={'hashtags': ''}).text
-    assert client.post(f'/app/hashtag/{ids["tag"]}/delete?view=hashtags', headers=HX).status_code == 200
+    assert client.post(f'/app/tag/{ids["tag"]}/delete?view=hashtags', headers=HX).status_code == 200
     db.expire_all()
     assert db.get(Folder, ids['folder']).hashtags == [] and db.get(Folder, ids['child']).hashtags == []
     fresh = db.query(Folder).filter_by(name='Fresh').one()

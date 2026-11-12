@@ -1,6 +1,6 @@
 """Hashtag index for the compact daisyUI frontend: usage, options, rename, delete.
 
-Per-tag view options reuse the /hashtag/{id}/options routes from
+Per-tag view options reuse the /tag/{id}/options routes from
 daisyui_test_search with ``view=hashtags`` so they re-render this page.
 """
 from fastapi import Depends, Form, Request
@@ -29,7 +29,7 @@ def attach_hashtag_routes(router, *, templates, get_db, actions, feedback, succe
         context = dict(
             request=request, prototype_url=base, query="?view=hashtags", hashtags_page=True,
             workspace_template="daisyui_test/_hashtags_workspace.html",
-            page_title="Tags", page_url=base + "/hashtags",
+            page_title="Tags", page_url=base + "/tags",
             hashtags=db.query(Hashtag).order_by(func.lower(Hashtag.name)).all(),
             list_counts=usage(db, list_hashtags), todo_counts=usage(db, todo_hashtags),
             event_counts=usage(db, calendar_event_hashtags), folder_counts=usage(db, folder_hashtags),
@@ -42,11 +42,11 @@ def attach_hashtag_routes(router, *, templates, get_db, actions, feedback, succe
             headers={"Vary": "HX-Request, HX-History-Restore-Request", "Cache-Control": "no-store"},
         )
 
-    @router.get("/hashtags", response_class=HTMLResponse)
+    @router.get("/tags", response_class=HTMLResponse)
     def hashtags(request: Request, db: Session = Depends(get_db)):
         return render_hashtags(request, db)
 
-    @router.post("/hashtag/{hashtag_id}/rename", response_class=HTMLResponse)
+    @router.post("/tag/{hashtag_id}/rename", response_class=HTMLResponse)
     def rename(request: Request, hashtag_id: int, name: str = Form(""), db: Session = Depends(get_db)):
         tag = db.get(Hashtag, hashtag_id)
         if tag is None:
@@ -68,7 +68,7 @@ def attach_hashtag_routes(router, *, templates, get_db, actions, feedback, succe
         db.commit()
         return success(request, db, "user", None, f"Renamed {old_name} to {new_name}.")
 
-    @router.post("/hashtag/{hashtag_id}/delete", response_class=HTMLResponse)
+    @router.post("/tag/{hashtag_id}/delete", response_class=HTMLResponse)
     def delete(request: Request, hashtag_id: int, db: Session = Depends(get_db)):
         tag = db.get(Hashtag, hashtag_id)
         if tag is None:

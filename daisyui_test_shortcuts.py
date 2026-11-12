@@ -18,10 +18,10 @@ MODELS = {"folder": Folder, "list": List, "smart": SmartFolder, "hashtag": Hasht
 MAX_FAVOURITES = 40
 MAX_RECENT = 12
 SHOWN_RECENT = 8
-PLACE = re.compile(r"/app(?:/(list|smart-folder|hashtag)/(\d+))?/?$")
+PLACE = re.compile(r"/app(?:/(list|smart-folder|tag)/(\d+))?/?$")
 PAGES = [
     ("", "home", "Overview"), ("/calendar", "calendar", "Calendar"), ("/search", "search", "Search"),
-    ("/folders", "folder", "Folders"), ("/smart-folders", "smart", "Smart folders"), ("/hashtags", "hash", "Tags"),
+    ("/folders", "folder", "Folders"), ("/smart-folders", "smart", "Smart folders"), ("/tags", "tag", "Tags"), ("/hashtags", "hash", "Hashtags"),
     ("/uncompleted", "check", "Open tasks"), ("/categories", "list", "Categories"),
     ("/collations", "layers", "Collations"), ("/archived", "archive", "Archived"), ("/bills", "money", "Bills"),
     ("/expenses", "list", "Quick expenses"), ("/journal", "book", "Journal"), ("/customization", "settings", "Customize"),
@@ -35,7 +35,7 @@ def key_from_url(url):
     if not match:
         return None
     if match.group(1):
-        return f"{'smart' if match.group(1) == 'smart-folder' else match.group(1)}:{int(match.group(2))}"
+        return f"{ {'smart-folder': 'smart', 'tag': 'hashtag'}.get(match.group(1), match.group(1)) }:{int(match.group(2))}"
     folder = parse_qs(parts.query).get("folder_id", [""])[0]
     return f"folder:{int(folder)}" if folder.isdecimal() and int(folder) > 0 else None
 
@@ -79,7 +79,7 @@ def place(kind, item, base):
         return dict(key=key, kind=kind, icon="list", label=item.name, context=folder, url=f"{base}/list/{item.id}")
     if kind == "smart":
         return dict(key=key, kind=kind, icon="smart", label=item.name, context="Smart folder", url=f"{base}/smart-folder/{item.id}")
-    return dict(key=key, kind=kind, icon="hash", label=item.name, context="Tag", url=f"{base}/hashtag/{item.id}")
+    return dict(key=key, kind=kind, icon="tag", label=item.name, context="Tag", url=f"{base}/tag/{item.id}")
 
 
 def resolve(db, keys, base):

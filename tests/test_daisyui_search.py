@@ -42,7 +42,7 @@ def test_search_documents_fragments_and_parity(prototype):
 def test_hashtag_results_and_options_match_original(prototype):
     db, client, ids = prototype
     ids = add_results_data(db, ids)
-    url = f'/app/hashtag/{ids["tag"]}'
+    url = f'/app/tag/{ids["tag"]}'
     page = client.get(url)
     assert page.status_code == 200 and page.context['page_title'].startswith('personal')
     assert [t.id for t in page.context['todos']] == [ids['todo']]
@@ -66,7 +66,7 @@ def test_hashtag_results_and_options_match_original(prototype):
 
     bad = client.post(f'{url}/options/unknown{query}', headers=HX, data={'enabled': 'true'})
     assert bad.status_code == 400 and bad.headers['HX-Retarget'] == '#page-feedback'
-    assert client.get('/app/hashtag/999999').status_code == 404
+    assert client.get('/app/tag/999999').status_code == 404
     redirect = client.post(f'{url}/options/show_completed{query}', data={}, follow_redirects=False)
     assert redirect.status_code == 303 and redirect.headers['location'] == url + '?sort=user'
 
@@ -96,9 +96,9 @@ def test_editor_returns_to_results(prototype):
     assert 'id="search-form"' in response.text and 'Book a quiet morning' in response.text
     tag_path = f'/app/list/{ids["list"]}/edit?sort=user&view=hashtag&hashtag_id={ids["tag"]}&back=results'
     response = client.post(tag_path, headers=HX, data={'name': 'Renamed', 'hashtags': ''})
-    assert response.headers['HX-Push-Url'] == f'/app/hashtag/{ids["tag"]}?sort=user'
+    assert response.headers['HX-Push-Url'] == f'/app/tag/{ids["tag"]}?sort=user'
     response = client.post(tag_path.replace('/edit?', '/edit/delete?'), follow_redirects=False)
-    assert response.status_code == 303 and response.headers['location'] == f'/app/hashtag/{ids["tag"]}?sort=user'
+    assert response.status_code == 303 and response.headers['location'] == f'/app/tag/{ids["tag"]}?sort=user'
 
 
 def test_browser_search_complete_edit_and_hashtag(prototype_server, page):

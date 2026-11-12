@@ -14,7 +14,7 @@ def shortcuts(db):
 def test_key_from_url():
     assert key_from_url('/app/list/7?sort=user') == 'list:7'
     assert key_from_url('http://host/prefix/app/smart-folder/3') == 'smart:3'
-    assert key_from_url('/app/hashtag/2') == 'hashtag:2'
+    assert key_from_url('/app/tag/2') == 'hashtag:2'
     assert key_from_url('/app?sort=user&folder_id=5') == 'folder:5'
     for other in ['/app', '/app?folder_id=0', '/app/list/7/edit', '/app/list/7/shopping', '/app/calendar', '/app/folders', '']:
         assert key_from_url(other) is None
@@ -27,7 +27,7 @@ def test_visits_are_recorded_most_recent_first(prototype):
     db.commit()
     client.get(f'/app/list/{ids["list"]}')
     client.get(f'/app?folder_id={ids["folder"]}', headers=HX)
-    client.get(f'/app/hashtag/{ids["tag"]}')
+    client.get(f'/app/tag/{ids["tag"]}')
     client.get(f'/app/smart-folder/{smart.id}')
     client.get(f'/app/list/{ids["list"]}')
     assert shortcuts(db)['recent'] == [f'list:{ids["list"]}', f'smart:{smart.id}', f'hashtag:{ids["tag"]}', f'folder:{ids["folder"]}']

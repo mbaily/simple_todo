@@ -12,7 +12,7 @@
         </div>
         <div class="page-heading-actions">
             <span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
-            {% if not searching %}<a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/search{{ nav_query }}&amp;q={{ hashtag.name|urlencode }}" hx-get="{{ prototype_url }}/search{{ nav_query }}&amp;q={{ hashtag.name|urlencode }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ icon('search', 16) }} Search text</a><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/hashtags">{{ icon('hash', 16) }} All tags</a>{% endif %}
+            {% if not searching %}<a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/search{{ nav_query }}&amp;q={{ hashtag.name|urlencode }}" hx-get="{{ prototype_url }}/search{{ nav_query }}&amp;q={{ hashtag.name|urlencode }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ icon('search', 16) }} Search text</a><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/tags">{{ icon('tag', 16) }} All tags</a>{% endif %}
             {% if lists or todos %}<button type="button" class="btn btn-ghost btn-sm select-mode-button" data-command="toggle-selection" aria-pressed="false">{{ icon('select', 16) }} <span>Select</span></button>{% endif %}
         </div>
     </div>
@@ -28,7 +28,7 @@
     {% else %}
     <div class="results-options" aria-label="Tag view options">
         {% for name, label in hashtag_options.items() %}
-        <form action="{{ prototype_url }}/hashtag/{{ hashtag.id }}/options/{{ name }}{{ query }}" method="post" hx-post="{{ prototype_url }}/hashtag/{{ hashtag.id }}/options/{{ name }}{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find input"><label class="option-checkbox"><input id="hashtag-option-{{ name }}" type="checkbox" class="checkbox checkbox-xs" name="enabled" value="true" {% if hashtag[name] %}checked{% endif %} {% if name == 'hide_completed_list_items' and not hashtag.include_list_items %}disabled{% endif %}> {{ label }}</label><noscript><button>Save</button></noscript></form>
+        <form action="{{ prototype_url }}/tag/{{ hashtag.id }}/options/{{ name }}{{ query }}" method="post" hx-post="{{ prototype_url }}/tag/{{ hashtag.id }}/options/{{ name }}{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find input"><label class="option-checkbox"><input id="hashtag-option-{{ name }}" type="checkbox" class="checkbox checkbox-xs" name="enabled" value="true" {% if hashtag[name] %}checked{% endif %} {% if name == 'hide_completed_list_items' and not hashtag.include_list_items %}disabled{% endif %}> {{ label }}</label><noscript><button>Save</button></noscript></form>
         {% endfor %}
     </div>
     {% endif %}
@@ -56,7 +56,7 @@
             <div class="agenda-content">
                 <div class="item-title-line"><a class="item-title {{ 'one-off-event' if not event.rrule else '' }}" {% if event.color and event.color|lower not in ['#000000', '#000', 'black'] %}style="color: {{ event.color }}"{% endif %} href="{{ prototype_url }}/calendar?month={{ event.display_start_at.strftime('%Y-%m') }}&amp;day={{ event.display_start_at.strftime('%Y-%m-%d') }}">{{ event.title }}</a></div>
                 <div class="item-context"><span>{{ event.display_start_at.strftime('%A') }}{% if event.display_start_at.year != today_year %} {{ event.display_start_at.year }}{% endif %} · {{ 'All day' if event.all_day else event.display_start_at.strftime('%H:%M') }}</span>{% if event.rrule %}<span>Recurring</span>{% endif %}{% if event.note %}<span class="event-summary">{{ event.note }}</span>{% endif %}</div>
-                {% if event.hashtags %}<div class="item-tags">{% for tag in event.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">{{ tag.name }}</a>{% endfor %}</div>{% endif %}
+                {% set found = text_hashtags(event.title, event.note) %}{% if event.hashtags or found %}<div class="item-tags">{% for tag in event.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/tag/{{ tag.id }}">{{ tag.name }}</a>{% endfor %}{% for name in found %}<a class="badge badge-outline tag text-hashtag" href="{{ prototype_url }}/hashtag/{{ name|lower|urlencode }}">#{{ name }}</a>{% endfor %}</div>{% endif %}
             </div>
             <a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/calendar/event/{{ event.id }}/edit" title="Edit event" aria-label="Edit event {{ event.title }}">{{ icon('edit', 17) }}</a>
         </li>{% endfor %}</ul>

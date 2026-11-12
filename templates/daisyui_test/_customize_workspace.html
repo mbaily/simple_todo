@@ -19,7 +19,7 @@
     </section>
 
     <form id="filter-form" class="section-panel filter-form" action="{{ prototype_url }}/customization/filters{{ query }}" method="post" hx-post="{{ prototype_url }}/customization/filters{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button[type=submit]">
-        <header class="section-heading"><div><h2>{{ icon('hash', 17) }} Global filters</h2><p>Apply to the overview and every list view. “Only” shows just items with at least one of those tags; “Hide” removes items with any of them.</p></div><button type="submit" class="btn btn-primary btn-sm">{{ icon('check', 14) }} Save filters</button></header>
+        <header class="section-heading"><div><h2>{{ icon('tag', 17) }} Global filters</h2><p>Apply to the overview and every list view. “Only” shows just items with at least one of those tags; “Hide” removes items with any of them.</p></div><button type="submit" class="btn btn-primary btn-sm">{{ icon('check', 14) }} Save filters</button></header>
         {% if hashtags %}
         <ul class="list rule-list filter-list">{% for tag in hashtags %}{% set mode = tag_modes.get(tag.name, '') %}
             <li class="list-row rule-row"><span class="rule-name">{{ tag.name }}</span>

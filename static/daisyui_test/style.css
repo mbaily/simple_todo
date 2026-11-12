@@ -111,6 +111,8 @@ h2 { font-size: 1rem; letter-spacing: -.1px; font-weight: 600; margin: 0; }
 .item-context a { color: #abd9be; }
 .item-context a:hover { text-decoration: underline; }
 .item-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+/* On a hashtag's own page, the pill of that hashtag stands out among an item's other hashtags. */
+.tag.text-hashtag[aria-current] { border-color: var(--accent); }
 .tag { font-size: 0.8462rem; height: auto; min-height: 1.3846rem; padding: 0 5px; color: #a8debb; background: var(--surface); border-color: var(--line); overflow-wrap: anywhere; max-width: 100%; white-space: normal; }
 .row-marker { color: #e8c774; display: inline-flex; align-items: center; }
 .collation-marker { width: 9px; height: 9px; border-radius: 50%; background: var(--collation-color); display: inline-block; }
