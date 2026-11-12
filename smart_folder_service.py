@@ -48,11 +48,41 @@ def _combine(folder, conditions):
     return (and_ if folder.match_all else or_)(*conditions)
 
 
-def _with_subtasks(condition):
-    """A task carrying a rule, or any of its descendants, at every nesting depth."""
+def _ancestor_matches(condition):
+    """A parent or more distant ancestor carries this rule, at any nesting depth."""
     matched = select(Todo.id).where(condition).cte(recursive=True)
     matched = matched.union(select(Todo.id).join(matched, Todo.parent_id == matched.c.id))
-    return Todo.id.in_(select(matched.c.id))
+    # Roots have no parent: make this False rather than SQL NULL so negating an
+    # inherited exclusion does not accidentally discard every root task.
+    return and_(Todo.parent_id != None, Todo.parent_id.in_(select(matched.c.id)))
+
+
+def _todo_rule_sources(folder, *, excluded=False):
+    """Each rule has one or more ways to match. Matching and explanations use
+    these same SQL expressions so they cannot disagree about inheritance.
+    """
+    rules = []
+    associations = folder.exclude_hashtags_assoc if excluded else folder.include_hashtags_assoc
+    names = folder.exclude_text_hashtags if excluded else folder.include_text_hashtags
+    list_items = folder.include_list_items and not excluded
+    for assoc in associations:
+        label = assoc.hashtag.name if assoc.hashtag else f"Deleted tag #{assoc.hashtag_id}"
+        direct = Todo.hashtags.any(Hashtag.id == assoc.hashtag_id)
+        sources = [(f"Own tag: {label}", direct)]
+        if folder.include_subtodos:
+            sources.append((f"Parent/ancestor: {label}", _ancestor_matches(direct)))
+        if list_items:
+            sources.append((f"List: {label}", List.hashtags.any(Hashtag.id == assoc.hashtag_id)))
+        rules.append(sources)
+    for name in _names(names):
+        direct = _todo_has_hashtag(Todo, name)
+        sources = [(f"Own text: #{name}", direct)]
+        if folder.include_subtodos:
+            sources.append((f"Parent/ancestor: #{name}", _ancestor_matches(direct)))
+        if list_items:
+            sources.append((f"List: #{name}", _list_has_hashtag(name)))
+        rules.append(sources)
+    return rules
 
 
 def _folder_scope(db, folder):
@@ -158,26 +188,10 @@ class SmartFolderService:
         if folder.root_todos_only:
             qt = qt.filter(Todo.parent_id == None)
 
-        def tagged(assoc, list_items):
-            direct = Todo.hashtags.any(Hashtag.id == assoc.hashtag_id)
-            has = [_with_subtasks(direct) if folder.include_subtodos or assoc.include_subtodos else direct]
-            if list_items:
-                has.append(List.hashtags.any(Hashtag.id == assoc.hashtag_id))
-            return or_(*has)
-
-        def written(name, list_items):
-            direct = _todo_has_hashtag(Todo, name)
-            has = [_with_subtasks(direct) if folder.include_subtodos else direct]
-            if list_items:
-                has.append(_list_has_hashtag(name))
-            return or_(*has)
-
-        include = [tagged(a, folder.include_list_items or a.include_list_items) for a in folder.include_hashtags_assoc]
-        include += [written(name, folder.include_list_items) for name in _names(folder.include_text_hashtags)]
+        include = [or_(*(condition for _, condition in sources)) for sources in _todo_rule_sources(folder)]
         if include:
             qt = qt.filter(_combine(folder, include))
-        exclude = [tagged(a, False) for a in folder.exclude_hashtags_assoc]
-        exclude += [written(name, False) for name in _names(folder.exclude_text_hashtags)]
+        exclude = [or_(*(condition for _, condition in sources)) for sources in _todo_rule_sources(folder, excluded=True)]
         if exclude:
             qt = qt.filter(~or_(*exclude))
 
@@ -228,6 +242,18 @@ class SmartFolderService:
             )
 
         return matching_todos, todo_tree
+
+    @staticmethod
+    def todo_match_reasons(db: Session, folder: SmartFolder, todos):
+        """Explain the supplied matching sample, without fetching all matching tasks."""
+        if not todos:
+            return {}
+        sources = [source for rule in _todo_rule_sources(folder) for source in rule]
+        if not sources:
+            return {todo.id: ["No tag or hashtag filter"] for todo in todos}
+        expressions = [condition.label(f"reason_{index}") for index, (_, condition) in enumerate(sources)]
+        rows = db.query(Todo.id, *expressions).join(List, Todo.list).filter(Todo.id.in_([todo.id for todo in todos])).all()
+        return {row[0]: [label for (label, _), matched in zip(sources, row[1:]) if matched] for row in rows}
 
     @staticmethod
     def get_calendar_events(db: Session, folder: SmartFolder):

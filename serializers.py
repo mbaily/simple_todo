@@ -185,8 +185,6 @@ def serialize_smart_folder(sf):
             {
                 "id": assoc.hashtag.id,
                 "name": assoc.hashtag.name,
-                "include_subtodos": assoc.include_subtodos,
-                "include_list_items": assoc.include_list_items,
             }
             for assoc in sf.include_hashtags_assoc if assoc.hashtag
         ],
@@ -194,7 +192,6 @@ def serialize_smart_folder(sf):
             {
                 "id": assoc.hashtag.id,
                 "name": assoc.hashtag.name,
-                "include_subtodos": assoc.include_subtodos,
             }
             for assoc in sf.exclude_hashtags_assoc if assoc.hashtag
         ],
@@ -202,8 +199,6 @@ def serialize_smart_folder(sf):
             {
                 "id": assoc.hashtag.id,
                 "name": assoc.hashtag.name,
-                "include_subtodos": assoc.include_subtodos,
-                "include_list_items": assoc.include_list_items,
             }
             for assoc in sf.include_hashtags_assoc if assoc.hashtag
         ],
@@ -211,7 +206,6 @@ def serialize_smart_folder(sf):
             {
                 "id": assoc.hashtag.id,
                 "name": assoc.hashtag.name,
-                "include_subtodos": assoc.include_subtodos,
             }
             for assoc in sf.exclude_hashtags_assoc if assoc.hashtag
         ],

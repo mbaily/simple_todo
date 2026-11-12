@@ -37,6 +37,14 @@ SUBTASKS = {
 }
 HASHTAG_NAME = re.compile(r"[^\W\d_]\w{0,99}\Z")
 PREVIEW_ROWS = 6
+PRESETS = {
+    "open-work": dict(label="Open tasks with #work", name="Open tasks with #work", show_lists=False,
+                      show_todos=True, show_events=False, uncompleted_only=True, include=["hash:work"]),
+    "open-tasks": dict(label="All open tasks", name="Open tasks", show_lists=False,
+                       show_todos=True, show_events=False, uncompleted_only=True),
+    "work-lists": dict(label="Lists with #work", name="Work lists", show_lists=True,
+                       show_todos=False, show_events=False, include=["hash:work"]),
+}
 
 
 def smart_view(request):
@@ -65,9 +73,7 @@ def folder_state(folder):
         match="all" if folder.match_all else "any",
         include=[f"tag:{a.hashtag_id}" for a in includes] + [f"hash:{name}" for name in folder.include_text_hashtags or []],
         exclude=[f"tag:{a.hashtag_id}" for a in excludes] + [f"hash:{name}" for name in folder.exclude_text_hashtags or []],
-        # Older smart folders kept these per tag; the editor shows one switch for the whole folder.
-        subtodos=bool(folder.include_subtodos) or any(a.include_subtodos for a in includes + excludes),
-        list_items=bool(folder.include_list_items) or any(a.include_list_items for a in includes),
+        subtodos=bool(folder.include_subtodos), list_items=bool(folder.include_list_items),
         scope="only" if only else "except" if without else "all", places=only or without,
         extra_exclude_places=without if only else [],
         subfolders=bool(folder.include_subfolders), list_ids=[item.id for item in folder.lists],
@@ -226,7 +232,7 @@ def apply_state(db, folder, state):
         setattr(folder, key, value)
     folder.modified_at = utcnow()
 
-    def tags(collection, model, keys, **flags):
+    def tags(collection, model, keys):
         wanted = [int(key[4:]) for key in keys if key.startswith("tag:")]
         for assoc in [assoc for assoc in collection if assoc.hashtag_id not in wanted]:
             collection.remove(assoc)
@@ -236,12 +242,8 @@ def apply_state(db, folder, state):
             if assoc is None:
                 assoc = model(hashtag_id=tag_id)
                 collection.append(assoc)
-            for name, value in flags.items():
-                setattr(assoc, name, value)
-
-    tags(folder.include_hashtags_assoc, SmartFolderIncludeHashtag, state["include"],
-         include_subtodos=state["subtodos"], include_list_items=state["list_items"])
-    tags(folder.exclude_hashtags_assoc, SmartFolderExcludeHashtag, state["exclude"], include_subtodos=state["subtodos"])
+    tags(folder.include_hashtags_assoc, SmartFolderIncludeHashtag, state["include"])
+    tags(folder.exclude_hashtags_assoc, SmartFolderExcludeHashtag, state["exclude"])
 
     chosen = [int(key[7:]) for key in state["places"] if key != "root"]
     folders = db.query(Folder).filter(Folder.id.in_(chosen)).all() if chosen else []
@@ -271,9 +273,9 @@ def rule_summary(folder):
     parts += include
     parts += [("not " + a.hashtag.name, "not") for a in folder.exclude_hashtags_assoc if a.hashtag]
     parts += [("not #" + name, "not") for name in folder.exclude_text_hashtags or []]
-    if folder.include_subtodos or any(a.include_subtodos for a in folder.include_hashtags_assoc):
+    if folder.include_subtodos:
         parts.append(("with subtasks", "plain"))
-    if folder.include_list_items or any(a.include_list_items for a in folder.include_hashtags_assoc):
+    if folder.include_list_items:
         parts.append(("with tasks in matching lists", "plain"))
     only = [item.path_name for item in folder.include_folders] + (["Top level"] if folder.include_root_folder else [])
     without = [item.path_name for item in folder.exclude_folders] + (["Top level"] if folder.exclude_root_folder else [])
@@ -377,10 +379,12 @@ def attach_smart_routes(router, *, templates, get_db, actions, feedback, success
             matching_ids = set()
             todos, _ = SmartFolderService.get_todos(db, draft, matching_ids=matching_ids)
             events = SmartFolderService.get_calendar_events(db, draft)
+            sample = todos[:PREVIEW_ROWS]
+            reasons = SmartFolderService.todo_match_reasons(db, draft, sample)
             return dict(
                 lists=len(lists), todos=len(matching_ids), events=len(events),
                 list_names=[item.name for item in lists[:PREVIEW_ROWS]],
-                todo_names=[(todo.title, todo.list.name if todo.list else "") for todo in todos[:PREVIEW_ROWS]],
+                todo_names=[(todo.title, todo.list.name if todo.list else "", reasons[todo.id]) for todo in sample],
                 event_names=[event.title for event in events[:PREVIEW_ROWS]],
             )
         finally:
@@ -408,6 +412,7 @@ def attach_smart_routes(router, *, templates, get_db, actions, feedback, success
             page_title=("Edit " + folder_name if folder_id else "New smart folder") + "",
             page_url=url + (f"/smart-folder/{folder_id}/edit" if folder_id else "/smart-folders/new"),
             smart_folder_id=folder_id, smart_folder_name=folder_name, values=state, matches=matches, problems=list(errors),
+            presets=PRESETS,
             section_orders=SECTION_ORDERS, sort_fields=SORT_FIELDS, scopes=SCOPES,
             subtask_modes={key: text for key, (text, _) in SUBTASKS.items()},
             include_chips=[(key, label(key)) for key in state["include"]],
@@ -419,7 +424,8 @@ def attach_smart_routes(router, *, templates, get_db, actions, feedback, success
             extra_exclude_chips=[(key, place_names[key]) for key in state["extra_exclude_places"] if key in place_names],
             extra_exclude_options=[("", [(key, name) for key, name in place_names.items() if key not in state["extra_exclude_places"]])],
             list_chips=[(list_id, list_names.get(list_id, "List")) for list_id in state["list_ids"]],
-            list_options=[("", [(item.id, item.name) for item in lists if item.id not in state["list_ids"]])],
+            list_options=[("", [(item.id, f"{item.folder.path_name} > {item.name}" if item.folder else item.name)
+                                 for item in lists if item.id not in state["list_ids"]])],
             enable_dokuwiki_links=actions["enable_dokuwiki_links"],
         ), message, status_code)
 
@@ -444,8 +450,13 @@ def attach_smart_routes(router, *, templates, get_db, actions, feedback, success
         return render_index(request, db)
 
     @router.get("/smart-folders/new", response_class=HTMLResponse)
-    def new(request: Request, db: Session = Depends(get_db)):
-        return render_editor(request, db, None, folder_state(None))
+    def new(request: Request, preset: str | None = None, db: Session = Depends(get_db)):
+        state = folder_state(None)
+        if preset:
+            if preset not in PRESETS:
+                raise HTTPException(404, "Smart folder preset not found")
+            state.update({key: value for key, value in PRESETS[preset].items() if key != "label"})
+        return render_editor(request, db, None, state)
 
     async def read(request, db):
         return form_state(db, await request.form())

@@ -139,8 +139,6 @@ class SmartFolderIncludeHashtag(Base):
     __tablename__ = 'smart_folder_include_hashtags'
     smart_folder_id = Column(Integer, ForeignKey('smart_folders.id'), primary_key=True)
     hashtag_id = Column(Integer, ForeignKey('hashtags.id'), primary_key=True)
-    include_subtodos = Column(Boolean, default=False)
-    include_list_items = Column(Boolean, default=False)
     metadata_json = Column(JSON, nullable=False, default=dict, server_default="{}")
 
     smart_folder = relationship("SmartFolder", back_populates="include_hashtags_assoc")
@@ -150,7 +148,6 @@ class SmartFolderExcludeHashtag(Base):
     __tablename__ = 'smart_folder_exclude_hashtags'
     smart_folder_id = Column(Integer, ForeignKey('smart_folders.id'), primary_key=True)
     hashtag_id = Column(Integer, ForeignKey('hashtags.id'), primary_key=True)
-    include_subtodos = Column(Boolean, default=False)
     metadata_json = Column(JSON, nullable=False, default=dict, server_default="{}")
 
     smart_folder = relationship("SmartFolder", back_populates="exclude_hashtags_assoc")
@@ -424,10 +421,6 @@ class SmartFolder(Base):
     uncompleted_only = Column(Boolean, default=False)
     include_archived_lists = Column(Boolean, default=False)
     
-    # Hashtag propagation
-    # filter_include_subtodos = Column(Boolean, default=False) # Deprecated in favor of per-hashtag setting
-    # filter_exclude_subtodos = Column(Boolean, default=False) # Deprecated in favor of per-hashtag setting
-
     # Sorting
     # Fields are stored as column names ("modified_at" or "created_at").
     list_sort_field = Column(String(32), default="modified_at")
@@ -454,8 +447,8 @@ class SmartFolder(Base):
     # Hashtags written in text (lower case, without the #). Tags use the association tables below.
     include_text_hashtags = Column(JSON, nullable=False, default=list, server_default="[]")
     exclude_text_hashtags = Column(JSON, nullable=False, default=list, server_default="[]")
-    # A matching task or list also brings its subtasks / its tasks. The tag associations carry
-    # their own copies of these flags; these apply to hashtags and are what the editor shows.
+    # Folder-wide inheritance applies equally to tags and text hashtags.
+    # Exclusions inherit through parent tasks; list inheritance applies to includes.
     include_subtodos = Column(Boolean, default=False)
     include_list_items = Column(Boolean, default=False)
     # A chosen folder also covers the folders inside it.

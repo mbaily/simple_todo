@@ -72,12 +72,42 @@ notes do not make its list match. Unused hashtags can be typed into the editor.
 Folder scope applies to lists and tasks; calendar events use the tag, hashtag,
 completion and date filters. Layout and sorting are in a separate expandable panel.
 
+New folders can start from an editable preset: open tasks with `#work`, all open
+tasks, or lists with `#work`. Presets only fill the editor and preview; they do
+not create records until Create is pressed. Change the hashtag chips or any other
+rule before saving. The task preview explains each sample's matching sources:
+its own text or attached tag, a parent/ancestor task, or its list. These labels
+evaluate the same SQL expressions used by the matching query. With no included
+tag/hashtag rules, samples explicitly say there is no tag or hashtag filter.
+
+The tag/hashtag, folder, folder-exception, and list pickers filter their choices
+as you type, without sending draft requests until an item is selected. Search is
+case insensitive; folder paths and lists can be searched using multiple words
+or slash-separated paths. List choices show their folder path to distinguish
+identical names. Arrow keys move through choices, Enter adds the highlighted
+choice, Escape closes the menu, and Tab moves to the next field. Selected chips
+are omitted from the choices and become available again when removed. The same
+forms retain native select controls when JavaScript is disabled.
+
 The editor posts rule changes to a draft endpoint and shows matching item counts
 and sample names. Drafts are rolled back, including association changes, and do
 not create journal entries. Only Create/Save commits the rules. Schema upgrades
 add hashtag arrays, match mode, event visibility, and inheritance/folder options
-without deleting existing smart folders or their tag associations. Legacy tag
-inheritance is reflected in the editor's common switches when an existing folder
-is edited. Mixed include/exclude folder scopes are retained as exceptions.
+without deleting existing smart folders or their tag associations. Inheritance is
+stored only in `smart_folders.include_subtodos` and `include_list_items`, shared by
+both editors, matching, defaults, export/import, and sync. Subtask inheritance
+applies to included and excluded rules; list inheritance applies to includes.
+Mixed include/exclude folder scopes are retained as exceptions.
+
+On upgrade, enabled legacy per-tag flags are combined with ANY into the common
+folder switches. The old association columns are then removed transactionally,
+and their history triggers rebuilt; IDs, tag selections, metadata, and historical
+snapshots are retained. This conversion can broaden a formerly mixed per-tag
+configuration to use the same setting for every rule. It runs once, so a switch
+turned off cannot be re-enabled by a later startup. Older import/sync/form inputs
+are normalized at the boundary; explicit folder values (including false) take
+precedence, and partial JSON updates preserve omitted settings. New exports put
+inheritance flags only on the folder. A downgrade to code expecting the removed
+columns requires restoring the pre-upgrade database backup.
 The new fields are included in export/import and sync. Verify with
-`python3 -m pytest tests/test_daisyui_smart.py tests/test_daisyui_texthashtags.py tests/test_import_relationships.py`.
+`python3 -m pytest tests/test_smart_folder_settings.py tests/test_daisyui_smart.py tests/test_daisyui_texthashtags.py tests/test_import_relationships.py tests/test_entity_history.py`.

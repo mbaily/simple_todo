@@ -22,6 +22,7 @@ from billing_service import lock_account, sync_invoice_due_date, refresh_invoice
 from billing_accounts import validate_refund_credit
 from expense_service import validate_expense_amounts
 from calendar_service import validate_calendar_imports
+from smart_folder_settings import inheritance_settings
 
 def parse_iso_date(date_str):
     if not date_str:
@@ -339,8 +340,9 @@ def _import_records(db: Session, json_data: dict, *, restore_history: bool = Fal
     # --- SMART FOLDERS ---
     for item in data.get("smart_folders", []):
         try:
-            include_hashtags_data = item.pop("include_hashtags", None)
-            exclude_hashtags_data = item.pop("exclude_hashtags", None)
+            item = {**item, **inheritance_settings(item)}
+            include_hashtags_data = item.pop("include_hashtags", item.get("include_hashtags_assoc"))
+            exclude_hashtags_data = item.pop("exclude_hashtags", item.get("exclude_hashtags_assoc"))
             item.pop("include_hashtags_assoc", None)  # Duplicate of include_hashtags
             item.pop("exclude_hashtags_assoc", None)  # Duplicate of exclude_hashtags
             lists_data = item.pop("lists", None)
@@ -361,13 +363,11 @@ def _import_records(db: Session, json_data: dict, *, restore_history: bool = Fal
                     db.flush()
                     
                     for h_data in include_hashtags_data:
-                        h = resolve_hashtag(db, h_data)
+                        h = resolve_hashtag(db, h_data.get("hashtag", h_data))
                         if h:
                             assoc = SmartFolderIncludeHashtag(
                                 smart_folder_id=obj.id,
                                 hashtag_id=h.id,
-                                include_subtodos=h_data.get("include_subtodos", False),
-                                include_list_items=h_data.get("include_list_items", False),
                             )
                             db.add(assoc)
                 
@@ -379,12 +379,11 @@ def _import_records(db: Session, json_data: dict, *, restore_history: bool = Fal
                     db.flush()
                     
                     for h_data in exclude_hashtags_data:
-                        h = resolve_hashtag(db, h_data)
+                        h = resolve_hashtag(db, h_data.get("hashtag", h_data))
                         if h:
                             assoc = SmartFolderExcludeHashtag(
                                 smart_folder_id=obj.id,
                                 hashtag_id=h.id,
-                                include_subtodos=h_data.get("include_subtodos", False),
                             )
                             db.add(assoc)
                 

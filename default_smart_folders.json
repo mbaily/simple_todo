@@ -4,6 +4,7 @@
         "show_lists": true,
         "show_todos": true,
         "group_todos_by_list": true,
+        "include_subtodos": true,
         "root_todos_only": false,
         "nest_subtodos": true,
         "uncompleted_only": true,
@@ -23,8 +24,7 @@
         "include_hashtags": [],
         "exclude_hashtags": [
             {
-                "name": "old",
-                "include_subtodos": true
+                "name": "old"
             }
         ],
         "lists": []

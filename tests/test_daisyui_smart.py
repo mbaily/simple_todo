@@ -48,9 +48,9 @@ def test_create_matches_original_and_returns_results(prototype):
                      'dokuwiki_date_field': 'created_at'}
     assert client.post('/smart-folder/create', data=original_form, follow_redirects=False).status_code == 303
     original = db.query(SmartFolder).filter_by(name='Original focus').one()
-    columns = [c.name for c in SmartFolder.__table__.columns if c.name not in {'id', 'name', 'created_at', 'modified_at', 'sort_order', 'include_subtodos'}]
+    columns = [c.name for c in SmartFolder.__table__.columns if c.name not in {'id', 'name', 'created_at', 'modified_at', 'sort_order'}]
     assert {c: getattr(daisy, c) for c in columns} == {c: getattr(original, c) for c in columns}
-    rules = lambda f: ([(a.hashtag_id, a.include_subtodos, a.include_list_items) for a in f.include_hashtags_assoc],
+    rules = lambda f: ([a.hashtag_id for a in f.include_hashtags_assoc],
                        [a.hashtag_id for a in f.exclude_hashtags_assoc])
     assert rules(daisy) == rules(original)
     assert db.query(JournalEntry).filter_by(action='Created Smart Folder', entity_id=daisy.id).count() == 1
@@ -146,7 +146,9 @@ def test_browser_smart_folder_workflow(prototype_server, page):
     expect(page).to_have_url(origin + '/app/smart-folders')
     page.get_by_role('link', name='New smart folder').first.click()
     page.get_by_role('textbox', name='Name').fill('Personal')
-    page.get_by_role('combobox', name='Add a tag or hashtag', exact=True).select_option(f'tag:{ids["tag"]}')
+    picker = page.get_by_role('combobox', name='Add a tag or hashtag', exact=True)
+    picker.fill('personal')
+    picker.press('Enter')
     expect(page.locator('#smart-preview')).to_contain_text('Weekend tagged task')
     expect(page.get_by_role('textbox', name='Name', exact=True)).to_have_value('Personal')
     page.get_by_role('button', name='Create smart folder').click()
@@ -166,6 +168,176 @@ def test_browser_smart_folder_workflow(prototype_server, page):
     expect(page).to_have_url(origin + '/app/smart-folders')
     expect(page.get_by_text('No smart folders yet.', exact=False)).to_be_visible()
     assert not errors
+
+
+def test_browser_searchable_rule_pickers_keyboard_and_no_search_requests(prototype_server, page):
+    origin, (db, _, ids) = prototype_server
+    db.add_all([Hashtag(name='Work alpha'), Hashtag(name='Work beta')])
+    db.get(Todo, ids['todo']).note = 'For #work'
+    db.commit()
+    drafts = []
+    page.on('request', lambda request: drafts.append(request.url) if request.method == 'POST' and '/draft' in request.url else None)
+    page.goto(origin + '/app/smart-folders/new')
+    page.get_by_role('textbox', name='Name', exact=True).fill('Working selection')
+    picker = page.get_by_role('combobox', name='Add a tag or hashtag', exact=True)
+    picker.fill('WORK')
+    expect(picker).to_have_attribute('aria-expanded', 'true')
+    expect(page.locator('[data-smart-picker-popup]:visible').get_by_role('option')).to_have_text(['Work alpha', 'Work beta', '#work'])
+    expect(page.get_by_role('group', name='Tags', exact=True)).to_be_visible()
+    expect(page.get_by_role('group', name='Hashtags in text', exact=True)).to_be_visible()
+    picker.press('ArrowDown')
+    expect(page.get_by_role('option', name='Work beta', exact=True)).to_have_attribute('aria-selected', 'true')
+    picker.press('ArrowUp')
+    expect(page.get_by_role('option', name='Work alpha', exact=True)).to_have_attribute('aria-selected', 'true')
+    picker.press('ArrowUp')
+    expect(page.get_by_role('option', name='#work', exact=True)).to_have_attribute('aria-selected', 'true')
+    picker.press('Escape')
+    expect(picker).to_have_attribute('aria-expanded', 'false')
+    expect(picker).to_be_focused()
+    # Clicking the already-focused field reopens its menu after Escape.
+    picker.click()
+    expect(picker).to_have_attribute('aria-expanded', 'true')
+    picker.press('Tab')
+    expect(picker).to_have_attribute('aria-expanded', 'false')
+    assert drafts == []
+    picker.fill('no matching tag')
+    expect(page.locator('[data-smart-picker-popup]:visible').get_by_text('No matches. Try another search.', exact=True)).to_be_visible()
+    assert picker.get_attribute('aria-activedescendant') is None
+    picker.press('ArrowDown')
+    picker.press('Enter')
+    expect(page.get_by_role('heading', name='New smart folder', exact=True)).to_be_visible()
+    assert drafts == [] and db.query(SmartFolder).count() == 0
+    picker.fill('#work')
+    expect(page.get_by_role('group', name='Tags', exact=True)).not_to_be_visible()
+    picker.press('Enter')
+    expect(page.locator('input[name="include"][value="hash:work"]')).to_be_checked()
+    expect(page.locator('#smart-preview')).to_contain_text('1 task')
+    expect(picker).to_have_value('')
+    expect(picker).to_be_focused()
+    expect(page.get_by_role('textbox', name='Name', exact=True)).to_have_value('Working selection')
+    assert len(drafts) == 1
+    picker.fill('#work')
+    expect(page.locator('[data-smart-picker-popup]:visible').get_by_text('No matches. Try another search.', exact=True)).to_be_visible()
+    page.get_by_role('heading', name='New smart folder', exact=True).click()
+    expect(picker).to_have_attribute('aria-expanded', 'false')
+    # Exclusion uses the same search behavior, and removes choices from both pickers.
+    exclude = page.get_by_role('combobox', name='Leave out a tag or hashtag', exact=True)
+    exclude.fill('PERSONAL')
+    page.get_by_role('option', name='personal', exact=True).click()
+    expect(page.locator(f'input[name="exclude"][value="tag:{ids["tag"]}"]')).to_be_checked()
+    expect(page.locator('#smart-preview')).to_contain_text('Nothing matches')
+    page.get_by_title('Remove #work', exact=True).click()
+    expect(page.locator('input[name="include"][value="hash:work"]')).to_have_count(0)
+    picker.fill('#work')
+    expect(page.get_by_role('option', name='#work', exact=True)).to_be_visible()
+    picker.press('Enter')
+    expect(page.locator('input[name="include"][value="hash:work"]')).to_be_checked()
+    page.get_by_role('button', name='Create smart folder').click()
+    expect(page.get_by_role('heading', name='Working selection', exact=True)).to_be_visible()
+    db.expire_all()
+    folder = db.query(SmartFolder).one()
+    assert folder.include_text_hashtags == ['work']
+    assert [a.hashtag_id for a in folder.exclude_hashtags_assoc] == [ids['tag']]
+
+
+def test_browser_searchable_locations_lists_and_mobile_menu(prototype_server, page):
+    origin, (db, _, ids) = prototype_server
+    root = db.get(Folder, ids['folder'])
+    child = Folder(name='Garden', parent=root)
+    selected = List(name='Weekly jobs', folder=child)
+    duplicate = List(name='Weekly jobs')
+    db.add_all([child, selected, duplicate])
+    db.add_all([Folder(name=f'Other folder {index:02d}') for index in range(60)])
+    db.commit()
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    page.goto(origin + '/app/smart-folders/new')
+    page.get_by_role('textbox', name='Name', exact=True).fill('Garden jobs')
+    page.get_by_role('radio', name='Only these folders', exact=True).check()
+    picker = page.get_by_role('combobox', name='Add a folder', exact=True)
+    picker.fill('PROJECTS/GARDEN')
+    expect(page.locator('[data-smart-picker-popup]:visible').get_by_role('option')).to_have_text(['Projects > Garden'])
+    picker.press('Enter')
+    expect(page.locator(f'input[name="places"][value="folder:{child.id}"]')).to_be_checked()
+    picker = page.get_by_role('combobox', name='Only certain lists', exact=True)
+    picker.fill('weekly')
+    expect(page.locator('[data-smart-picker-popup]:visible').get_by_role('option')).to_have_count(2)
+    picker.fill('garden weekly')
+    expect(page.locator('[data-smart-picker-popup]:visible').get_by_role('option')).to_have_text(['Projects > Garden > Weekly jobs'])
+    picker.press('Enter')
+    expect(page.locator(f'input[name="lists"][value="{selected.id}"]')).to_be_checked()
+    picker = page.get_by_role('combobox', name='Exclude a folder', exact=True)
+    picker.fill('other folder 59')
+    picker.press('Enter')
+    expect(page.locator('input[name="extra_exclude_places"]')).to_have_count(1)
+    page.get_by_role('combobox', name='Add a folder', exact=True).fill('other folder')
+    page.screenshot(path='/tmp/smart-picker-desktop.png', full_page=True)
+    for width in (390, 320):
+        page.set_viewport_size({'width': width, 'height': 844})
+        picker = page.get_by_role('combobox', name='Add a folder', exact=True)
+        picker.fill('other folder')
+        expect(page.locator('[data-smart-picker-popup]:visible').get_by_role('option')).to_have_count(60)
+        popup = page.locator('[data-smart-picker-popup]:visible')
+        bounds = popup.bounding_box()
+        assert bounds['x'] >= 0 and bounds['x'] + bounds['width'] <= width
+        assert popup.evaluate('element => element.scrollHeight > element.clientHeight')
+        assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+        if width == 390:
+            page.screenshot(path='/tmp/smart-picker-mobile.png', full_page=True)
+        # Filtering can find a choice near the end without scrolling through the menu.
+        picker.fill('other folder 58')
+        expect(page.locator('[data-smart-picker-popup]:visible').get_by_role('option')).to_have_count(1)
+        picker.press('Escape')
+    page.get_by_role('button', name='Create smart folder').click()
+    expect(page.get_by_role('heading', name='Garden jobs', exact=True)).to_be_visible()
+    db.expire_all()
+    saved = db.query(SmartFolder).one()
+    assert saved.include_folders == [child] and saved.lists == [selected]
+    assert saved.exclude_folders[0].name == 'Other folder 59'
+    assert not errors
+
+
+def test_smart_picker_native_fallback_without_javascript(prototype_server, browser):
+    origin, (db, _, ids) = prototype_server
+    context = browser.new_context(java_script_enabled=False)
+    try:
+        page = context.new_page()
+        page.goto(origin + '/app/smart-folders/new')
+        picker = page.get_by_role('combobox', name='Add a tag or hashtag', exact=True)
+        expect(picker).to_have_js_property('tagName', 'SELECT')
+        picker.select_option(f'tag:{ids["tag"]}')
+        page.get_by_role('textbox', name='Name', exact=True).fill('Native picker')
+        page.get_by_role('button', name='Create smart folder').click()
+        expect(page.get_by_role('heading', name='Native picker', exact=True)).to_be_visible()
+        db.expire_all()
+        saved = db.query(SmartFolder).one()
+        assert [assoc.hashtag_id for assoc in saved.include_hashtags_assoc] == [ids['tag']]
+    finally:
+        context.close()
+
+
+def test_smart_picker_touch_selection(prototype_server, browser):
+    origin, (db, _, ids) = prototype_server
+    context = browser.new_context(has_touch=True, is_mobile=True, viewport={'width': 390, 'height': 844})
+    try:
+        page = context.new_page()
+        page.goto(origin + '/app/smart-folders/new')
+        picker = page.get_by_role('combobox', name='Add a tag or hashtag', exact=True)
+        picker.tap()
+        picker.fill('personal')
+        page.get_by_role('option', name='personal', exact=True).tap()
+        expect(page.locator(f'input[name="include"][value="tag:{ids["tag"]}"]')).to_be_checked()
+        expect(page.locator('#smart-preview')).to_contain_text('1 task')
+        page.get_by_title('Remove personal', exact=True).tap()
+        expect(page.locator(f'input[name="include"][value="tag:{ids["tag"]}"]')).to_have_count(0)
+        toggle = page.get_by_role('button', name='Show choices for Add a tag or hashtag', exact=True)
+        toggle.tap()
+        expect(picker).to_have_attribute('aria-expanded', 'true')
+        toggle.tap()
+        expect(picker).to_have_attribute('aria-expanded', 'false')
+        assert db.query(SmartFolder).count() == 0
+    finally:
+        context.close()
 
 
 def test_tags_and_text_hashtags_match_any_all_and_exclude_item_notes(prototype):
@@ -360,7 +532,9 @@ def test_browser_hashtag_preview_scope_and_mobile_layout(prototype_server, page)
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(origin + '/app/smart-folders/new')
     # Rule previews work before a name has been entered, and never create a folder.
-    page.get_by_role('combobox', name='Add a tag or hashtag', exact=True).select_option('hash:home')
+    picker = page.get_by_role('combobox', name='Add a tag or hashtag', exact=True)
+    picker.fill('#home')
+    picker.press('Enter')
     expect(page.locator('input[name="include"][value="hash:home"]')).to_be_checked()
     expect(page.locator('#smart-preview')).to_contain_text('1 task')
     assert db.query(SmartFolder).count() == 0
@@ -375,7 +549,9 @@ def test_browser_hashtag_preview_scope_and_mobile_layout(prototype_server, page)
     expect(page.locator('#smart-preview')).to_contain_text('1 task')
     expect(page.locator('input[name="include"][value="hash:future"]')).to_have_count(0)
     page.get_by_role('radio', name='Only these folders', exact=True).check()
-    page.get_by_role('combobox', name='Add a folder', exact=True).select_option('root')
+    picker = page.get_by_role('combobox', name='Add a folder', exact=True)
+    picker.fill('top level')
+    picker.press('Enter')
     expect(page.locator('input[name="places"][value="root"]')).to_be_checked()
     page.get_by_role('textbox', name='Name', exact=True).fill('House jobs')
     page.get_by_text('Layout and sorting', exact=False).click()

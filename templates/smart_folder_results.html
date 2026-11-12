@@ -51,8 +51,8 @@
         <span class="dates">Tags:</span>
         {% if folder.include_hashtags_assoc %}
         {% for assoc in folder.include_hashtags_assoc %}
-        <a href="{{ request.scope.root_path }}/hashtag/{{ assoc.hashtag.id }}" class="pill">{{ assoc.hashtag.name }}{% if assoc.include_subtodos %}
-            (w/ subs){% endif %}{% if assoc.include_list_items %} (inc. list items){% endif %}</a>
+        <a href="{{ request.scope.root_path }}/hashtag/{{ assoc.hashtag.id }}" class="pill">{{ assoc.hashtag.name }}{% if folder.include_subtodos %}
+            (w/ subs){% endif %}{% if folder.include_list_items %} (inc. list items){% endif %}</a>
         {% endfor %}
         {% else %}
         <span class="dates">All items</span>
@@ -60,7 +60,7 @@
         {% if folder.exclude_hashtags_assoc %}
         <span class="dates">Excluding:</span>
         {% for assoc in folder.exclude_hashtags_assoc %}
-        <span class="pill">NOT {{ assoc.hashtag.name }}{% if assoc.include_subtodos %} (w/ subs){% endif %}</span>
+        <span class="pill">NOT {{ assoc.hashtag.name }}{% if folder.include_subtodos %} (w/ subs){% endif %}</span>
         {% endfor %}
         {% endif %}
     </div>

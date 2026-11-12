@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from urllib.parse import quote
 from storage import data_directory, data_path, external_data_enabled
-from entity_history import install_entity_history, thin_entity_history
+from entity_history import install_entity_history, install_table_history_triggers, thin_entity_history
 from search_index import install_search_index
 from hashtag_index import install_hashtag_index
 
@@ -90,13 +90,7 @@ MIGRATIONS = [
     
     # New columns (2026-01-02)
     ("todos", "color", "VARCHAR(7)"),
-    # ("smart_folders", "filter_include_subtodos", "BOOLEAN DEFAULT 0"), # Removed in favor of per-hashtag
-    # ("smart_folders", "filter_exclude_subtodos", "BOOLEAN DEFAULT 0"), # Removed in favor of per-hashtag
     
-    # Per-hashtag subtodo flags (2026-01-02 update)
-    ("smart_folder_include_hashtags", "include_subtodos", "BOOLEAN DEFAULT 0"),
-    ("smart_folder_exclude_hashtags", "include_subtodos", "BOOLEAN DEFAULT 0"),
-
     # Delayed items (2026-01-04)
     ("lists", "delayed_until", "DATETIME"),
     ("todos", "delayed_until", "DATETIME"),
@@ -157,6 +151,48 @@ TABLE_MIGRATIONS = [
         """,
     ),
 ]
+
+
+def migrate_smart_folder_inheritance(conn):
+    """Fold legacy per-tag inheritance into the folder once, then retire its columns.
+
+    Removing the old columns makes the migration naturally idempotent: a later
+    restart cannot turn a switch back on after the user has turned it off.
+    """
+    tables = {
+        "smart_folder_include_hashtags": ("include_subtodos", "include_list_items"),
+        "smart_folder_exclude_hashtags": ("include_subtodos",),
+    }
+    old = {name: [field for field in fields if field in {
+        row[1] for row in conn.exec_driver_sql(f'PRAGMA table_info("{name}")')
+    }] for name, fields in tables.items()}
+    if not any(old.values()):
+        return
+    conn.commit()
+    conn.exec_driver_sql("BEGIN IMMEDIATE")
+    try:
+        for field in ("include_subtodos", "include_list_items"):
+            sources = [f'EXISTS (SELECT 1 FROM "{name}" AS tag WHERE tag.smart_folder_id = smart_folders.id '
+                       f'AND tag."{field}" = 1)' for name, fields in old.items() if field in fields]
+            if sources:
+                conn.exec_driver_sql(f'UPDATE smart_folders SET "{field}" = 1 '
+                                     f'WHERE coalesce("{field}", 0) = 0 AND ({" OR ".join(sources)})')
+        for name, fields in old.items():
+            if not fields:
+                continue
+            triggers = {row[0] for row in conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?", (name,))}
+            history_triggers = [f"entity_history_{name}_{suffix}" for suffix in ("insert", "update", "delete", "rekey")]
+            for trigger in history_triggers:
+                conn.exec_driver_sql(f'DROP TRIGGER IF EXISTS "{trigger}"')
+            for field in fields:
+                conn.exec_driver_sql(f'ALTER TABLE "{name}" DROP COLUMN "{field}"')
+            if triggers.intersection(history_triggers):
+                install_table_history_triggers(conn, name)
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
 
 
 def run_migrations(engine):
@@ -267,6 +303,8 @@ def run_migrations(engine):
                 print(f"Migration: Adding column {column_name} to {table_name}")
                 conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}"))
                 conn.commit()
+
+        migrate_smart_folder_inheritance(conn)
 
 
 def init_db():
@@ -402,7 +440,6 @@ MIGRATIONS.append(("notes", "calendar_event_id", "INTEGER REFERENCES calendar_ev
 MIGRATIONS.append(("notes", "occurrence_at", "DATETIME"))
 
 # Smart folder cascade (2026-01-11)
-MIGRATIONS.append(("smart_folder_include_hashtags", "include_list_items", "BOOLEAN DEFAULT 0"))
 MIGRATIONS.append(("hashtags", "include_list_items", "BOOLEAN DEFAULT 0"))
 MIGRATIONS.append(("hashtags", "hide_completed_list_items", "BOOLEAN DEFAULT 0"))
 MIGRATIONS.append(("smart_folders", "section_order", "VARCHAR(8) DEFAULT 'LET'"))

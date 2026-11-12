@@ -56,6 +56,47 @@ def _record_sql(table_name, columns, keys, prefix, operation):
     """
 
 
+def install_table_history_triggers(connection, name):
+    """Rebuild a table's history triggers from its current SQLite columns."""
+    quoted = _identifier(name)
+    info = connection.exec_driver_sql(f"PRAGMA table_info({quoted})").all()
+    if not info:
+        raise RuntimeError(f"History cannot find entity table {name}")
+    columns = [row[1] for row in info]
+    keys = [row[1] for row in sorted(info, key=lambda row: row[5]) if row[5]]
+    if not keys:
+        raise RuntimeError(f"History requires a primary key on {name}")
+    # json_object has a limit of 127 arguments in older SQLite versions.
+    if len(columns) > 63:
+        raise RuntimeError(f"History cannot snapshot {name}: too many columns")
+    changed = " OR ".join(
+        f"OLD.{_identifier(column)} IS NOT NEW.{_identifier(column)}"
+        for column in columns
+    )
+    key_changed = " OR ".join(
+        f"OLD.{_identifier(column)} IS NOT NEW.{_identifier(column)}"
+        for column in keys
+    )
+    triggers = {
+        "insert": ("INSERT", "", _record_sql(name, columns, keys, "NEW", "create")),
+        "delete": ("DELETE", "", _record_sql(name, columns, keys, "OLD", "delete")),
+        "update": ("UPDATE", f"({changed}) AND NOT ({key_changed})",
+                   _record_sql(name, columns, keys, "NEW", "update")),
+        "rekey": ("UPDATE", key_changed,
+                  _record_sql(name, columns, keys, "OLD", "delete") +
+                  _record_sql(name, columns, keys, "NEW", "create")),
+    }
+    for suffix, (event, condition, body) in triggers.items():
+        trigger = _identifier(f"entity_history_{name}_{suffix}")
+        connection.exec_driver_sql(f"DROP TRIGGER IF EXISTS {trigger}")
+        when = f"WHEN {condition}" if condition else ""
+        connection.exec_driver_sql(
+            f"CREATE TRIGGER {trigger} AFTER {event} ON {quoted} "
+            f"{when} BEGIN {body} END"
+        )
+    return columns, keys
+
+
 def install_entity_history(engine):
     """Install triggers and seed each table once, atomically with concurrent writers."""
     with engine.connect() as connection:
@@ -95,42 +136,8 @@ def install_entity_history(engine):
             """)
             for table in Base.metadata.sorted_tables:
                 name = table.name
+                columns, keys = install_table_history_triggers(connection, name)
                 quoted = _identifier(name)
-                info = connection.exec_driver_sql(f"PRAGMA table_info({quoted})").all()
-                if not info:
-                    raise RuntimeError(f"History cannot find entity table {name}")
-                columns = [row[1] for row in info]
-                keys = [row[1] for row in sorted(info, key=lambda row: row[5]) if row[5]]
-                if not keys:
-                    raise RuntimeError(f"History requires a primary key on {name}")
-                # json_object has a limit of 127 arguments in older SQLite versions.
-                if len(columns) > 63:
-                    raise RuntimeError(f"History cannot snapshot {name}: too many columns")
-                changed = " OR ".join(
-                    f"OLD.{_identifier(column)} IS NOT NEW.{_identifier(column)}"
-                    for column in columns
-                )
-                key_changed = " OR ".join(
-                    f"OLD.{_identifier(column)} IS NOT NEW.{_identifier(column)}"
-                    for column in keys
-                )
-                triggers = {
-                    "insert": ("INSERT", "", _record_sql(name, columns, keys, "NEW", "create")),
-                    "delete": ("DELETE", "", _record_sql(name, columns, keys, "OLD", "delete")),
-                    "update": ("UPDATE", f"({changed}) AND NOT ({key_changed})",
-                               _record_sql(name, columns, keys, "NEW", "update")),
-                    "rekey": ("UPDATE", key_changed,
-                              _record_sql(name, columns, keys, "OLD", "delete") +
-                              _record_sql(name, columns, keys, "NEW", "create")),
-                }
-                for suffix, (event, condition, body) in triggers.items():
-                    trigger = _identifier(f"entity_history_{name}_{suffix}")
-                    connection.exec_driver_sql(f"DROP TRIGGER IF EXISTS {trigger}")
-                    when = f"WHEN {condition}" if condition else ""
-                    connection.exec_driver_sql(
-                        f"CREATE TRIGGER {trigger} AFTER {event} ON {quoted} "
-                        f"{when} BEGIN {body} END"
-                    )
                 registered = connection.execute(
                     text("SELECT 1 FROM entity_history_tables WHERE entity_type = :name"),
                     {"name": name},

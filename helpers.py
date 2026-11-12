@@ -673,11 +673,14 @@ def update_smart_folder_hashtags(db: Session, folder, form_data, include_ids: li
     Args:
         db: Database session
         folder: SmartFolder object
-        form_data: FormData (for reading include_subtodos variants)
+        form_data: FormData, including inheritance fields from older clients
         include_ids: List of hashtag IDs to include
         exclude_ids: List of hashtag IDs to exclude
     """
     from models import SmartFolderIncludeHashtag, SmartFolderExcludeHashtag
+    from smart_folder_settings import form_inheritance_settings
+    for field, value in form_inheritance_settings(form_data, include_ids, exclude_ids).items():
+        setattr(folder, field, value)
     
     # Clear existing associations
     folder.include_hashtags_assoc = []
@@ -685,19 +688,14 @@ def update_smart_folder_hashtags(db: Session, folder, form_data, include_ids: li
     db.flush()
 
     for hid in sorted(include_ids):
-        inc_sub = str(form_data.get(f'include_subtodos_{hid}') or '').strip().lower() in ("1", "true", "yes", "on")
-        inc_list_items = str(form_data.get(f'include_list_items_{hid}') or '').strip().lower() in ("1", "true", "yes", "on")
         assoc = SmartFolderIncludeHashtag(
             smart_folder_id=folder.id, 
             hashtag_id=hid, 
-            include_subtodos=inc_sub,
-            include_list_items=inc_list_items
         )
         db.add(assoc)
 
     for hid in sorted(exclude_ids):
-        exc_sub = str(form_data.get(f'exclude_subtodos_{hid}') or '').strip().lower() in ("1", "true", "yes", "on")
-        assoc = SmartFolderExcludeHashtag(smart_folder_id=folder.id, hashtag_id=hid, include_subtodos=exc_sub)
+        assoc = SmartFolderExcludeHashtag(smart_folder_id=folder.id, hashtag_id=hid)
         db.add(assoc)
 
 

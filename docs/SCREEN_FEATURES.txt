@@ -462,7 +462,11 @@ list_datetime_headers
 
 smart_folders
   A saved query/filter definition. Has a name, content toggles
-  (show_lists, show_todos), grouping options (group_todos_by_list,
+  (show_lists, show_todos, show_events), tag/hashtag match mode
+  (match_all), text hashtag arrays (include_text_hashtags,
+  exclude_text_hashtags), folder-wide inheritance switches
+  (include_subtodos, include_list_items), descendant folder scope
+  (include_subfolders), grouping options (group_todos_by_list,
   root_todos_only, nest_subtodos), common filters
   (uncompleted_only, include_archived_lists), folder scope filters
   (include_root_folder, exclude_root_folder, strict_nesting),
@@ -565,14 +569,13 @@ named_search_excluded_hashtags
 
 smart_folder_include_hashtags
   Links smart folders to hashtags they filter by (include). Columns:
-  smart_folder_id, hashtag_id. Also has per-association flags:
-  include_subtodos (propagate match to child todos) and
-  include_list_items (also match lists with this hashtag).
+  smart_folder_id, hashtag_id, metadata_json. Inheritance settings
+  live on smart_folders, shared across every tag and text hashtag.
 
 smart_folder_exclude_hashtags
   Links smart folders to hashtags they exclude. Columns:
-  smart_folder_id, hashtag_id. Also has per-association flag:
-  include_subtodos.
+  smart_folder_id, hashtag_id, metadata_json. Parent-task inheritance
+  uses the smart folder's include_subtodos setting.
 
 smart_folder_lists
   Links smart folders to specific lists they scope to. Columns:

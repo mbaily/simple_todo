@@ -185,7 +185,7 @@ Tracks completion of individual occurrences of recurring events.
 ## Saved Queries
 
 ### `smart_folders`
-User-defined filtered views combining lists and todos.
+User-defined filtered views combining lists, todos, and calendar events.
 
 | Column | Type | Nullable | Default | Description |
 |--------|------|----------|---------|-------------|
@@ -193,6 +193,13 @@ User-defined filtered views combining lists and todos.
 | `name` | VARCHAR(255) | No | - | Folder name |
 | `show_lists` | BOOLEAN | Yes | `True` | Include lists in results |
 | `show_todos` | BOOLEAN | Yes | `True` | Include todos in results |
+| `show_events` | BOOLEAN | Yes | `True` | Include calendar events |
+| `match_all` | BOOLEAN | Yes | `False` | Require every included tag/hashtag instead of any |
+| `include_text_hashtags` | JSON | No | `[]` | Included hashtags written in text |
+| `exclude_text_hashtags` | JSON | No | `[]` | Excluded hashtags written in text |
+| `include_subtodos` | BOOLEAN | Yes | `False` | Folder-wide inheritance from parent/ancestor tasks, for includes and exclusions |
+| `include_list_items` | BOOLEAN | Yes | `False` | Folder-wide inheritance from matching lists, for includes |
+| `include_subfolders` | BOOLEAN | Yes | `False` | Expand selected folder scopes to descendants |
 | `group_todos_by_list` | BOOLEAN | Yes | `True` | Group todos under their lists |
 | `root_todos_only` | BOOLEAN | Yes | `0` | Only show top-level todos |
 | `nest_subtodos` | BOOLEAN | Yes | `0` | Render subtodos hierarchically |
@@ -215,8 +222,8 @@ User-defined filtered views combining lists and todos.
 
 **Relationships:**
 - Many-to-many with `lists` via `smart_folder_lists`
-- Many-to-many with `hashtags` via `smart_folder_include_hashtags` (with `include_subtodos` flag)
-- Many-to-many with `hashtags` via `smart_folder_exclude_hashtags` (with `include_subtodos` flag)
+- Many-to-many with `hashtags` via `smart_folder_include_hashtags` (membership only)
+- Many-to-many with `hashtags` via `smart_folder_exclude_hashtags` (membership only)
 - Many-to-many with `folders` via `smart_folder_include_folders`
 - Many-to-many with `folders` via `smart_folder_exclude_folders`
 
@@ -286,8 +293,8 @@ Tracks DokuWiki link confirmation state (for external wiki integration).
 | `list_hashtags` | `list_id`, `hashtag_id` | Lists ↔ Hashtags |
 | `todo_hashtags` | `todo_id`, `hashtag_id` | Todos ↔ Hashtags |
 | `calendar_event_hashtags` | `calendar_event_id`, `hashtag_id` | Calendar Events ↔ Hashtags |
-| `smart_folder_include_hashtags` | `smart_folder_id`, `hashtag_id`, `include_subtodos` | Smart Folders ↔ Hashtags (include) |
-| `smart_folder_exclude_hashtags` | `smart_folder_id`, `hashtag_id`, `include_subtodos` | Smart Folders ↔ Hashtags (exclude) |
+| `smart_folder_include_hashtags` | `smart_folder_id`, `hashtag_id`, `metadata_json` | Smart Folders ↔ Hashtags (include) |
+| `smart_folder_exclude_hashtags` | `smart_folder_id`, `hashtag_id`, `metadata_json` | Smart Folders ↔ Hashtags (exclude) |
 | `smart_folder_lists` | `smart_folder_id`, `list_id` | Smart Folders ↔ Lists |
 | `smart_folder_include_folders` | `smart_folder_id`, `folder_id` | Smart Folders ↔ Folders (include) |
 | `smart_folder_exclude_folders` | `smart_folder_id`, `folder_id` | Smart Folders ↔ Folders (exclude) |

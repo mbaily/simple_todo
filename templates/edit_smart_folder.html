@@ -148,6 +148,11 @@
 
         <details style="margin-top: 12px;" open>
             <summary><strong>Tag filters</strong></summary>
+                <div class="dates" style="margin:8px 0;">
+                    <label><input type="checkbox" name="include_subtodos" value="true" {% if folder.include_subtodos %}checked{% endif %}> Also match subtasks of matching tasks</label><br>
+                    <label><input type="checkbox" name="include_list_items" value="true" {% if folder.include_list_items %}checked{% endif %}> Also match tasks in matching lists</label>
+                    <p>These settings apply to every included tag and hashtag. Subtask inheritance also applies to exclusions.</p>
+                </div>
             {% if hashtags %}
             <div>
                 <label>
@@ -159,10 +164,6 @@
             </div>
             <div class="dates" style="margin-top:4px; margin-bottom:8px;">
                 Select include tags and/or exclude tags (NOT). NOT wins if both are checked.
-                <br>
-                Check "w/ subtodos" to apply the filter to subtodos of matching parents.
-                <br>
-                Check "inc. list items" to include all items from lists matching the tag.
             </div>
             {% for hashtag in hashtags %}
             <div style="margin-bottom: 4px;">
@@ -171,16 +172,6 @@
                         folder_include_ids %}checked{% endif %}>
                     {{ hashtag.name }}
                 </label>
-                <label class="dates" style="font-size: 0.85em;">
-                    <input type="checkbox" name="include_subtodos_{{ hashtag.id }}" value="true" {% if
-                        folder_include_subtodos_map.get(hashtag.id) %}checked{% endif %}>
-                    w/ subtodos
-                </label>
-                <label class="dates" style="font-size: 0.85em; margin-left:6px;">
-                    <input type="checkbox" name="include_list_items_{{ hashtag.id }}" value="true" {% if
-                        folder_include_list_items_map.get(hashtag.id) %}checked{% endif %}>
-                    inc. list items
-                </label>
 
                 <span style="display:inline-block; width: 12px;"></span>
 
@@ -188,11 +179,6 @@
                     <input type="checkbox" name="exclude_hashtag_ids" value="{{ hashtag.id }}" {% if hashtag.id in
                         folder_exclude_ids %}checked{% endif %}>
                     NOT
-                </label>
-                <label class="dates" style="font-size: 0.85em;">
-                    <input type="checkbox" name="exclude_subtodos_{{ hashtag.id }}" value="true" {% if
-                        folder_exclude_subtodos_map.get(hashtag.id) %}checked{% endif %}>
-                    w/ subtodos
                 </label>
             </div>
             {% endfor %}

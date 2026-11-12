@@ -13,6 +13,7 @@ import calendar
 from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
+from smart_folder_settings import inheritance_settings
 from urllib.parse import urlencode, urlsplit
 import random
 import asyncio
@@ -289,6 +290,7 @@ def apply_default_smart_folders(db: Session, defaults: list):
             exclude_root_folder=data.get("exclude_root_folder", False),
             strict_nesting=data.get("strict_nesting", False),
             section_order=data.get("section_order", "LET"),
+            **inheritance_settings(data),
         )
         
         if data.get("modified_after"):
@@ -319,7 +321,6 @@ def apply_default_smart_folders(db: Session, defaults: list):
             assoc = SmartFolderIncludeHashtag(
                 smart_folder_id=sf.id,
                 hashtag_id=hashtag.id,
-                include_subtodos=h_data.get("include_subtodos", False)
             )
             db.add(assoc)
 
@@ -335,7 +336,6 @@ def apply_default_smart_folders(db: Session, defaults: list):
             assoc = SmartFolderExcludeHashtag(
                 smart_folder_id=sf.id,
                 hashtag_id=hashtag.id,
-                include_subtodos=h_data.get("include_subtodos", False)
             )
             db.add(assoc)
             
@@ -5966,9 +5966,6 @@ def edit_smart_folder(request: Request, folder_id: int, db: Session = Depends(ge
     folder_include_ids = {a.hashtag_id for a in folder.include_hashtags_assoc}
     folder_exclude_ids = {a.hashtag_id for a in folder.exclude_hashtags_assoc}
     
-    folder_include_subtodos_map = {a.hashtag_id: a.include_subtodos for a in folder.include_hashtags_assoc}
-    folder_include_list_items_map = {a.hashtag_id: a.include_list_items for a in folder.include_hashtags_assoc}
-    folder_exclude_subtodos_map = {a.hashtag_id: a.include_subtodos for a in folder.exclude_hashtags_assoc}
 
     folder_folder_ids = {f.id for f in folder.include_folders}
     folder_exclude_folder_ids = {f.id for f in folder.exclude_folders}
@@ -5990,9 +5987,6 @@ def edit_smart_folder(request: Request, folder_id: int, db: Session = Depends(ge
         "folder_exclude_ids": folder_exclude_ids,
         "folder_folder_ids": folder_folder_ids,
         "folder_exclude_folder_ids": folder_exclude_folder_ids,
-        "folder_include_subtodos_map": folder_include_subtodos_map,
-        "folder_include_list_items_map": folder_include_list_items_map,
-        "folder_exclude_subtodos_map": folder_exclude_subtodos_map,
         "modified_after_val": modified_after_val,
         "modified_before_val": modified_before_val,
     })
@@ -6016,8 +6010,9 @@ def api_edit_smart_folder_data(folder_id: int, db: Session = Depends(get_db)):
     folder_include_ids = [a.hashtag_id for a in folder.include_hashtags_assoc]
     folder_exclude_ids = [a.hashtag_id for a in folder.exclude_hashtags_assoc]
     
-    folder_include_subtodos_map = {a.hashtag_id: a.include_subtodos for a in folder.include_hashtags_assoc}
-    folder_exclude_subtodos_map = {a.hashtag_id: a.include_subtodos for a in folder.exclude_hashtags_assoc}
+    # Compatibility maps are derived from the authoritative folder settings.
+    folder_include_subtodos_map = {a.hashtag_id: folder.include_subtodos for a in folder.include_hashtags_assoc}
+    folder_exclude_subtodos_map = {a.hashtag_id: folder.include_subtodos for a in folder.exclude_hashtags_assoc}
 
     folder_folder_ids = [f.id for f in folder.include_folders]
     folder_exclude_folder_ids = [f.id for f in folder.exclude_folders]
@@ -6028,27 +6023,8 @@ def api_edit_smart_folder_data(folder_id: int, db: Session = Depends(get_db)):
         # stored as exclusive next-midnight; present it as the inclusive date the user typed.
         modified_before_val = (folder.modified_before - timedelta(days=1)).strftime('%Y-%m-%d')
 
-    def serialize_smart_folder_edit(sf):
-        return {
-            "id": sf.id,
-            "name": sf.name,
-            "show_lists": sf.show_lists,
-            "show_todos": sf.show_todos,
-            "group_todos_by_list": sf.group_todos_by_list,
-            "root_todos_only": sf.root_todos_only,
-            "nest_subtodos": sf.nest_subtodos,
-            "uncompleted_only": sf.uncompleted_only,
-            "include_archived_lists": sf.include_archived_lists,
-            "dokuwiki_links_enabled": sf.dokuwiki_links_enabled,
-            "dokuwiki_date_field": sf.dokuwiki_date_field,
-            "list_sort_field": sf.list_sort_field,
-            "list_sort_desc": sf.list_sort_desc,
-            "todo_sort_field": sf.todo_sort_field,
-            "todo_sort_desc": sf.todo_sort_desc,
-        }
-
     return JSONResponse({
-        "folder": serialize_smart_folder_edit(folder),
+        "folder": serialize_smart_folder(folder),
         "hashtags": [serialize_hashtag(h) for h in hashtags],
         "lists": [serialize_list(l) for l in lists],
         "folder_list_ids": folder_list_ids,
@@ -6617,35 +6593,8 @@ def api_smart_folders_data(db: Session = Depends(get_db)):
     hashtags = db.query(Hashtag).order_by(Hashtag.name).all()
     lists = db.query(List).filter(List.archived == False).order_by(List.modified_at.desc()).all()
     
-    def serialize_smart_folder(sf):
-        return {
-            "id": sf.id,
-            "name": sf.name,
-            "show_lists": sf.show_lists,
-            "show_todos": sf.show_todos,
-            "group_todos_by_list": sf.group_todos_by_list,
-            "root_todos_only": sf.root_todos_only,
-            "nest_subtodos": sf.nest_subtodos,
-            "uncompleted_only": sf.uncompleted_only,
-            "include_archived_lists": sf.include_archived_lists,
-            "modified_after": sf.modified_after.isoformat() if sf.modified_after else None,
-            "modified_before": sf.modified_before.isoformat() if sf.modified_before else None,
-            "modified_at": sf.modified_at.isoformat() if sf.modified_at else None,
-            "list_sort_field": sf.list_sort_field,
-            "list_sort_desc": sf.list_sort_desc,
-            "todo_sort_field": sf.todo_sort_field,
-            "todo_sort_desc": sf.todo_sort_desc,
-            "dokuwiki_links_enabled": sf.dokuwiki_links_enabled,
-            "dokuwiki_date_field": sf.dokuwiki_date_field,
-            "include_hashtags": [{"id": a.hashtag.id, "name": a.hashtag.name, "include_subtodos": a.include_subtodos} for a in sf.include_hashtags_assoc if a.hashtag],
-            "exclude_hashtags": [{"id": a.hashtag.id, "name": a.hashtag.name, "include_subtodos": a.include_subtodos} for a in sf.exclude_hashtags_assoc if a.hashtag],
-            "include_hashtags_assoc": [{"id": a.hashtag.id, "name": a.hashtag.name, "include_subtodos": a.include_subtodos} for a in sf.include_hashtags_assoc if a.hashtag],
-            "exclude_hashtags_assoc": [{"id": a.hashtag.id, "name": a.hashtag.name, "include_subtodos": a.include_subtodos} for a in sf.exclude_hashtags_assoc if a.hashtag],
-            "list_ids": [l.id for l in sf.lists]
-        }
-
     return JSONResponse({
-        "folders": [serialize_smart_folder(sf) for sf in folders],
+        "folders": [{**serialize_smart_folder(sf), "list_ids": [item.id for item in sf.lists]} for sf in folders],
         "hashtags": [serialize_hashtag(h) for h in hashtags],
         "lists": [serialize_list(l) for l in lists],
     })
@@ -6736,18 +6685,9 @@ def api_smart_folder_view_data(folder_id: int, db: Session = Depends(get_db)):
     # Serialize folder
     def serialize_smart_folder_full(sf):
         return {
-            "id": sf.id,
-            "name": sf.name,
-            "show_lists": sf.show_lists,
-            "show_todos": sf.show_todos,
-            "group_todos_by_list": sf.group_todos_by_list,
-            "root_todos_only": sf.root_todos_only,
-            "nest_subtodos": sf.nest_subtodos,
-            "uncompleted_only": sf.uncompleted_only,
-            "include_archived_lists": sf.include_archived_lists,
-            "include_hashtags_assoc": [{"hashtag": {"id": a.hashtag.id, "name": a.hashtag.name}, "include_subtodos": a.include_subtodos} for a in sf.include_hashtags_assoc],
-            "exclude_hashtags_assoc": [{"hashtag": {"id": a.hashtag.id, "name": a.hashtag.name}, "include_subtodos": a.include_subtodos} for a in sf.exclude_hashtags_assoc],
-            "lists": [{"id": l.id, "name": l.name} for l in sf.lists]
+            **serialize_smart_folder(sf),
+            "include_hashtags_assoc": [{"hashtag": {"id": a.hashtag.id, "name": a.hashtag.name}} for a in sf.include_hashtags_assoc],
+            "exclude_hashtags_assoc": [{"hashtag": {"id": a.hashtag.id, "name": a.hashtag.name}} for a in sf.exclude_hashtags_assoc],
         }
 
     # Serialize lists (matching_lists is list of objects)

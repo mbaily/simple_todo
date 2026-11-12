@@ -2,6 +2,7 @@ from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
 from calendar_service import parse_calendar_duration
+from smart_folder_settings import inheritance_settings
 from sqlalchemy import text # For manual ID insertion/lookup if needed
 
 from models import (
@@ -434,12 +435,14 @@ def apply_smart_folder(db: Session, data: Dict[str, Any], id_map: Dict[str, int]
         'todo_sort_field', 'todo_sort_desc', 'dokuwiki_links_enabled', 
         'dokuwiki_date_field', 'include_root_folder', 'exclude_root_folder',
         'strict_nesting', 'sort_order', 'section_order', 'show_events', 'match_all',
-        'include_subtodos', 'include_list_items', 'include_subfolders',
+        'include_subfolders',
     ]
     for field in simple_fields:
         if field in data:
             setattr(obj, field, data[field])
 
+    for field, value in inheritance_settings(data).items():
+        setattr(obj, field, value)
     for field in ('include_text_hashtags', 'exclude_text_hashtags'):
         if isinstance(data.get(field), list):
             setattr(obj, field, [str(name).lstrip('#').lower() for name in data[field] if str(name).strip('#')])
@@ -456,11 +459,10 @@ def apply_smart_folder(db: Session, data: Dict[str, Any], id_map: Dict[str, int]
             target_ids = [item_id for item_id in target_ids if item_id]
             setattr(obj, field, db.query(model).filter(model.id.in_(target_ids)).all() if target_ids else [])
 
-    if 'include_hashtags' in data:
-        update_smart_folder_hashtags(db, obj, data['include_hashtags'], True, id_map)
-        
-    if 'exclude_hashtags' in data:
-        update_smart_folder_hashtags(db, obj, data['exclude_hashtags'], False, id_map)
+    for field, is_include in (('include_hashtags', True), ('exclude_hashtags', False)):
+        selection = data.get(field, data.get(field + '_assoc'))
+        if isinstance(selection, list):
+            update_smart_folder_hashtags(db, obj, selection, is_include, id_map)
 
     db.flush()
 
@@ -662,6 +664,7 @@ def update_smart_folder_hashtags(db: Session, sf: SmartFolder, data_list: List[D
     seen_ids = set()
     
     for item in data_list:
+        item = item.get('hashtag', item)
         # Resolve hashtag ID:
         resolved_hid = _resolve_id(item.get('id'), id_map) 
         
@@ -675,19 +678,12 @@ def update_smart_folder_hashtags(db: Session, sf: SmartFolder, data_list: List[D
         
         seen_ids.add(resolved_hid)
         
-        include_sub = item.get('include_subtodos', False)
-        
-        if resolved_hid in current_assocs:
-            # update
-            assoc = current_assocs[resolved_hid]
-            if assoc.include_subtodos != include_sub:
-                assoc.include_subtodos = include_sub
-        else:
+        if resolved_hid not in current_assocs:
             # create
             if is_include:
-                assoc = SmartFolderIncludeHashtag(smart_folder_id=sf.id, hashtag_id=resolved_hid, include_subtodos=include_sub)
+                assoc = SmartFolderIncludeHashtag(smart_folder_id=sf.id, hashtag_id=resolved_hid)
             else:
-                assoc = SmartFolderExcludeHashtag(smart_folder_id=sf.id, hashtag_id=resolved_hid, include_subtodos=include_sub)
+                assoc = SmartFolderExcludeHashtag(smart_folder_id=sf.id, hashtag_id=resolved_hid)
             db.add(assoc)
             
     # Delete missing

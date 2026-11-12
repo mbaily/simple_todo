@@ -186,6 +186,7 @@
             root.querySelector('.task-options-toggle')?.setAttribute('aria-expanded', String(open));
         }
         initializeEditor(root);
+        initializeSmartPickers(root);
         if (root.dataset.editor && (firstLoad || enteringScope)) document.getElementById('editor-title')?.focus({ preventScroll: true });
         // Arriving from a calendar note icon: focus the main field or the specific attached note.
         if (firstLoad && /^#event-note(?:-\d+)?$/.test(location.hash)) document.getElementById(location.hash.slice(1))?.focus();
@@ -218,6 +219,106 @@
             input?.focus({ preventScroll: true });
         }
     }
+
+    // Smart-folder pickers filter the server-rendered choices locally. Only choosing
+    // an item changes the native select and asks HTMX to update the draft.
+    function initializeSmartPickers(root) {
+        root.querySelectorAll('[data-smart-picker]').forEach(picker => {
+            picker.querySelector('[data-smart-picker-native]').hidden = true;
+            picker.querySelector('[data-smart-picker-control]').hidden = false;
+            closeSmartPicker(picker);
+        });
+    }
+
+    function closeSmartPicker(picker) {
+        const input = picker.querySelector('[data-smart-picker-search]');
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+        picker.querySelector('[data-smart-picker-popup]').hidden = true;
+    }
+
+    function smartPickerOptions(picker) {
+        return [...picker.querySelectorAll('[data-smart-picker-value]')].filter(option => !option.hidden);
+    }
+
+    function activeSmartOption(input, option) {
+        const picker = input.closest('[data-smart-picker]');
+        picker.querySelectorAll('[data-smart-picker-value]').forEach(item => {
+            item.setAttribute('aria-selected', String(item === option));
+        });
+        if (option) input.setAttribute('aria-activedescendant', option.id);
+        else input.removeAttribute('aria-activedescendant');
+    }
+
+    function filterSmartPicker(input) {
+        const picker = input.closest('[data-smart-picker]');
+        // Folder paths can be searched as "work garden" or "work/garden".
+        const tokens = input.value.trim().toLocaleLowerCase().split(/[\s/>]+/).filter(Boolean);
+        picker.querySelectorAll('[data-smart-picker-value]').forEach(option => {
+            const text = option.textContent.toLocaleLowerCase();
+            option.hidden = !tokens.every(token => text.includes(token));
+        });
+        picker.querySelectorAll('[data-smart-picker-group]').forEach(group => {
+            group.hidden = ![...group.querySelectorAll('[data-smart-picker-value]')].some(option => !option.hidden);
+        });
+        const visible = smartPickerOptions(picker);
+        picker.querySelector('[data-smart-picker-empty]').hidden = visible.length > 0;
+        picker.querySelector('[data-smart-picker-count]').textContent = `${visible.length} ${visible.length === 1 ? 'choice' : 'choices'}`;
+        activeSmartOption(input, visible[0]);
+        const popup = picker.querySelector('[data-smart-picker-popup]');
+        popup.hidden = false;
+        popup.scrollTop = 0;
+        input.setAttribute('aria-expanded', 'true');
+        const bounds = input.getBoundingClientRect();
+        popup.classList.toggle('smart-picker-above', window.innerHeight - bounds.bottom < 240 && bounds.top > window.innerHeight - bounds.bottom);
+    }
+
+    function chooseSmartOption(option) {
+        const picker = option.closest('[data-smart-picker]');
+        const input = picker.querySelector('[data-smart-picker-search]');
+        const select = picker.querySelector('[data-smart-picker-native]');
+        select.value = option.dataset.smartPickerValue;
+        input.value = '';
+        input.focus({ preventScroll: true });
+        closeSmartPicker(picker);
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    document.addEventListener('focusin', event => {
+        if (event.target.matches?.('[data-smart-picker-search]')) filterSmartPicker(event.target);
+    });
+    document.addEventListener('focusout', event => {
+        const picker = event.target.closest?.('[data-smart-picker]');
+        if (picker && !picker.contains(event.relatedTarget)) closeSmartPicker(picker);
+    });
+    document.addEventListener('pointerdown', event => {
+        document.querySelectorAll('[data-smart-picker]').forEach(picker => {
+            if (!picker.contains(event.target)) closeSmartPicker(picker);
+        });
+    });
+    document.addEventListener('mousedown', event => {
+        // Keep focus through a click without cancelling touch-generated clicks in Safari
+        // or preventing a touch gesture from scrolling the choices.
+        if (event.target.closest?.('[data-smart-picker-value], [data-smart-picker-toggle]')) event.preventDefault();
+    });
+    document.addEventListener('click', event => {
+        if (event.target.matches?.('[data-smart-picker-search]')) { filterSmartPicker(event.target); return; }
+        const option = event.target.closest?.('[data-smart-picker-value]');
+        if (option) { chooseSmartOption(option); return; }
+        const toggle = event.target.closest?.('[data-smart-picker-toggle]');
+        if (toggle) {
+            const picker = toggle.closest('[data-smart-picker]');
+            const input = picker.querySelector('[data-smart-picker-search]');
+            const open = input.getAttribute('aria-expanded') === 'true';
+            input.focus({ preventScroll: true });
+            if (open) closeSmartPicker(picker);
+            else filterSmartPicker(input);
+        }
+    });
+    // A search field's blur/change must not submit the smart-folder draft.
+    document.addEventListener('change', event => {
+        if (event.target.matches?.('[data-smart-picker-search]')) event.stopPropagation();
+    }, true);
 
     function initializeEditor(root, changed = null) {
         if (!root?.dataset.editor) return;
@@ -399,6 +500,7 @@
         if (empty) empty.hidden = !rows.length || rows.some(row => !row.hidden);
     }
     document.addEventListener('input', event => {
+        if (event.target.matches?.('[data-smart-picker-search]')) { filterSmartPicker(event.target); return; }
         if (event.target.matches?.('[data-colour-picker]')) {
             const form = event.target.form;
             form.querySelector('[data-colour-toggle]').checked = true;
@@ -726,6 +828,28 @@
     });
 
     document.addEventListener('keydown', event => {
+        if (event.target.matches?.('[data-smart-picker-search]')) {
+            const input = event.target, picker = input.closest('[data-smart-picker]');
+            const open = input.getAttribute('aria-expanded') === 'true';
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (!open) filterSmartPicker(input);
+                const options = smartPickerOptions(picker);
+                const index = options.findIndex(option => option.id === input.getAttribute('aria-activedescendant'));
+                const next = !open ? (event.key === 'ArrowDown' ? 0 : options.length - 1)
+                    : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
+                activeSmartOption(input, options[next]);
+                options[next]?.scrollIntoView({ block: 'nearest' });
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                const option = open && document.getElementById(input.getAttribute('aria-activedescendant'));
+                if (option) chooseSmartOption(option);
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                closeSmartPicker(picker);
+            } else if (event.key === 'Tab') closeSmartPicker(picker);
+            return;
+        }
         if (event.key === 'Enter' && event.target.matches?.('#smart-form [name="new_include"], #smart-form [name="new_exclude"]')) {
             event.preventDefault();
             htmx.trigger(document.getElementById('smart-rules'), 'change');

@@ -12,7 +12,25 @@
     {% for key, label in chosen %}<label class="badge badge-outline chip {{ kind }}" title="Remove {{ label }}"><input type="checkbox" name="{{ name }}" value="{{ key }}" checked aria-label="{{ label }} (untick to remove)"><span>{{ label }}</span><span class="chip-x" aria-hidden="true">×</span></label>{% endfor %}
     {% if not chosen and empty %}<span class="chip-empty">{{ empty }}</span>{% endif %}
     {% set available = options|map(attribute=1)|map('length')|sum %}
-    {% if available %}<select class="select select-sm chip-add" name="add_{{ name }}" aria-label="{{ add_label }}"><option value="">{{ add_label }}…</option>{% for group, items in options %}{% if items %}{% if group %}<optgroup label="{{ group }}">{% endif %}{% for key, label in items %}<option value="{{ key }}">{{ label }}</option>{% endfor %}{% if group %}</optgroup>{% endif %}{% endif %}{% endfor %}</select>{% endif %}
+    {% if available %}
+    <div class="smart-picker" data-smart-picker>
+        {# Keep native submission and a usable fallback when JavaScript is unavailable. #}
+        <select class="select select-sm chip-add" name="add_{{ name }}" aria-label="{{ add_label }}" data-smart-picker-native><option value="">{{ add_label }}…</option>{% for group, items in options %}{% if items %}{% if group %}<optgroup label="{{ group }}">{% endif %}{% for key, label in items %}<option value="{{ key }}">{{ label }}</option>{% endfor %}{% if group %}</optgroup>{% endif %}{% endif %}{% endfor %}</select>
+        <div data-smart-picker-control hidden>
+            <div class="input input-sm smart-picker-search">{{ icon('search', 14) }}<input id="smart-picker-{{ name }}" type="search" role="combobox" aria-label="{{ add_label }}" aria-autocomplete="list" aria-expanded="false" aria-controls="smart-options-{{ name }}" placeholder="{{ add_label }}…" autocomplete="off" spellcheck="false" data-smart-picker-search><button type="button" class="btn btn-ghost btn-square btn-xs" tabindex="-1" aria-label="Show choices for {{ add_label }}" data-smart-picker-toggle>{{ icon('down', 12) }}</button></div>
+            <div class="smart-picker-popup" data-smart-picker-popup hidden>
+                <div id="smart-options-{{ name }}" role="listbox" aria-label="{{ add_label }}">
+                    {% for group, items in options %}{% set group_index = loop.index0 %}{% if items %}<div role="group" {% if group %}aria-label="{{ group }}"{% endif %} data-smart-picker-group>
+                        {% if group %}<div class="smart-picker-heading" aria-hidden="true">{{ group }}</div>{% endif %}
+                        {% for key, label in items %}<div id="smart-option-{{ name }}-{{ group_index }}-{{ loop.index0 }}" role="option" aria-selected="false" class="smart-picker-option" data-smart-picker-value="{{ key }}">{{ label }}</div>{% endfor %}
+                    </div>{% endif %}{% endfor %}
+                </div>
+                <p class="smart-picker-empty" data-smart-picker-empty hidden>No matches. Try another search.</p>
+                <span class="sr-only" role="status" aria-live="polite" data-smart-picker-count></span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endmacro %}
 {% macro sort(prefix, label) %}
@@ -24,6 +42,15 @@
         <div class="detail-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><button id="smart-save" type="submit" form="smart-form" class="btn btn-primary">{{ icon('check', 16) }} {{ 'Save changes' if smart_folder_id else 'Create smart folder' }}</button><a class="btn" href="{{ cancel }}">Cancel</a>{% if smart_folder_id %}<form action="{{ prototype_url }}/smart-folder/{{ smart_folder_id }}/delete?view=smart-index" method="post" hx-post="{{ prototype_url }}/smart-folder/{{ smart_folder_id }}/delete?view=smart-index" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete smart folder “{{ smart_folder_name }}”? Only the saved view is deleted; its lists and tasks are kept."><button class="btn delete-button">{{ icon('trash', 15) }} Delete</button></form>{% endif %}</div>
     </header>
     <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    {% if not smart_folder_id %}
+    <details class="section-panel smart-presets" data-persist="smart-presets">
+        <summary class="capture-summary">{{ icon('smart', 16) }} Start with a preset <small>Loads editable rules; nothing is saved yet.</small>{{ icon('down', 14) }}</summary>
+        <nav class="smart-preset-options" aria-label="Smart folder presets">
+            {% for key, preset in presets.items() %}<a class="btn btn-sm" href="{{ prototype_url }}/smart-folders/new?preset={{ key }}">{{ preset.label }}</a>{% endfor %}
+            <a class="btn btn-sm btn-ghost" href="{{ prototype_url }}/smart-folders/new">Start blank</a>
+        </nav>
+    </details>
+    {% endif %}
 
     <div class="smart-layout">
     <div class="smart-editor">
@@ -88,7 +115,7 @@
         <div class="preview-group"><h3>{{ count }} {{ one if count == 1 else many }}</h3>{% if names %}<ul>{% for name in names %}<li>{{ caller(name) }}</li>{% endfor %}{% if count > names|length %}<li class="preview-more">and {{ count - names|length }} more</li>{% endif %}</ul>{% endif %}</div>
         {% endif %}{% endmacro %}
         {% call(name) sample(values.show_lists, matches.lists, 'list', 'lists', matches.list_names) %}{{ name }}{% endcall %}
-        {% call(name) sample(values.show_todos, matches.todos, 'task', 'tasks', matches.todo_names) %}{{ name[0] }}{% if name[1] %} <small>{{ name[1] }}</small>{% endif %}{% endcall %}
+        {% call(name) sample(values.show_todos, matches.todos, 'task', 'tasks', matches.todo_names) %}{{ name[0] }}{% if name[1] %} <small>{{ name[1] }}</small>{% endif %}<div class="preview-reasons" aria-label="Why this task matches">{% for reason in name[2] %}<span>{{ reason }}</span>{% endfor %}</div>{% endcall %}
         {% call(name) sample(values.show_events, matches.events, 'calendar event', 'calendar events', matches.event_names) %}{{ name }}{% endcall %}
         {% if not (matches.lists or matches.todos or matches.events) %}<p class="section-empty">Nothing matches these rules yet.</p>{% endif %}
         <p class="page-hint">Updates as you change the rules. Nothing is stored until you save.</p>

@@ -30,9 +30,10 @@ def related(account):
     task = Todo(title='Original task', list=item, hashtags=[included])
     calendar = CalendarEvent(title='Original event', start_at=day('2026-10-01'), hashtags=[included])
     search = NamedSearch(name='Original search', hashtags=[included], excluded_hashtags=[excluded])
-    smart = SmartFolder(name='Original smart folder', lists=[item], include_folders=[first], exclude_folders=[second])
-    smart.include_hashtags_assoc = [SmartFolderIncludeHashtag(hashtag=included, include_subtodos=True, include_list_items=True)]
-    smart.exclude_hashtags_assoc = [SmartFolderExcludeHashtag(hashtag=excluded, include_subtodos=True)]
+    smart = SmartFolder(name='Original smart folder', lists=[item], include_folders=[first], exclude_folders=[second],
+                        include_subtodos=True, include_list_items=True)
+    smart.include_hashtags_assoc = [SmartFolderIncludeHashtag(hashtag=included)]
+    smart.exclude_hashtags_assoc = [SmartFolderExcludeHashtag(hashtag=excluded)]
     db.add_all([included, excluded, first, second, item, task, calendar, search, smart])
     db.commit()
     return db, client, dict(lists=item, todos=task, calendar_events=calendar, named_searches=search, smart_folders=smart)
@@ -100,8 +101,10 @@ def test_explicit_nonempty_tag_replacement_keeps_other_records_and_filters(relat
     expected = copy.deepcopy(before)
     expected['lists'][records['lists'].id]['hashtags'] = [dict(id=excluded.id)]
     expected['smart_folders'][records['smart_folders'].id]['include_hashtags'] = [
-        dict(id=excluded.id, include_subtodos=False, include_list_items=True)]
+        dict(id=excluded.id)]
     assert relation_snapshot(client) == expected
+    assert records['smart_folders'].include_subtodos is False
+    assert records['smart_folders'].include_list_items is True
 
 
 def test_repeated_full_export_restore_preserves_all_relationships_and_filter_flags(related):
