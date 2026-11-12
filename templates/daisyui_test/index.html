@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>{% if results_page or folders_page or smart_page or hashtags_page or calendar_page or pages_page or customize_page or bills_page or expenses_page or recipe_page or reorder_page or uncompleted_page or categories_page %}{{ page_title }} · {{ t('app_title') }}{% else %}{% if editor_page %}Edit {{ item_label }} · {% elif list_page %}{{ list.name }} · {% endif %}{{ t('app_title') }}{% endif %}</title>
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/daisyui_test/daisyui-5.7.50.css">
-    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/daisyui_test/style.css?v=56">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/daisyui_test/style.css?v=57">
     <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
     <script src="{{ request.scope.root_path }}/static/daisyui_test/htmx-4.0.0.min.js" defer></script>
     <script src="{{ request.scope.root_path }}/static/daisyui_test/app.js?v=28" defer></script>
@@ -18,6 +18,8 @@
 <div class="app-shell">
     <header class="navbar topbar">
         <a class="brand" href="{{ prototype_url }}" title="{{ t('app_title') }}" aria-label="{{ t('app_title') }}"><span class="brand-symbol">{{ icon('check', 18) }}</span></a>
+        {# Shortcuts to sections of the overview; shown only while the section is on the page. #}
+        <span class="topbar-jumps">{% for anchor, symbol, label in [('folders-heading', 'folder', 'Jump to folders'), ('lists-heading', 'list', 'Jump to your lists')] %}<a class="btn btn-ghost btn-square btn-sm" href="#{{ anchor }}" hx-boost="false" title="{{ label }}" aria-label="{{ label }}">{{ icon(symbol, 17) }}</a>{% endfor %}</span>
         <nav class="toolbar-navigation" aria-label="Main navigation">
             {% for path, symbol, label in [('', 'home', 'Overview'), ('/search', 'search', t('title_search', 'Search')), ('/calendar', 'calendar', t('title_calendar', 'Calendar')), ('/folders', 'folder', t('title_folders', 'Folders')), ('/smart-folders', 'smart', t('title_smart_folders', 'Smart folders')), ('/hashtags', 'hash', t('title_hashtags', 'Hashtags'))] %}
             {% set active = (not path and not list_page and not editor_page and not results_page and not folders_page and not smart_page and not hashtags_page and not calendar_page and not pages_page and not customize_page and not bills_page and not expenses_page and not recipe_page and not reorder_page and not uncompleted_page and not categories_page) or (path == '/search' and results_kind == 'search') or (path == '/folders' and folders_page) or (path == '/smart-folders' and smart_page) or (path == '/hashtags' and hashtags_page) or (path == '/calendar' and calendar_page) %}
