@@ -79,7 +79,6 @@
         const tasksOnly = count > 0 && keys.every(key => key.startsWith('todo:'));
         document.querySelectorAll('[data-single-item]').forEach(button => { button.disabled = count !== 1 || keys[0]?.startsWith('datetime_header:'); });
         document.querySelectorAll('[data-single-todo]').forEach(button => { button.disabled = count !== 1 || !tasksOnly; });
-        document.querySelectorAll('[data-todos-only]').forEach(button => { button.disabled = !tasksOnly; });
         document.querySelectorAll('[data-pin-items]').forEach(button => { button.disabled = !count || keys.some(key => !/^(todo|list):/.test(key)); });
         document.querySelectorAll('[data-movable]').forEach(button => { button.disabled = !count || keys.some(key => !/^(todo|note):/.test(key)); });
         document.querySelectorAll('[data-native-todos]').forEach(button => {
@@ -198,6 +197,13 @@
         }
         updateSelection();
         if (state.focusId) document.getElementById(state.focusId)?.focus({ preventScroll: true });
+        if (state.orderFocus) {
+            // Keep focus on the moved task's grip so it can be moved again from the keyboard.
+            const grip = document.getElementById(state.orderFocus)?.querySelector('[data-drag-handle]');
+            grip?.focus({ preventScroll: true });
+            grip?.closest('.task-row').scrollIntoView({ block: 'nearest' });
+            state.orderFocus = null;
+        }
         if (state.reorderFocus) {
             // Keep focus on the moved list's button so it can be moved again from the keyboard.
             const [id, to] = state.reorderFocus.split(':');
@@ -448,6 +454,100 @@
         updateSelection();
     });
 
+    // Manual ordering. Tasks of one level are siblings; a task's subtasks and notes are the rows
+    // below it with a greater depth, and travel with it.
+    const depthOf = row => Number(row.style.getPropertyValue('--depth') || 0);
+    const orderSiblings = row => [...row.parentElement.children].filter(item => item.dataset.orderGroup === row.dataset.orderGroup);
+    function blockOf(row) {
+        const rows = [row];
+        const depth = depthOf(row);
+        for (let next = row.nextElementSibling; next && next.matches('.task-row, .note-row') && depthOf(next) > depth; next = next.nextElementSibling) rows.push(next);
+        return rows;
+    }
+    function placeTask(row, target, position, keepFocus) {
+        const form = document.getElementById('order-form');
+        const siblings = orderSiblings(row);
+        const index = siblings.indexOf(row);
+        // Dropping a task where it already is changes nothing.
+        if (!form || !target || target === row || siblings[index + (position === 'before' ? 1 : -1)] === target) return;
+        form.elements.task_id.value = row.dataset.itemKey.split(':')[1];
+        form.elements.target_id.value = target.dataset.itemKey.split(':')[1];
+        form.elements.position.value = position;
+        state.orderFocus = keepFocus ? row.id : null;
+        htmx.trigger(form, 'submit');
+    }
+    function moveTask(row, move, keepFocus) {
+        const siblings = orderSiblings(row);
+        const index = siblings.indexOf(row);
+        if (move === 'up') placeTask(row, siblings[index - 1], 'before', keepFocus);
+        if (move === 'down') placeTask(row, siblings[index + 1], 'after', keepFocus);
+        if (move === 'top' && index > 0) placeTask(row, siblings[0], 'before', keepFocus);
+        if (move === 'bottom' && index < siblings.length - 1) placeTask(row, siblings.at(-1), 'after', keepFocus);
+    }
+    let drag = null;
+    function dropPlace(y) {
+        // The first sibling whose block (the task with its subtasks) has its middle below the pointer.
+        const others = orderSiblings(drag.row).filter(item => item !== drag.row);
+        for (const item of others) {
+            const top = item.getBoundingClientRect().top;
+            const bottom = blockOf(item).at(-1).getBoundingClientRect().bottom;
+            if (y < (top + bottom) / 2) return { target: item, position: 'before', y: top };
+        }
+        const last = others.at(-1);
+        return last ? { target: last, position: 'after', y: blockOf(last).at(-1).getBoundingClientRect().bottom } : null;
+    }
+    function dragFrame() {
+        if (!drag?.active) return;
+        const edge = 70;
+        const top = document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0;
+        if (drag.y < top + edge) window.scrollBy(0, -Math.ceil((top + edge - drag.y) / 6));
+        else if (drag.y > innerHeight - edge) window.scrollBy(0, Math.ceil((drag.y - innerHeight + edge) / 6));
+        drag.place = dropPlace(drag.y);
+        const box = drag.row.getBoundingClientRect();
+        drag.line.hidden = !drag.place;
+        if (drag.place) Object.assign(drag.line.style, { top: drag.place.y + 'px', left: box.left + 'px', width: box.width + 'px' });
+        drag.frame = requestAnimationFrame(dragFrame);
+    }
+    function endDrag(apply) {
+        if (!drag) return;
+        const { row, place, active, line, frame, handle, pointer } = drag;
+        drag = null;
+        cancelAnimationFrame(frame);
+        line?.remove();
+        if (handle.hasPointerCapture?.(pointer)) handle.releasePointerCapture(pointer);
+        document.documentElement.classList.remove('is-ordering');
+        document.querySelectorAll('.drag-source').forEach(item => item.classList.remove('drag-source'));
+        if (active && apply && place) placeTask(row, place.target, place.position);
+    }
+    document.addEventListener('pointerdown', event => {
+        const handle = event.target.closest('[data-drag-handle]');
+        if (!handle || event.button !== 0 || !event.isPrimary) return;
+        event.preventDefault();
+        handle.focus({ preventScroll: true });
+        handle.setPointerCapture(event.pointerId);
+        drag = { handle, pointer: event.pointerId, row: handle.closest('.task-row'), startY: event.clientY, y: event.clientY, active: false };
+    });
+    document.addEventListener('pointermove', event => {
+        if (!drag || event.pointerId !== drag.pointer) return;
+        drag.y = event.clientY;
+        if (drag.active || Math.abs(drag.y - drag.startY) < 5) return;
+        // The drag starts once the pointer has clearly moved, so a plain click on the grip does nothing.
+        drag.active = true;
+        document.documentElement.classList.add('is-ordering');
+        blockOf(drag.row).forEach(item => item.classList.add('drag-source'));
+        drag.line = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'drop-line', hidden: true }));
+        drag.frame = requestAnimationFrame(dragFrame);
+    });
+    document.addEventListener('pointerup', event => { if (drag && event.pointerId === drag.pointer) endDrag(true); });
+    document.addEventListener('pointercancel', event => { if (drag && event.pointerId === drag.pointer) endDrag(false); });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && drag) { endDrag(false); return; }
+        const handle = event.target.closest?.('[data-drag-handle]');
+        if (!handle || !['ArrowUp', 'ArrowDown'].includes(event.key) || event.altKey || event.ctrlKey || event.metaKey) return;
+        event.preventDefault();
+        moveTask(handle.closest('.task-row'), event.key === 'ArrowUp' ? 'up' : 'down', true);
+    });
+
     document.addEventListener('click', event => {
         const reorder = event.target.closest('[data-reorder-key]');
         if (reorder) state.reorderFocus = reorder.dataset.reorderKey;
@@ -511,6 +611,11 @@
             state.selecting = !state.selecting;
             if (!state.selecting) state.selected.clear();
             updateSelection();
+        }
+        if (command === 'order-task') {
+            const row = button.closest('.task-row');
+            button.closest('details').open = false;
+            moveTask(row, button.dataset.move);
         }
         if (command === 'select-item') {
             state.selecting = true;

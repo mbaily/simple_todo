@@ -8,7 +8,7 @@ from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
-from models import List, Todo, Note
+from models import List, Todo, Note, collation_todos
 from daisyui_test_http import wants_fragment
 
 
@@ -266,18 +266,53 @@ def attach_list_routes(router, *, templates, get_db, list_context, actions, feed
         except HTTPException as exc:
             return error(request, db, sort, folder_id, exc)
 
-    @router.post("/list/{list_id}/reorder", response_class=HTMLResponse)
-    async def reorder(request: Request, list_id: int, items: list[str] = Form([]), target_id: int = Form(...),
-                      sort: str = "user", folder_id: int | None = None, db: Session = Depends(get_db)):
+    def order_task(db, item, task_id, target_id, position):
+        """Place one task directly before or after another task of the same level.
+
+        A list keeps one sequence for its own tasks and, in a collation, the tasks it collects.
+        Subtasks are ordered among the subtasks of their parent, so both tasks must share a level.
+        """
+        native = db.query(Todo).filter(Todo.list_id == item.id).order_by(Todo.sort_order.asc(), Todo.created_at.desc()).all()
+        entries = [(task.sort_order or 0, task.id) for task in native]
+        level = {task.id: task.parent_id for task in native}
+        collected = set()
+        if item.is_collation:
+            rows = db.execute(collation_todos.select().where(collation_todos.c.collation_list_id == item.id)
+                              .order_by(collation_todos.c.sort_order.asc())).fetchall()
+            for row in rows:
+                if row.todo_id not in level:
+                    entries.append((row.sort_order or 0, row.todo_id))
+                    level[row.todo_id] = None
+                    collected.add(row.todo_id)
+        if task_id not in level or target_id not in level:
+            raise HTTPException(404, "This task is no longer in the list. Refresh and try again.")
+        if task_id == target_id:
+            raise HTTPException(400, "Choose a different task to move next to.")
+        if level[task_id] != level[target_id]:
+            raise HTTPException(400, "A task can only be reordered among the tasks at its own level.")
+        entries.sort(key=lambda entry: entry[0])
+        order = [entry[1] for entry in entries if entry[1] != task_id]
+        order.insert(order.index(target_id) + (position == "after"), task_id)
+        by_id = {task.id: task for task in native}
+        for index, todo_id in enumerate(order):
+            if todo_id in collected:
+                db.execute(collation_todos.update().where(collation_todos.c.collation_list_id == item.id)
+                           .where(collation_todos.c.todo_id == todo_id).values(sort_order=index * 10))
+            else:
+                by_id[todo_id].sort_order = index * 10
+        db.commit()
+
+    @router.post("/list/{list_id}/order", response_class=HTMLResponse)
+    def order(request: Request, list_id: int, task_id: int = Form(...), target_id: int = Form(...),
+              position: str = Form(...), sort: str = "user", folder_id: int | None = None,
+              db: Session = Depends(get_db)):
         try:
             item = require_list(db, list_id)
             if not item.manual_sorting:
                 raise HTTPException(400, "Enable manual ordering first.")
-            ids = selected_tasks(db, list_id, items)
-            selected_tasks(db, list_id, [f"todo:{target_id}"], single=True)
-            if target_id in ids:
-                raise HTTPException(400, "Choose a destination task outside the selection.")
-            await run("reorder", db, source_ids=ids, target_id=target_id, list_id=list_id)
+            if position not in {"before", "after"}:
+                raise HTTPException(400, "Choose where to place the task.")
+            order_task(db, item, task_id, target_id, position)
             return success(request, db, sort, folder_id, "Task order updated.")
         except HTTPException as exc:
             return error(request, db, sort, folder_id, exc)

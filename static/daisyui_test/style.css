@@ -203,7 +203,7 @@ h2 { font-size: 1rem; letter-spacing: -.1px; font-weight: 600; margin: 0; }
     .section-heading p { font-size: 0.7692rem; }
     .section-heading .btn { font-size: 0.8462rem; padding: 0 5px; }
     .item-row, .agenda-row { gap: 6px; min-height: 2.6923rem; padding: 2px 6px; }
-    .completion-form, .selection-control, .row-symbol { height: 2.3077rem; }
+    .completion-form, .selection-control, .row-symbol, .drag-handle { height: 2.3077rem; }
     .item-content, .agenda-content { min-height: 2.3077rem; }
     .row-actions .btn-square, .agenda-row > .btn-square { width: 2.3077rem; height: 2.3077rem; min-height: 2.3077rem; }
     .count-label { display: none; }
@@ -239,6 +239,9 @@ h2 { font-size: 1rem; letter-spacing: -.1px; font-weight: 600; margin: 0; }
 .detail-controls { margin-bottom: 6px; gap: 4px 12px; }
 .option-checkbox { display: flex; align-items: center; gap: 6px; font-size: 0.9231rem; min-height: 2.0769rem; }
 .option-checkbox .checkbox { border-color: #7a9c86; }
+/* A labelled group of view options, such as which tasks a list shows. */
+.option-box { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0 12px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; }
+.option-box-label { font-size: 0.8462rem; color: var(--muted); }
 .option-checkbox .checkbox:checked { --input-color: var(--color-primary); }
 .list-options-menu { width: 23.4615rem; padding: 8px; }
 .list-options-menu > form { padding-block: 2px; }
@@ -259,6 +262,16 @@ h2 { font-size: 1rem; letter-spacing: -.1px; font-weight: 600; margin: 0; }
 .detail-editor > form { padding: 0 8px 6px; }
 .detail-editor .capture-summary { flex-wrap: wrap; }
 .task-row, .note-row { padding-inline-start: calc(8px + min(var(--depth, 0), 12) * 16px); }
+/* Manual ordering: drag a task by its grip; a line shows where it will land. */
+.drag-handle { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 1.2rem; height: 1.8462rem; margin-inline: -4px -2px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: grab; touch-action: none; }
+.drag-handle:hover, .drag-handle:focus-visible { color: var(--accent); }
+.drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.is-ordering, .is-ordering * { cursor: grabbing !important; user-select: none; }
+.drag-source { opacity: .4; }
+.drop-line { position: fixed; z-index: 60; height: 3px; margin-top: -1.5px; border-radius: 2px; background: var(--accent); pointer-events: none; }
+.row-menu .order-items { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
+.row-menu .order-items button { justify-content: center; }
+.row-menu .order-items button:disabled { opacity: .35; pointer-events: none; }
 .task-row > .row-actions, .note-row > .row-actions { max-width: min(40%, 420px); flex-wrap: wrap; justify-content: flex-end; }
 .note-marker { display: flex; align-items: center; height: 1.8462rem; color: var(--muted); }
 .note-text, .legacy-task-note { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; font-size: 0.9231rem; line-height: 1.55; }

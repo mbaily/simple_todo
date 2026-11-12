@@ -7101,7 +7101,7 @@ app.include_router(create_daisyui_test_router(
         "dokuwiki_page_enabled": toggle_list_dokuwiki_page,
         "sort_ascending": toggle_list_sort_order, "partition_by_datetime_headers": toggle_list_header_partitioning,
         "intersperse_collated_todos": toggle_list_intersperse_collated,
-        "collation": toggle_todo_in_collation, "reorder": reorder_todos,
+        "collation": toggle_todo_in_collation,
         "defer": api_defer_todo, "alarm": api_set_alarm_todo, "hashtags": api_update_hashtags_todo,
         "wiki_pages": bulk_toggle_dokuwiki_page, "wiki_confirm": track_dokuwiki_click,
         "wiki_unconfirm": untrack_dokuwiki_click,

@@ -145,28 +145,119 @@ def test_manual_order_category_recipe_and_ingredient_actions(detail):
     assert db.query(IngredientEvent).filter_by(todo_id=ids['todo']).count() == 2
     assert client.post(path(ids, '/ingredients/reset'), headers=HX).status_code == 200
     assert db.query(IngredientEvent).filter_by(event_type='reset').count() == 3
-    response = client.post(path(ids, '/reorder'), headers=HX,
-                           data={'items': f'todo:{ids["todo"]}', 'target_id': ids['child']})
-    assert response.status_code == 200
-    db.expire_all()
-    assert db.get(Todo, ids['todo']).sort_order > db.get(Todo, ids['child']).sort_order
     assert client.post(path(ids, '/category'), headers=HX, data={'category': 'Desktop work'}).status_code == 200
     db.expire_all()
     assert db.get(List, ids['list']).category == 'Desktop work'
 
 
-def test_reorder_preserves_the_requested_relative_order_of_multiple_tasks(detail):
+def test_order_places_a_task_before_or_after_another_of_its_level(detail):
     db, client, ids = detail
+    order = lambda **data: client.post(path(ids, '/order'), headers=HX, data=data)
+    assert order(task_id=ids['todo'], target_id=ids['child'], position='after').status_code == 400  # manual ordering is off
     client.post(path(ids, '/options/manual_sorting'), headers=HX, data={'enabled': 'true'})
-    for title in ('Move second', 'Move first'):
+    for title in ('Second', 'Third'):
         client.post(path(ids, '/todos'), headers=HX, data={'title': title})
-    second = db.query(Todo).filter_by(title='Move second').one()
-    first = db.query(Todo).filter_by(title='Move first').one()
-    response = client.post(path(ids, '/reorder'), headers=HX,
-                           data={'items': [f'todo:{first.id}', f'todo:{second.id}'], 'target_id': ids['todo']})
-    assert response.status_code == 200
-    db.expire_all()
-    assert db.get(Todo, ids['todo']).sort_order < first.sort_order < second.sort_order
+    first, second, third = ids['todo'], db.query(Todo).filter_by(title='Second').one().id, db.query(Todo).filter_by(title='Third').one().id
+
+    def roots():
+        db.expire_all()
+        return [t.id for t in db.query(Todo).filter_by(list_id=ids['list'], parent_id=None).order_by(Todo.sort_order)]
+    assert order(task_id=third, target_id=first, position='before').status_code == 200 and roots()[0] == third
+    assert order(task_id=third, target_id=second, position='after').status_code == 200
+    assert roots().index(second) + 1 == roots().index(third)
+    response = order(task_id=first, target_id=third, position='after')
+    assert 'Task order updated.' in response.text and roots().index(third) + 1 == roots().index(first)
+    # The old "move selected tasks after" panel and its route are gone; each row has a grip and Move items instead.
+    page = client.get(path(ids)).text
+    assert 'id="order-form"' in page and 'panel-reorder' not in page and client.post(path(ids, '/reorder'), headers=HX).status_code in (404, 405)
+    row = page.split(f'id="todo-row-{first}"')[1].split('</li>')[0]
+    assert 'data-order-group="root"' in row and 'data-drag-handle' in row
+    assert f'data-order-group="{first}"' in page.split(f'id="todo-row-{ids["child"]}"')[1].split('>')[0]
+    assert page.count('data-move="top"') == page.count('data-drag-handle') == 5
+    # Subtasks stay within their parent, and unknown tasks or positions are refused.
+    before = roots()
+    for data, status in [(dict(task_id=ids['child'], target_id=first, position='after'), 400),
+                         (dict(task_id=first, target_id=first, position='after'), 400),
+                         (dict(task_id=first, target_id=second, position='sideways'), 400),
+                         (dict(task_id=first, target_id=ids['external'], position='after'), 404)]:
+        bad = order(**data)
+        assert bad.status_code == status and bad.headers['HX-Retarget'] == '#page-feedback'
+    assert roots() == before
+
+
+def test_order_covers_collected_tasks_in_a_collation(detail):
+    db, client, ids = detail
+    collection = db.get(List, ids['collection'])
+    own = Todo(title='Own task', list=collection)
+    db.add(own)
+    collection.manual_sorting = True
+    db.commit()
+    url = f'/app/list/{collection.id}'
+    shown = lambda: [item['obj'].id for item in client.get(url).context['items'] if item['type'] == 'todo']
+    for position in ('before', 'after'):
+        assert client.post(url + '/order', headers=HX, data={'task_id': ids['external'], 'target_id': own.id, 'position': position}).status_code == 200
+        assert shown() == ([ids['external'], own.id] if position == 'before' else [own.id, ids['external']])
+    # The collected task's own subtasks belong to another list's order and get no grip here.
+    page = client.get(url).text
+    assert 'data-drag-handle' in page.split(f'id="todo-row-{ids["external"]}"')[1].split('</li>')[0]
+    assert 'data-drag-handle' not in page.split(f'id="todo-row-{ids["external_child"]}"')[1].split('</li>')[0]
+
+
+def test_browser_tasks_are_reordered_by_dragging_menu_and_keyboard(prototype_server, page):
+    origin, (db, client, ids) = prototype_server
+    todo_list = db.get(List, ids['list'])
+    todo_list.manual_sorting = True
+    first = db.get(Todo, ids['todo'])
+    first.sort_order = 0
+    child = Todo(title='A subtask', list=todo_list, parent=first, sort_order=5)
+    others = [Todo(title=title, list=todo_list, sort_order=10 * index) for index, title in enumerate(['Beta', 'Gamma', 'Delta'], 1)]
+    db.add_all([child, *others])
+    db.commit()
+    errors = []
+    page.on('pageerror', lambda error: errors.append(error))
+    titles = lambda: page.locator('.task-row[data-order-group="root"] .item-title').all_inner_texts()
+    for width in (1100, 380):
+        page.set_viewport_size({'width': width, 'height': 800})
+        page.goto(origin + f'/app/list/{ids["list"]}')
+        start = titles()
+        assert start[0] == 'Book a quiet afternoon' and set(start[1:]) == {'Beta', 'Gamma', 'Delta'}
+        last = start[-1]
+        # Drag the last task above the first one: a line marks the landing place, and the order is saved on drop.
+        grip = page.locator('.task-row').filter(has_text=last).locator('[data-drag-handle]')
+        box, target = grip.bounding_box(), page.locator(f'#todo-row-{ids["todo"]}').bounding_box()
+        page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+        page.mouse.down()
+        page.mouse.move(box['x'] + box['width'] / 2, target['y'] + 3, steps=8)
+        expect(page.locator('.drop-line')).to_be_visible()
+        assert abs(page.locator('.drop-line').bounding_box()['y'] - target['y']) < 4
+        page.mouse.up()
+        expect(page.locator('.task-row[data-order-group="root"] .item-title').first).to_have_text(last)
+        expect(page.locator('.drop-line')).to_have_count(0)
+        assert titles() == [last, *start[:-1]] and page.evaluate('document.documentElement.scrollWidth') <= width
+        # A task dragged past its own subtask lands below the whole block, and the subtask follows its parent.
+        rows = page.locator('.task-row .item-title').all_inner_texts()
+        assert rows.index('A subtask') == rows.index('Book a quiet afternoon') + 1
+        # Escape abandons a drag.
+        page.mouse.move(box['x'] + box['width'] / 2, target['y'] + 12)
+        page.mouse.down()
+        page.mouse.move(box['x'] + box['width'] / 2, target['y'] + 200, steps=4)
+        page.keyboard.press('Escape')
+        page.mouse.up()
+        assert titles() == [last, *start[:-1]]
+        # The row menu moves a task without dragging; the keyboard works from the grip and keeps focus on it.
+        page.locator(f'summary[aria-label="Actions for {last}"]').click()
+        page.get_by_role('button', name='Move to bottom').click()
+        expect(page.locator('.task-row[data-order-group="root"] .item-title').last).to_have_text(last)
+        assert titles() == start
+        grip = page.locator('.task-row').filter(has_text=last).locator('[data-drag-handle]')
+        grip.focus()
+        page.keyboard.press('ArrowUp')
+        expect(page.locator('.task-row[data-order-group="root"] .item-title').nth(len(start) - 2)).to_have_text(last)
+        expect(grip).to_be_focused()
+        page.keyboard.press('ArrowDown')
+        expect(page.locator('.task-row[data-order-group="root"] .item-title').last).to_have_text(last)
+        assert titles() == start
+    assert not errors
 
 
 @pytest.mark.parametrize('prefix', ['', '/simple_todo', '/apps/simple_todo'])

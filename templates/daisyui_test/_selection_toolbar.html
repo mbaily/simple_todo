@@ -11,7 +11,6 @@
         <button type="button" class="btn btn-sm" data-command="show-panel" data-panel="defer" data-single-todo>Defer</button>
         <button type="button" class="btn btn-sm" data-command="show-panel" data-panel="alarm" data-single-todo>Alarm</button>
         <button type="button" class="btn btn-sm" data-command="show-panel" data-panel="hashtags" data-single-todo>Tags</button>
-        {% if list.manual_sorting %}<button type="button" class="btn btn-sm" data-command="show-panel" data-panel="reorder" data-todos-only>Reorder</button>{% endif %}
         {% if enable_dokuwiki_links and list.show_dokuwiki_item_links %}
         {% for action, label in [('wiki-enable', 'Enable wiki pages'), ('wiki-disable', 'Disable wiki pages')] %}
         <button type="button" class="btn btn-sm" hx-post="{{ detail_url }}/selected/{{ action }}{{ query }}" hx-include="[name='items']:checked" hx-disable="this" data-todos-only>{{ label }}</button>
