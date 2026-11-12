@@ -31,7 +31,7 @@
 </li>
 {% endmacro %}
 <div id="daisy-workspace" data-page-title="{{ t('app_title') }}" data-edit-query="{{ query }}&amp;back=home" data-scope="home:{{ folder_param if folder_param is not none else 'default' }}" data-page-url="{{ prototype_url }}{{ query }}" data-sort="{{ sort }}" data-folder="{{ folder_param if folder_param is not none else '' }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
-    {{ page_trail(active_folder_name or 'Top level', folder=current_folder.parent if current_folder else None, sort=sort, swap=True) }}
+    {{ page_trail(active_folder_name or 'Top level', folder=current_folder.parent if current_folder else None, sort=sort, swap=True, jumps=([('folders-heading', 'folder', 'Jump to folders')] if subfolders else []) + [('lists-heading', 'list', 'Jump to your lists')]) }}
     <div class="page-heading">
         <div class="page-title"><h1>{{ active_folder_name or 'Overview' }}<span class="heading-dot">.</span></h1><time class="eyebrow" datetime="{{ today.isoformat() }}">{{ today | date_format }}</time></div>
         <div class="page-heading-actions">

@@ -233,6 +233,12 @@ def test_overview_browses_folders_with_breadcrumbs_and_actions(prototype):
     assert client.get('/app/calendar').text.count('class="trail-icon"') == 0
     assert 'folder_id=0">Top level<' in trail(f'/app/list/{ids["other"]}')
     assert '<li aria-current="page">Top level</li>' in trail('/app')
+    # The overview's breadcrumb row ends with shortcuts to its folders and lists; other pages have none.
+    home = client.get('/app').text.split('class="trail-jumps"')[1].split('</span>')[0]
+    assert home.index('href="#folders-heading"') < home.index('href="#lists-heading"') and 'aria-label="Jump to your lists"' in home
+    leaf = client.get(f'/app?folder_id={ids["admin"]}').text
+    assert 'href="#lists-heading"' in leaf and 'href="#folders-heading"' not in leaf
+    assert 'class="trail-jumps"' not in client.get(f'/app/list/{ids["list"]}').text
     edit = trail(f'/app/todo/{ids["todo"]}/edit')
     assert edit.index('>Shed<') < edit.index(f'/app/list/{ids["list"]}">A place to start<') < edit.index('<li aria-current="page">Edit task</li>')
     assert '<li aria-current="page">Edit list</li>' in trail(f'/app/list/{ids["other"]}/edit')
@@ -269,6 +275,16 @@ def test_browser_overview_folders_expand_in_place(prototype_server, page):
         assert step > 10 and abs(page.evaluate(left, 'Level 8') - page.evaluate(left, 'Projects') - 8 * step) < 1
         assert page.evaluate(left, 'Level 11') == page.evaluate(left, 'Level 8')
         assert page.evaluate('document.documentElement.scrollWidth') <= width
+        if width == 360:
+            # On a phone the breadcrumb stays on one line and scrolls sideways, with the shortcuts kept in view.
+            page.goto(origin + f'/app?folder_id={parent}')
+            trail = page.locator('.page-trail')
+            assert trail.evaluate('e => e.scrollWidth > e.clientWidth') and trail.evaluate('e => e.getBoundingClientRect().height') < 45
+            assert page.evaluate('document.documentElement.scrollWidth') <= width
+            expect(page.get_by_role('link', name='Jump to your lists')).to_be_in_viewport()
+            page.goto(origin + '/app?folder_id=0')
+        page.get_by_role('link', name='Jump to your lists').click()
+        assert page.url.endswith('#lists-heading')
         # Open folders are remembered across reloads and workspace updates, and can be closed again.
         page.reload()
         expect(page.locator('.subfolder-group').get_by_role('link', name='Level 11', exact=True)).to_be_visible()
