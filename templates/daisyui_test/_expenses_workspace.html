@@ -1,0 +1,83 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set rp = request.scope.root_path %}
+{% macro money(symbol, value) %}{{ symbol }}{{ "%.2f"|format(value or 0) }}{% endmacro %}
+{% macro filter_link(label, params) %}{% set href = expenses_url ~ ('?' ~ params|urlencode if params else '') %}<a class="btn btn-ghost btn-sm" href="{{ href }}" hx-get="{{ href }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ label }}</a>{% endmacro %}
+<div id="daisy-workspace" data-scope="expenses" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Quick expenses</h1><span class="eyebrow">{{ total_count }} recorded</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><a class="btn btn-ghost btn-sm" href="{{ rp }}/expenses/export/csv" download>{{ icon('down', 14) }} Export CSV</a></div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+
+    <form id="expense-form" data-draft class="section-panel expense-entry" action="{{ prototype_url }}/expenses/create{{ query }}" method="post" hx-post="{{ prototype_url }}/expenses/create{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button[type=submit]">
+        <div class="bill-fields">
+            <label><span>Amount</span><span class="inline-fields"><input id="exp-amount" class="input input-sm amount-input" type="number" step="0.01" min="0.01" name="amount" required placeholder="0.00" aria-label="Amount"><select class="select select-sm" name="currency" aria-label="Currency">{% for code in currencies %}<option value="{{ code }}" {% if code == default_currency %}selected{% endif %}>{{ code }}</option>{% endfor %}</select></span></label>
+            <label class="grow"><span>Description</span><input class="input input-sm" name="description" placeholder="What was it for?" aria-label="Description" autocomplete="off"></label>
+            <label><span>Category</span><input class="input input-sm" name="category" list="expense-categories" placeholder="e.g. Groceries" aria-label="Category"></label>
+            <label><span>Date</span><input class="input input-sm" type="date" name="date" value="{{ today_iso }}" max="{{ today_iso }}" required aria-label="Date"></label>
+            <label><span>Paid by</span><select class="select select-sm" name="payment_method" aria-label="Payment method">{% for method in methods %}<option value="{{ method }}">{{ method }}</option>{% endfor %}</select></label>
+            <label class="grow"><span>Note</span><input class="input input-sm" name="note" placeholder="Optional" aria-label="Note"></label>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">{{ icon('plus', 14) }} Add expense</button>
+        <datalist id="expense-categories">{% for category in category_choices %}<option value="{{ category }}"></option>{% endfor %}</datalist>
+    </form>
+
+    <section class="section-panel" aria-labelledby="averages-heading">
+        <header class="section-heading"><div><h2 id="averages-heading">{{ icon('money', 17) }} Spending averages</h2><p>{{ 'Including bill payments and their recurring estimate.' if include_bills else 'Quick expenses only.' }}</p></div><a class="btn btn-sm {{ 'btn-active layout-active' if include_bills else '' }}" href="{{ toggle_bills_url }}" hx-get="{{ toggle_bills_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true" aria-pressed="{{ 'true' if include_bills else 'false' }}">{{ icon('money', 14) }} Include bills</a></header>
+        {% for s in summaries %}
+        <div class="spend-grid">
+            {% if summaries|length > 1 %}<h3 class="spend-currency">{{ s.currency }}</h3>{% endif %}
+            {% for label, avg, actual, actual_label, bills_avg, bills_actual in [
+                ('Weekly', s.combined_weekly_avg if include_bills else s.weekly_avg, s.combined_past_7_days if include_bills else s.past_7_days_total, 'last 7 days', s.bills_weekly, s.bills_past_7_days),
+                ('Monthly', s.combined_monthly_avg if include_bills else s.monthly_avg, s.combined_this_month if include_bills else s.this_month_total, 'this month', s.bills_monthly, s.bills_this_month),
+                ('Yearly', s.combined_yearly_avg if include_bills else s.yearly_avg, s.combined_ytd if include_bills else s.ytd_total, 'this year', s.bills_yearly, s.bills_ytd)] %}
+            <div class="stat-tile"><span>{{ label }} average</span><strong>{{ money(s.currency_symbol, avg) }}</strong><small>{{ money(s.currency_symbol, actual) }} {{ actual_label }}{% if include_bills %} · bills {{ money(s.currency_symbol, bills_actual) }}{% endif %}</small></div>
+            {% endfor %}
+            <div class="stat-tile"><span>All time</span><strong>{{ money(s.currency_symbol, s.combined_total_spending if include_bills else s.total_spending) }}</strong><small>{{ s.total_count }} expenses · {{ money(s.currency_symbol, s.avg_per_txn) }} each{% if include_bills %} · bills {{ money(s.currency_symbol, s.all_time_bills) }}{% endif %}</small></div>
+        </div>
+        {% endfor %}
+    </section>
+
+    {% set has_categories = summaries|selectattr('category_breakdown')|list %}
+    {% if has_categories %}
+    <section class="section-panel" aria-labelledby="categories-heading">
+        <header class="section-heading"><div><h2 id="categories-heading">{{ icon('layers', 17) }} By category</h2><p>Select a category to filter the list.</p></div></header>
+        <ul class="category-bars">{% for s in summaries %}{% for row in s.category_breakdown %}
+            {% set href = expenses_url ~ '?' ~ {'category': row.name}|urlencode %}
+            <li><a href="{{ href }}" hx-get="{{ href }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true" class="{{ 'is-current' if filters.category == row.name else '' }}"><span class="category-name">{{ row.name }}</span><span class="category-bar"><span style="width: {{ '%.1f'|format(row.percent) }}%"></span></span><span class="category-value">{{ money(s.currency_symbol, row.total) }} · {{ '%.0f'|format(row.percent) }}% · {{ row.count }}</span></a></li>
+        {% endfor %}{% endfor %}</ul>
+    </section>
+    {% endif %}
+
+    <section class="section-panel" aria-labelledby="ledger-heading">
+        <header class="section-heading"><div><h2 id="ledger-heading">{{ icon('list', 17) }} Expenses <span class="section-count">{{ row_total }}</span></h2>{% for currency, entry in row_totals.items() %}<span class="item-context">{{ money(entry.symbol, entry.total) }} {{ currency }}</span>{% endfor %}</div></header>
+        <form id="expense-filter" class="expense-filter" method="get" action="{{ expenses_url }}" hx-get="{{ expenses_url }}" hx-trigger="submit, change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">
+            {% if include_bills %}<input type="hidden" name="include_bills" value="1">{% endif %}
+            <label class="input input-sm search-input">{{ icon('search', 15) }}<input type="search" name="q" value="{{ filters.q }}" placeholder="Search descriptions and notes" aria-label="Search expenses"></label>
+            <select class="select select-sm" name="category" aria-label="Filter by category"><option value="">All categories</option>{% for category in known_categories %}<option value="{{ category }}" {% if filters.category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select>
+            <select class="select select-sm" name="method" aria-label="Filter by payment method"><option value="">Any payment</option>{% for method in known_methods %}<option value="{{ method }}" {% if filters.method == method %}selected{% endif %}>{{ method }}</option>{% endfor %}</select>
+            <input class="input input-sm" type="date" name="start" value="{{ filters.start }}" aria-label="From date">
+            <input class="input input-sm" type="date" name="end" value="{{ filters.end }}" aria-label="To date">
+            <select class="select select-sm" name="sort" aria-label="Sort expenses">{% for value, label in sorts.items() %}<option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            {% if filtering %}{{ filter_link(icon('close', 14) ~ ' Clear', {'include_bills': 1} if include_bills else {}) }}{% endif %}
+        </form>
+        {% if rows %}<ul class="list">{% for e in rows %}
+            <li class="list-row bill-row expense-row">
+                <div class="bill-main"><div class="item-title-line"><span class="bill-amount">{{ money(e.currency_symbol, e.amount) }}</span><span class="item-title">{{ e.description or e.category or 'Expense' }}</span><span class="item-context">{{ e.date.strftime('%a %-d %b %Y') if e.date else '' }}</span><span class="badge badge-sm badge-outline tag">{{ e.category or 'Other' }}</span><span class="item-context">{{ e.payment_method }}</span>{% if e.currency and e.currency != 'AUD' %}<span class="item-context">{{ e.currency }}</span>{% endif %}</div>{% if e.note %}<div class="item-context">{{ e.note }}</div>{% endif %}</div>
+                <div class="row-actions bill-actions"><button type="button" class="btn btn-ghost btn-sm" data-command="bill-panel" data-panel="edit-expense-{{ e.id }}" aria-expanded="false" aria-controls="edit-expense-{{ e.id }}">Edit</button><form action="{{ prototype_url }}/expenses/{{ e.id }}/delete{{ query }}" method="post" hx-post="{{ prototype_url }}/expenses/{{ e.id }}/delete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete the {{ money(e.currency_symbol, e.amount) }} expense{{ ' for ' ~ e.description if e.description else '' }}?"><button class="btn btn-ghost btn-square btn-sm delete-button" aria-label="Delete expense {{ e.description or '' }}">{{ icon('trash', 15) }}</button></form></div>
+                <div id="edit-expense-{{ e.id }}" class="bill-panel" hidden><form class="bill-form" action="{{ prototype_url }}/expenses/{{ e.id }}/update{{ query }}" method="post" hx-post="{{ prototype_url }}/expenses/{{ e.id }}/update{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button[type=submit]">
+                    <div class="bill-fields">
+                        <label><span>Amount</span><span class="inline-fields"><input class="input input-sm amount-input" type="number" step="0.01" min="0.01" name="amount" value="{{ '%.2f'|format(e.amount) if e.amount is not none else '' }}" required><select class="select select-sm" name="currency">{% for code in currencies %}<option value="{{ code }}" {% if code == (e.currency or 'AUD') %}selected{% endif %}>{{ code }}</option>{% endfor %}</select></span></label>
+                        <label class="grow"><span>Description</span><input class="input input-sm" name="description" value="{{ e.description or '' }}"></label>
+                        <label><span>Category</span><input class="input input-sm" name="category" list="expense-categories" value="{{ e.category or '' }}"></label>
+                        <label><span>Date</span><input class="input input-sm" type="date" name="date" value="{{ e.date.strftime('%Y-%m-%d') if e.date else '' }}" required></label>
+                        <label><span>Paid by</span><select class="select select-sm" name="payment_method">{% for method in known_methods %}<option value="{{ method }}" {% if method == e.payment_method %}selected{% endif %}>{{ method }}</option>{% endfor %}</select></label>
+                        <label class="grow"><span>Note</span><input class="input input-sm" name="note" value="{{ e.note or '' }}"></label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Save expense</button></form></div>
+            </li>
+        {% endfor %}</ul>
+        {% if row_total > rows|length %}<p class="section-empty">Showing the first {{ rows|length }} of {{ row_total }}. Narrow the filters, or export the CSV for everything.</p>{% endif %}
+        {% else %}<p class="section-empty">{{ 'No expenses match these filters.' if filtering else 'No expenses yet. Add your first one above.' }}</p>{% endif %}
+    </section>
+</div>

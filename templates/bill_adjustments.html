@@ -1,0 +1,41 @@
+<section id="adjustments" style="margin-top:24px; max-width:1200px;">
+    <h3>Opening balance, adjustments and refunds</h3>
+    <p class="dates">Opening balances cover history before your first recorded event. Supplier credits and debits change the account balance without changing cash spending. Record adjustments once they take effect, using today or an earlier date. Record a refund only when money is returned to you; it reduces net spending. Enter missing invoice issue dates before recording a refund so available credit can be checked.</p>
+    <details style="margin:12px 0;"><summary>Record adjustment or refund</summary>
+        <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/adjustments" method="post" style="margin-top:8px;" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            <label>Type <select name="kind">{% for kind, label in adjustment_types.items() %}<option value="{{ kind }}">{{ label }}</option>{% endfor %}</select></label><br>
+            <label>Amount <input name="amount" type="text" inputmode="decimal" required style="width:100px;"></label>
+            <label>Effective date <input name="effective_date" type="date" value="{{ today_iso }}" max="{{ today_iso }}" required></label><br>
+            <label>Note <input name="note" type="text" style="width:280px;"></label>
+            <button type="submit">Record adjustment</button>
+        </form>
+    </details>
+    {% if bill.adjustments %}<div style="overflow-x:auto;">
+    <table class="history-table" style="max-width:1200px; min-width:650px;">
+        <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Remaining credit / owing</th><th>Note / actions</th></tr></thead>
+        <tbody>{% for adjustment in bill.adjustments|sort(attribute='effective_date', reverse=true) %}
+        <tr>
+            <td>{{ adjustment.effective_date.strftime('%Y-%m-%d') }}</td>
+            <td>{{ adjustment.kind_label }}</td>
+            <td>{{ bill.currency_symbol }}{{ adjustment.amount_cents|cents }}</td>
+            <td>{% if adjustment.is_credit %}{{ bill.currency_symbol }}{{ adjustment.available_cents|cents }} credit{% else %}{{ bill.currency_symbol }}{{ adjustment.outstanding_cents|cents }} owing{% endif %}</td>
+            <td>{% if adjustment.note %}<p class="dates">{{ adjustment.note }}</p>{% endif %}
+                <details><summary>Edit adjustment</summary>
+                    <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/adjustments" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+                        <input name="request_token" type="hidden" value="{{ new_invoice_token() }}">
+                        <input name="adjustment_id" type="hidden" value="{{ adjustment.id }}">
+                        <label>Type <select name="kind">{% for kind, label in adjustment_types.items() %}<option value="{{ kind }}" {% if kind == adjustment.kind %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label><br>
+                        <label>Amount <input name="amount" type="text" inputmode="decimal" value="{{ adjustment.amount_cents|cents }}" required style="width:100px;"></label><br>
+                        <label>Effective date <input name="effective_date" type="date" value="{{ adjustment.effective_date.strftime('%Y-%m-%d') }}" max="{{ today_iso }}" required></label><br>
+                        <label>Note <input name="note" type="text" value="{{ adjustment.note or '' }}"></label>
+                        <button type="submit">Save adjustment</button>
+                    </form>
+                </details>
+                <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/adjustments/{{ adjustment.id }}/delete" method="post" onsubmit="return confirm('Delete this adjustment? Account balances will be recalculated.');">
+                    <button type="submit">Delete adjustment</button>
+                </form>
+            </td>
+        </tr>{% endfor %}</tbody>
+    </table></div>{% endif %}
+</section>

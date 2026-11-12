@@ -1,0 +1,129 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set rp = request.scope.root_path %}
+{% macro timing(payment) %}
+{% if payment.effective_due_date and payment.paid_date %}
+{% if payment.days_difference > 0 %}<span class="badge badge-sm timing-good">{{ payment.timing_label }}</span>
+{% elif payment.days_difference == 0 %}<span class="badge badge-sm timing-good">On time</span>
+{% elif payment.is_late_overridden %}<span class="badge badge-sm timing-good" title="Marked on time">On time (override)</span>
+{% else %}<span class="badge badge-sm timing-late">{{ payment.timing_label }}</span>{% endif %}
+{% endif %}
+{% endmacro %}
+{% macro pay_form(bill) %}
+{% set days_away = bill.days_until_due(now) %}
+<form class="bill-form" action="{{ prototype_url }}/bills/{{ bill.id }}/pay{{ query }}" method="post" hx-post="{{ prototype_url }}/bills/{{ bill.id }}/pay{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button[type=submit]">
+    <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+    {% if bill.open_invoice %}<input type="hidden" name="invoice_id" value="{{ bill.open_invoice.id }}">{% endif %}
+    {% if days_away is not none and days_away < 0 %}<p class="bill-form-note late-text">Paying {{ -days_away }} {{ 'day' if days_away == -1 else 'days' }} late.</p>{% endif %}
+    <div class="bill-fields">
+        <label><span>Amount paid</span><input class="input input-sm" name="amount_paid" inputmode="decimal" value="{{ bill|bill_amount }}" aria-label="Amount paid for {{ bill.name }}"></label>
+        <label><span>Paid on</span><input class="input input-sm" type="date" name="paid_date" value="{{ now.strftime('%Y-%m-%d') }}" max="{{ now.strftime('%Y-%m-%d') }}"></label>
+        <label><span>Due date on the bill</span><input class="input input-sm" type="date" name="actual_due_date" value="{{ bill.next_due_date_iso }}"></label>
+        <label class="grow"><span>Note</span><input class="input input-sm" name="note" placeholder="Optional"></label>
+        <label><span>Next due (optional)</span><input class="input input-sm" type="date" name="next_due_override" title="Leave blank to move to the next cycle automatically"></label>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">{{ icon('check', 14) }} Record payment</button>
+</form>
+{% endmacro %}
+{% macro confirm_form(bill) %}
+<form class="bill-form confirm-invoice-form" action="{{ prototype_url }}/bills/{{ bill.id }}/confirm-invoice{{ query }}" method="post" hx-post="{{ prototype_url }}/bills/{{ bill.id }}/confirm-invoice{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button[type=submit]">
+    <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+    <p class="bill-form-note">Enter the due date and amount from the provider's bill.</p>
+    <div class="bill-fields">
+        {% if bill.ordered_invoices %}<label class="grow"><span>Invoice</span><select class="select select-sm" name="invoice_target" data-invoice-target>
+            <option value="new" data-number="" data-issued="" data-due="{{ bill.next_due_date_iso if not bill.open_invoice else '' }}" data-amount="{{ '%.2f'|format(bill.effective_amount) if not bill.open_invoice and bill.effective_amount is not none else '' }}">Record a new invoice</option>
+            {% for invoice in bill.ordered_invoices|reverse %}<option value="{{ invoice.id }}" data-number="{{ invoice.invoice_number or '' }}" data-issued="{{ invoice.invoice_date.strftime('%Y-%m-%d') if invoice.invoice_date else '' }}" data-due="{{ invoice.due_date_iso }}" data-amount="{{ invoice.amount_cents|cents }}">Correct {{ invoice.invoice_number or (invoice.invoice_date.strftime('%Y-%m-%d') if invoice.invoice_date else 'due ' ~ (invoice.due_date_iso or 'unknown')) }} · {{ bill.currency_symbol }}{{ invoice.amount_cents|cents }} · {{ 'Outstanding' if invoice.outstanding_cents else 'Settled' }}</option>{% endfor %}
+        </select></label>{% else %}<input type="hidden" name="invoice_target" value="new">{% endif %}
+        <label><span>Due date</span><input class="input input-sm" type="date" name="actual_due_date" value="{{ bill.next_due_date_iso if not bill.open_invoice else '' }}"></label>
+        <label><span>Amount</span><input class="input input-sm" name="actual_amount" inputmode="decimal" value="{{ '%.2f'|format(bill.effective_amount) if not bill.open_invoice and bill.effective_amount is not none else '' }}" aria-label="Invoice amount for {{ bill.name }}"></label>
+        <label><span>Amount shown is</span><select class="select select-sm" name="amount_type" data-amount-type><option value="gross">The charge before credit</option><option value="net">Owing after credit</option></select></label>
+        <label class="invoice-credit" hidden><span>Credit applied on the invoice</span><input class="input input-sm" name="credit_applied" inputmode="decimal" disabled placeholder="Optional"></label>
+        <label><span>Invoice number</span><input class="input input-sm" name="invoice_number" maxlength="255" placeholder="Optional"></label>
+        <label><span>Issue date</span><input class="input input-sm" type="date" name="invoice_date" title="Required when the amount is owing after credit"></label>
+    </div>
+    <div class="bill-form-actions"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="allow_duplicate" value="true"> Record as a separate invoice even if it looks like a duplicate</label><button type="submit" class="btn btn-primary btn-sm">{{ icon('check', 14) }} Save bill details</button></div>
+</form>
+{% endmacro %}
+{% macro bill_row(bill, section) %}
+{% set days_away = bill.days_until_due(now) %}
+{% set lp = bill.last_payment %}
+<li class="list-row bill-row bill-{{ section }}" id="bill-{{ bill.id }}">
+    <div class="bill-main">
+        <div class="item-title-line">
+            <a class="item-title bill-name" href="{{ prototype_url }}/bills/{{ bill.id }}" {% if bill.color and bill.color != '#000000' %}style="color: {{ bill.color }}"{% endif %}>{{ bill.name }}</a>
+            {% if bill.payee %}<span class="item-context">{{ bill.payee }}</span>{% endif %}
+            {% if bill.effective_amount is not none %}<span class="bill-amount">{% if bill.is_estimated %}~{% endif %}{{ bill.currency_symbol }}{{ bill|bill_amount }}</span>{% endif %}
+            {% if section == 'inactive' %}<span class="item-context">{{ 'last due ' ~ bill.next_due_date_formatted if bill.next_due_date_formatted else 'No due date' }}</span>
+            {% elif section == 'covered_early' %}<span class="item-context">{{ '' if bill.is_due_date_confirmed else 'estimated ' }}next due {{ bill.next_due_date_formatted }}</span>
+            {% elif bill.next_due_date_formatted %}<span class="item-context {{ 'late-text' if days_away is not none and days_away < 0 else '' }}">{% set est = '' if bill.is_due_date_confirmed else 'estimated ' %}{% if days_away is none %}{{ est }}due {{ bill.next_due_date_formatted }}{% elif days_away < 0 %}{{ -days_away }} {{ 'day' if days_away == -1 else 'days' }} overdue · {{ est }}due {{ bill.next_due_date_formatted }}{% elif days_away == 0 %}{{ est }}due today{% else %}{{ est }}due {{ bill.next_due_date_formatted }} · in {{ days_away }} {{ 'day' if days_away == 1 else 'days' }}{% endif %}</span>{% endif %}
+        </div>
+        <div class="item-tags">
+            {% if section != 'inactive' %}{% if bill.is_due_date_confirmed %}<span class="badge badge-sm badge-confirmed">Invoice confirmed</span>{% endif %}{% else %}<span class="badge badge-sm badge-ghost">Inactive</span>{% endif %}
+            {% if bill.is_auto_pay %}<span class="badge badge-sm badge-outline">Auto-pay</span>{% endif %}
+            {% if bill.category %}<span class="badge badge-sm badge-outline tag">{{ bill.category }}</span>{% endif %}
+            {% if bill.ledger_enabled %}<a class="badge badge-sm badge-outline ledger-badge" href="{{ prototype_url }}/bills/{{ bill.id }}#billing">Credit {{ bill.currency_symbol }}{{ bill.credit_cents|cents }} · Owing {{ bill.currency_symbol }}{{ bill.outstanding_cents|cents }}</a>{% endif %}
+            {% if section == 'covered_early' and lp %}<span class="item-context">Paid {% if lp.amount_paid is not none %}{{ lp.currency_symbol }}{{ "%.2f"|format(lp.amount_paid) }} {% endif %}on {{ lp.paid_date_formatted }}</span>{{ timing(lp) }}{% endif %}
+            {% if bill.note %}<span class="item-context bill-note" title="{{ bill.note }}">{{ icon('note', 12) }} {{ bill.note }}</span>{% endif %}
+        </div>
+    </div>
+    <div class="row-actions bill-actions">
+        {% if section == 'inactive' %}
+        <form action="{{ prototype_url }}/bills/{{ bill.id }}/active{{ query }}" method="post" hx-post="{{ prototype_url }}/bills/{{ bill.id }}/active{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><input type="hidden" name="active" value="true"><button class="btn btn-sm">Reactivate</button></form>
+        {% elif section != 'unscheduled' %}
+        {% if not bill.ledger_enabled or bill.open_invoice or section == 'covered_early' %}<button type="button" class="btn btn-sm {{ 'btn-primary' if section in ['overdue', 'due_today'] else '' }}" data-command="bill-panel" data-panel="pay-{{ bill.id }}" aria-expanded="false" aria-controls="pay-{{ bill.id }}">{{ 'Pay next cycle' if section == 'covered_early' else 'Record payment' }}</button>
+        {% else %}<a class="btn btn-sm" href="{{ prototype_url }}/bills/{{ bill.id }}#billing">Invoice or extra payment</a>{% endif %}
+        {% endif %}
+        {% if section != 'inactive' %}<button type="button" class="btn btn-sm btn-ghost" data-command="bill-panel" data-panel="confirm-{{ bill.id }}" aria-expanded="false" aria-controls="confirm-{{ bill.id }}">{{ 'Set due date' if section == 'unscheduled' else 'Confirm bill' }}</button>{% endif %}
+        <details class="dropdown dropdown-end row-dropdown">
+            <summary class="btn btn-ghost btn-square btn-sm" aria-label="More for {{ bill.name }}">{{ icon('more', 19) }}</summary>
+            <ul class="dropdown-content menu row-menu">
+                <li><a href="{{ prototype_url }}/bills/{{ bill.id }}">{{ icon('clock', 15) }} History and account</a></li>
+                <li><a href="{{ prototype_url }}/bills/{{ bill.id }}/edit">{{ icon('edit', 15) }} Edit bill</a></li>
+                {% if section != 'inactive' %}<li><form action="{{ prototype_url }}/bills/{{ bill.id }}/active{{ query }}" method="post" hx-post="{{ prototype_url }}/bills/{{ bill.id }}/active{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Deactivate {{ bill.name }}? It leaves the dashboard and monthly estimate but keeps its history."><button>{{ icon('archive', 15) }} Deactivate</button></form></li>{% endif %}
+            </ul>
+        </details>
+    </div>
+    {% if section not in ['inactive', 'unscheduled'] %}<div id="pay-{{ bill.id }}" class="bill-panel" hidden>{{ pay_form(bill) }}</div>{% endif %}
+    {% if section != 'inactive' %}<div id="confirm-{{ bill.id }}" class="bill-panel" hidden>{{ confirm_form(bill) }}</div>{% endif %}
+</li>
+{% endmacro %}
+<div id="daisy-workspace" data-scope="bills" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Bills</h1><span class="eyebrow">{% for s in currency_summaries %}{{ ' · ' if not loop.first else '' }}~{{ s.currency_symbol }}{{ "%.2f"|format(s.bills_monthly) }} {{ s.currency }} a month{% endfor %}</span></div>
+        <div class="page-heading-actions">
+            <span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
+            {% if show_inactive %}<a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/bills" hx-get="{{ prototype_url }}/bills" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">Hide inactive</a>
+            {% elif inactive_count %}<a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/bills?show_inactive=1" hx-get="{{ prototype_url }}/bills?show_inactive=1" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">Show inactive ({{ inactive_count }})</a>{% endif %}
+            <a class="btn btn-primary btn-sm" href="{{ prototype_url }}/bills/new">{{ icon('plus', 15) }} New bill</a>
+        </div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+
+    {% if not bill_total and not recent_payments and not (show_inactive and inactive_bills) %}
+    <div class="empty-state"><h3>No active bills yet.</h3><a class="btn btn-primary btn-sm" href="{{ prototype_url }}/bills/new">{{ icon('plus', 15) }} Add a bill</a></div>
+    {% endif %}
+    {% for key, label, symbol in sections %}
+    {% set rows = {'overdue': overdue, 'due_today': due_today, 'upcoming': upcoming, 'covered_early': covered_early, 'future_estimates': future_estimates, 'unscheduled': unscheduled}[key] %}
+    {% if rows %}
+    <section class="section-panel bills-section bills-{{ key }}" aria-labelledby="bills-{{ key }}-heading">
+        <header class="section-heading"><div><h2 id="bills-{{ key }}-heading">{{ icon(symbol, 17) }} {{ label }} <span class="section-count">{{ rows|length }}</span></h2>{% if key == 'future_estimates' %}<p>Due in more than two weeks, from the bill's usual cycle.</p>{% endif %}</div></header>
+        <ul class="list">{% for bill in rows %}{{ bill_row(bill, key) }}{% endfor %}</ul>
+    </section>
+    {% endif %}
+    {% endfor %}
+
+    {% if recent_payments %}
+    <section class="section-panel" aria-labelledby="bills-recent-heading">
+        <header class="section-heading"><div><h2 id="bills-recent-heading">{{ icon('money', 17) }} Paid in the last 30 days <span class="section-count">{{ recent_payments|length }}</span></h2></div></header>
+        <ul class="list">{% for payment in recent_payments %}
+            <li class="list-row bill-payment-row"><a class="item-title" href="{{ prototype_url }}/bills/{{ payment.bill_id }}" {% if payment.bill and payment.bill.color and payment.bill.color != '#000000' %}style="color: {{ payment.bill.color }}"{% endif %}>{{ payment.bill.name if payment.bill else 'Unknown bill' }}</a>{% if payment.amount_paid is not none %}<span class="bill-amount">{{ payment.currency_symbol }}{{ "%.2f"|format(payment.amount_paid) }}</span>{% endif %}<span class="item-context">paid {{ payment.paid_date_formatted }}{% if payment.effective_due_date %} for {{ payment.due_date_formatted }}{% endif %}</span>{{ timing(payment) }}{% if payment.display_note %}<span class="item-context">{{ payment.display_note }}</span>{% endif %}</li>
+        {% endfor %}</ul>
+    </section>
+    {% endif %}
+
+    {% if show_inactive and inactive_bills %}
+    <section class="section-panel bills-inactive" aria-labelledby="bills-inactive-heading">
+        <header class="section-heading"><div><h2 id="bills-inactive-heading">{{ icon('archive', 17) }} Inactive <span class="section-count">{{ inactive_bills|length }}</span></h2></div></header>
+        <ul class="list">{% for bill in inactive_bills %}{{ bill_row(bill, 'inactive') }}{% endfor %}</ul>
+    </section>
+    {% endif %}
+</div>

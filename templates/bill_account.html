@@ -1,0 +1,84 @@
+<section id="billing" style="margin-top:20px; max-width:1200px;">
+    <h3>Invoices and account credit</h3>
+    <p>Available credit: <strong>{{ bill.currency_symbol }}{{ bill.credit_cents|cents }}</strong> · Outstanding: <strong>{{ bill.currency_symbol }}{{ bill.outstanding_cents|cents }}</strong></p>
+    <p class="dates">Cash payments appear in payment history. Existing credit is applied to invoices in date order.</p>
+    <details style="margin:12px 0;">
+        <summary>Record invoice</summary>
+        <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/invoices" method="post" style="margin-top:8px;" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            <label>Supplier invoice number <input name="invoice_number" type="text" maxlength="255" placeholder="Optional"></label><br>
+            <label>Amount <input name="amount" type="text" required inputmode="decimal" style="width:100px;"></label>
+            {% include 'partials/invoice_amount_type.html' %}<br>
+            <label>Due date <input name="due_date" type="date"></label> <span class="dates">Leave blank if unknown.</span><br>
+            <label>Issue date <input name="invoice_date" type="date"></label> <span class="dates">Required for an amount owing after credit; credit is calculated on this date.</span><br>
+            <label>Service period <input name="period_start" type="date"> to <input name="period_end" type="date"></label><br>
+            <label>Statement balance at issue <input name="statement_balance" type="text" inputmode="decimal" style="width:100px;"></label>
+            <select name="balance_type"><option value="owing">Owing</option><option value="credit">Credit</option></select> <span class="dates">Optional; records what the statement showed.</span><br>
+            <label>Note <input name="note" type="text" style="width:280px;"></label>
+            <button type="submit">Record invoice and apply available credit</button>
+        </form>
+    </details>
+    <details style="margin:12px 0;">
+        <summary>Record extra payment</summary>
+        <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/extra-payment" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;" style="margin-top:8px;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            <p class="dates">Enter money actually paid to the provider. Any excess stays as account credit.</p>
+            <label>Cash paid <input name="amount_paid" type="text" required inputmode="decimal" style="width:100px;"></label>
+            <label>Paid date <input name="paid_date" type="date" value="{{ today_iso }}" max="{{ today_iso }}" required></label><br>
+            <label>Note <input name="note" type="text" style="width:280px;"></label>
+            <button type="submit">Record extra payment</button>
+        </form>
+    </details>
+    {% if bill.invoices %}
+    <div style="overflow-x:auto;">
+    <table class="history-table" style="max-width:1200px; min-width:850px;">
+        <thead><tr><th>Invoice / service period</th><th>Due date</th><th>Charge before credit</th><th>Statement balance at issue</th><th>Credit applied</th><th>Outstanding</th><th>Status / actions</th></tr></thead>
+        <tbody>{% for invoice in bill.ordered_invoices|reverse %}
+            <tr id="invoice-{{ invoice.id }}">
+                <td>{% if invoice.invoice_date %}{{ invoice.invoice_date.strftime('%Y-%m-%d') }}{% else %}Issue date unknown{% endif %}
+                    {% if invoice.invoice_number %}<p>{{ invoice.invoice_number }}</p>{% endif %}
+                    {% if invoice.period_start and invoice.period_end %}<p class="dates">{{ invoice.period_start.strftime('%Y-%m-%d') }} – {{ invoice.period_end.strftime('%Y-%m-%d') }}</p>{% endif %}</td>
+                <td>{{ invoice.due_date_iso or 'Unknown' }}</td>
+                <td>{{ bill.currency_symbol }}{{ invoice.amount_cents|cents }}</td>
+                <td>{% if invoice.statement_balance_cents is not none %}{{ bill.currency_symbol }}{{ invoice.statement_balance_cents|abs|cents }} {% if invoice.statement_balance_cents < 0 %}credit{% else %}owing{% endif %}{% else %}—{% endif %}</td>
+                <td>{{ bill.currency_symbol }}{{ invoice.credit_applied_cents|cents }}</td>
+                <td>{{ bill.currency_symbol }}{{ invoice.outstanding_cents|cents }}</td>
+                <td>
+                    {% if invoice.outstanding_cents %}Outstanding{% else %}Settled{% endif %}
+                    {% if invoice.is_legacy %}<span class="dates"> · From old payment history</span>{% endif %}
+                    {% if invoice.note %}<p class="dates">{{ invoice.note }}</p>{% endif %}
+                    <details><summary>Edit invoice</summary>
+                        <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/invoices" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+                            <input name="request_token" type="hidden" value="{{ new_invoice_token() }}">
+                            <input name="invoice_id" type="hidden" value="{{ invoice.id }}">
+                            <label>Supplier invoice number <input name="invoice_number" type="text" maxlength="255" value="{{ invoice.invoice_number or '' }}"></label><br>
+                            <label>Charge before credit <input name="amount" type="text" value="{{ invoice.amount_cents|cents }}" required style="width:85px;"></label><br>
+                            <label>Due date <input name="due_date" type="date" value="{{ invoice.due_date_iso }}"></label><br>
+                            <label>Issue date <input name="invoice_date" type="date" value="{{ invoice.invoice_date.strftime('%Y-%m-%d') if invoice.invoice_date else '' }}"></label><br>
+                            <label>Service period <input name="period_start" type="date" value="{{ invoice.period_start.strftime('%Y-%m-%d') if invoice.period_start else '' }}"> to <input name="period_end" type="date" value="{{ invoice.period_end.strftime('%Y-%m-%d') if invoice.period_end else '' }}"></label><br>
+                            <label>Statement balance <input name="statement_balance" type="text" value="{{ invoice.statement_balance_cents|abs|cents if invoice.statement_balance_cents is not none else '' }}" style="width:85px;"></label>
+                            <select name="balance_type"><option value="owing">Owing</option><option value="credit" {% if invoice.statement_balance_cents is not none and invoice.statement_balance_cents < 0 %}selected{% endif %}>Credit</option></select><br>
+                            <label>Note <input name="note" type="text" value="{{ invoice.note or '' }}"></label>
+                            <button type="submit">Save invoice</button>
+                        </form>
+                    </details>
+                    {% if invoice.outstanding_cents %}
+                    <details><summary>Record payment</summary>
+                        <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/pay" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+                            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+                            <input name="invoice_id" type="hidden" value="{{ invoice.id }}">
+                            <label>Cash paid <input name="amount_paid" type="text" value="{{ invoice.outstanding_cents|cents }}" required style="width:85px;"></label><br>
+                            <label>Paid date <input name="paid_date" type="date" value="{{ today_iso }}" max="{{ today_iso }}" required></label>
+                            <button type="submit">Record payment</button>
+                        </form>
+                    </details>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}</tbody>
+    </table>
+    </div>
+    {% endif %}
+</section>
+{% include 'bill_adjustments.html' %}
+{% include 'bill_reconciliation.html' %}

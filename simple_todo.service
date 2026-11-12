@@ -1,0 +1,23 @@
+[Unit]
+Description=Simple Todo FastAPI Service
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/simple_todo
+Environment="PATH=/opt/simple_todo/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment=SIMPLE_TODO_DATA_DIR=/var/lib/simple_todo
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=-/var/lib/simple_todo/.env
+UMask=0077
+
+# Command to run the service
+ExecStart=/opt/simple_todo/.venv/bin/python main.py
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

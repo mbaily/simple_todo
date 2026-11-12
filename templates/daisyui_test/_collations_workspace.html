@@ -1,0 +1,22 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+<div id="daisy-workspace" data-scope="collations" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Collations</h1><span class="eyebrow">{{ collation_lists|length }} {{ 'list' if collation_lists|length == 1 else 'lists' }}</span></div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    <p class="page-hint">Collation lists gather tasks from other lists. Turn a list into one under its view options, then add tasks with its coloured dot.</p>
+    {% if collation_lists %}
+    <section class="section-panel" aria-label="Collation lists"><ul class="list">{% for item in collation_lists %}
+        <li class="list-row item-row smart-row">
+            <span class="collation-marker" style="--collation-color: {{ item.collation_color or '#888' }}" aria-hidden="true"></span>
+            <div class="item-content"><div class="item-title-line">
+                <a class="item-title" href="{{ prototype_url }}/list/{{ item.id }}?sort=user&amp;folder_id={{ item.folder_id or 0 }}">{{ item.name }}</a>
+                <span class="item-context">{{ open_collected.get(item.id, 0) }} collected open · {{ uncompleted_counts.get(item.id, 0) }} remaining in total</span>
+                {% for link in item.links %}<a class="item-context" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ icon('link', 13) }} {{ link.title or link.url }}</a>{% endfor %}
+            </div></div>
+        </li>
+    {% endfor %}</ul></section>
+    {% else %}
+    <div class="empty-state"><h3>No collation lists yet.</h3></div>
+    {% endif %}
+</div>

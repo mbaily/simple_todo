@@ -1,0 +1,43 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+<div id="daisy-workspace" data-scope="edit:{{ item_kind }}:{{ item.id }}" data-editor="{{ item_kind }}" data-editor-label="{{ item_label }}" data-editor-title="{{ item_title }}" data-page-title="Edit {{ item_label }}" data-page-url="{{ editor_url }}{{ query }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <header class="page-heading editor-heading">
+        <div class="page-title"><h1>Edit {{ item_label }}</h1><span class="editor-item-title">{{ item_title }}</span></div>
+        <div class="detail-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><button id="editor-save" type="submit" form="editor-form" class="btn btn-primary">{{ icon('check', 16) }} Save changes</button><a class="btn" href="{{ return_url }}">Cancel</a><button type="button" class="btn delete-button" data-command="delete-edit-item">{{ icon('trash', 15) }} Delete {{ item_label }}</button></div>
+    </header>
+    <div class="detail-context">Created {{ item.created_at_formatted_full if item_kind == 'todo' else item.created_at_formatted }} · Modified {{ item.modified_at_formatted_full if item_kind == 'todo' else item.modified_at_formatted }}</div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+
+    <form id="editor-form" data-draft action="{{ editor_url }}{{ query }}" method="post" hx-post="{{ editor_url }}{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="#editor-save" class="editor-form section-panel">
+        {% if item_kind in ['list', 'todo'] %}
+        <label class="editor-field editor-wide" for="editor-title"><span>{{ 'List name' if item_kind == 'list' else 'Task title' }}</span><input id="editor-title" class="input input-sm" type="text" name="{{ 'name' if item_kind == 'list' else 'title' }}" value="{{ values.name if item_kind == 'list' else values.title }}" required autocomplete="off"></label>
+        {% else %}
+        <label class="editor-field editor-wide" for="editor-title"><span>Note name <small>(optional)</small></span><input id="editor-title" class="input input-sm" name="name" value="{{ values.name }}" autocomplete="off"></label>
+        {% endif %}
+
+        {% if item_kind in ['todo', 'note'] %}
+        <label class="editor-field editor-wide" for="editor-text"><span>{{ 'Note' if item_kind == 'todo' else 'Note text' }}</span><textarea id="editor-text" class="textarea textarea-sm" name="{{ 'note' if item_kind == 'todo' else 'text' }}" rows="{{ 4 if item_kind == 'todo' else 6 }}" {% if item_kind == 'note' %}required{% endif %}>{{ values.note if item_kind == 'todo' else values.text }}</textarea></label>
+        {% endif %}
+
+        {% if item_kind in ['list', 'todo'] %}
+        <div class="editor-field {{ 'editor-wide' if item_kind == 'list' else '' }}"><label for="editor-tags">Hashtags</label><div class="inline-fields"><input id="editor-tags" class="input input-sm grow-input" name="hashtags" value="{{ values.hashtags }}" placeholder="#work #personal">{% if all_hashtags %}<select class="select select-sm" data-add-tag aria-label="Add existing hashtag"><option value="">Existing tag…</option>{% for tag in all_hashtags %}<option value="{{ tag.name }}">#{{ tag.name }}</option>{% endfor %}</select>{% endif %}</div></div>
+        {% if item_kind == 'todo' %}
+        <div class="editor-field"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="use_color" value="true" data-editor-control {% if values.use_color %}checked{% endif %}> Custom colour</label><div class="inline-fields"><input class="input input-sm editor-colour-value" name="color" value="{{ values.color }}" placeholder="#6fe0b1" aria-label="Task colour" data-editor-colour {% if not values.use_color %}disabled{% endif %}><input type="color" value="{{ picker_color }}" aria-label="Pick task colour" data-editor-colour-picker {% if not values.use_color %}disabled{% endif %}></div></div>
+        {% endif %}
+        <div class="editor-field editor-wide"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="is_delayed" value="true" data-editor-control {% if values.is_delayed %}checked{% endif %}> Defer until</label><input class="input input-sm" type="date" name="delayed_until" value="{{ values.delayed_until }}" aria-label="Deferred until" {% if not values.is_delayed %}disabled{% else %}required{% endif %}></div>
+        {% endif %}
+
+        {% if item_kind == 'todo' %}
+        <fieldset class="editor-alarm editor-wide"><legend>Alarm</legend><div class="inline-fields"><label for="editor-alarm-mode">Mode</label><select id="editor-alarm-mode" class="select select-sm" name="alarm_mode" data-editor-control><option value="none" {% if values.alarm_mode == 'none' %}selected{% endif %}>No alarm</option><option value="range" {% if values.alarm_mode == 'range' %}selected{% endif %}>Time range</option><option value="tolerance" {% if values.alarm_mode == 'tolerance' %}selected{% endif %}>Target ± minutes</option></select>
+            <div class="inline-fields" data-editor-alarm="range" {% if values.alarm_mode != 'range' %}hidden{% endif %}><label>Start <input class="input input-sm" type="datetime-local" name="alarm_start_range" value="{{ values.alarm_start_range }}" {% if values.alarm_mode != 'range' %}disabled{% else %}required{% endif %}></label><label>End <input class="input input-sm" type="datetime-local" name="alarm_end_range" value="{{ values.alarm_end_range }}" {% if values.alarm_mode != 'range' %}disabled{% else %}required{% endif %}></label></div>
+            <div class="inline-fields" data-editor-alarm="tolerance" {% if values.alarm_mode != 'tolerance' %}hidden{% endif %}><label>Target <input class="input input-sm" type="datetime-local" name="alarm_target_time" value="{{ values.alarm_target_time }}" {% if values.alarm_mode != 'tolerance' %}disabled{% else %}required{% endif %}></label><label>± minutes <input class="input input-sm minutes-input" type="number" name="alarm_minutes" value="{{ values.alarm_minutes }}" min="0" max="525600" {% if values.alarm_mode != 'tolerance' %}disabled{% endif %}></label></div>
+        </div></fieldset>
+        {% endif %}
+    </form>
+
+    <details class="section-panel editor-links" data-persist="editor-links" {% if item.links %}open{% endif %}><summary class="capture-summary">{{ icon('link', 16) }} Links <span class="section-count">{{ item.links|length }}</span>{{ icon('down', 14) }}</summary>
+        <ul class="list">{% for link in item.links %}<li class="list-row item-row editor-link-row"><a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" title="{{ link.url }}">{{ link.title or link.url }}</a><form action="{{ editor_url }}/links/{{ link.id }}/delete{{ query }}" method="post" hx-post="{{ editor_url }}/links/{{ link.id }}/delete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><button class="btn btn-ghost btn-square btn-sm" aria-label="Remove {{ link.title or link.url }}">{{ icon('close', 15) }}</button></form></li>{% endfor %}</ul>
+        <form id="editor-link-form" data-draft action="{{ editor_url }}/links{{ query }}" method="post" hx-post="{{ editor_url }}/links{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button" class="inline-fields editor-link-form"><input id="editor-link-url" class="input input-sm grow-input" name="url" type="url" placeholder="https://…" aria-label="Link URL" required><input class="input input-sm" name="title" placeholder="Optional title" aria-label="Link title"><button class="btn" type="submit">{{ icon('plus', 15) }} Add link</button></form>
+    </details>
+    {% if item_kind == 'todo' and item.notes %}<details class="section-panel editor-attached-notes" data-persist="editor-notes"><summary class="capture-summary">{{ icon('note', 16) }} Attached notes <span class="section-count">{{ item.notes|length }}</span></summary><ul class="list">{% for note in item.notes %}<li class="list-row item-row"><a href="{{ prototype_url }}/note/{{ note.id }}/edit{{ query }}">{{ note.name or 'Untitled note' }}</a><span class="item-context">{{ note.created_at_formatted }}</span></li>{% endfor %}</ul></details>{% endif %}
+    <form id="editor-delete-form" hidden action="{{ editor_url }}/delete{{ query }}" method="post" hx-post="{{ editor_url }}/delete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph"></form>
+</div>

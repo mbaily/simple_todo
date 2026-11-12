@@ -1,0 +1,70 @@
+    <form id="create-event-form" action="{{ request.scope.root_path }}/calendar/create" method="post" oninput="updateRRulePreview(this)"
+        onchange="updateRRulePreview(this)" style="display:none;">
+        {% if traditional_view %}<input type="hidden" name="view_month" value="{{ current_month_str }}">{% endif %}
+        {% if weekly_view %}<input type="hidden" name="view_week" value="{{ current_week_str }}">{% endif %}
+        <label>Title: <input type="text" name="title" required></label>
+        <br>
+        <label>Event group:
+            <select name="event_group_id">
+                <option value="">None</option>
+                {% for group in event_groups %}
+                <option value="{{ group.id }}">{{ group.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <br>
+        <label>Hashtags: <input type="text" id="hashtags-create" name="hashtags" placeholder="#example #tags"
+                style="width: 200px;"></label>
+        {% if all_hashtags %}
+        <select onchange="addHashtagFromSelect(this, 'hashtags-create')">
+            <option value="">Add existing...</option>
+            {% for h in all_hashtags %}
+            <option value="{{ h.name }}">#{{ h.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <br>
+        <label>Date: <input type="date" name="start_at" required></label>
+        <label>Start time: <input type="time" name="start_time" step="60"></label>
+        <label>Duration (minutes, optional): <input type="number" name="duration_minutes" min="1" max="10080" step="1" style="width:90px;"></label>
+        <span class="dates">Leave time blank for an all-day event.</span>
+        <br>
+        <label><input type="checkbox" name="important_if_late" value="1"> Mark as important if late and unchecked</label>
+        <fieldset style="border:1px solid #ccc; padding:8px;">
+            <legend>Recurrence</legend>
+            <label>
+                Frequency:
+                <select name="rrule_freq" data-rrule-field="freq">
+                    <option value="">None</option>
+                    <option value="DAILY">Daily</option>
+                    <option value="WEEKLY">Weekly</option>
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="YEARLY">Yearly</option>
+                </select>
+            </label>
+            <label>
+                Interval:
+                <input type="number" name="rrule_interval" data-rrule-field="interval" min="1" value="1"
+                    style="width:80px;">
+            </label>
+            <div data-rrule-weekly style="margin-top:6px; display:none;">
+                Days:
+                <label><input type="checkbox" value="MO" data-rrule-byday> Mon</label>
+                <label><input type="checkbox" value="TU" data-rrule-byday> Tue</label>
+                <label><input type="checkbox" value="WE" data-rrule-byday> Wed</label>
+                <label><input type="checkbox" value="TH" data-rrule-byday> Thu</label>
+                <label><input type="checkbox" value="FR" data-rrule-byday> Fri</label>
+                <label><input type="checkbox" value="SA" data-rrule-byday> Sat</label>
+                <label><input type="checkbox" value="SU" data-rrule-byday> Sun</label>
+            </div>
+            <div data-rrule-until-container style="margin-top:6px; display:none;">
+                <label>End date (optional):
+                    <input type="date" data-rrule-field="until" style="width: 160px;">
+                </label>
+            </div>
+            <input type="hidden" name="rrule" value="" data-rrule-output>
+            <p class="dates" data-rrule-preview></p>
+        </fieldset>
+        <label>Note: <input type="text" name="note" placeholder="optional"></label>
+        <button type="submit" onclick="return prepareRRuleForSubmit(this.form)">Create</button>
+    </form>

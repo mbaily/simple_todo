@@ -1,0 +1,26 @@
+<div id="calendar-day-menu" popover="auto" aria-label="Day actions">
+    <strong id="calendar-day-menu-date"></strong>
+    <button type="button" onclick="addCalendarDayEvent(this.closest('[popover]').dataset.day)">Add event</button>
+    <button type="button" onclick="openCalendarDay(this.closest('[popover]').dataset.day)">Open day</button>
+    <form method="post" id="calendar-day-complete-form">
+        <button type="submit">Mark all complete</button>
+    </form>
+    <form method="post" id="calendar-day-visibility-form">
+        <button type="submit">Hide completed</button>
+    </form>
+    <button type="button" id="calendar-day-note-button" onclick="openCalendarDay(this.closest('[popover]').dataset.day, true)">Add day note</button>
+</div>
+<dialog id="calendar-day-dialog" aria-labelledby="calendar-day-title">
+    <div class="cal-day-dialog-heading">
+        <h2 id="calendar-day-title"></h2>
+        <button type="button" onclick="this.closest('dialog').close()" aria-label="Close day">✕</button>
+    </div>
+    <p id="calendar-day-dialog-count" class="dates"></p>
+    <button type="button" onclick="addCalendarDayEvent(this.closest('dialog').dataset.day)">+ Add event</button>
+    <div id="calendar-day-events"></div>
+    <form method="post" id="calendar-day-note-form">
+        <label for="calendar-day-note">Day note</label>
+        <textarea id="calendar-day-note" name="note" rows="4"></textarea>
+        <button type="submit">Save day note</button>
+    </form>
+</dialog>

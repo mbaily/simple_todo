@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Edit Todo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h1>Edit Todo</h1>
+
+    <form class="edit-todo-form" action="{{ request.scope.root_path }}/todo/{{ todo.id }}/update" method="post">
+        <label>Title:<br>
+            <input type="text" name="title" value="{{ todo.title }}" required>
+        </label><br>
+        <button type="submit">Save Changes</button>
+        <br><br>
+
+        <label>Note:<br>
+            <textarea name="note" rows="10">{{ todo.note or '' }}</textarea>
+        </label><br><br>
+
+        <label>Color:<br>
+            <input type="color" name="color" value="{{ todo.color or '#000000' }}">
+        </label><br><br>
+
+        <label>Hashtags:<br>
+            <input type="text" id="hashtags-edit" name="hashtags"
+                value="{% for h in todo.hashtags %}#{{ h.name }} {% endfor %}" placeholder="example tags (or #tags)">
+        </label>
+        {% if all_hashtags %}
+        <select onchange="addHashtagFromSelect(this, 'hashtags-edit')">
+            <option value="">Add existing...</option>
+            {% for h in all_hashtags %}
+            <option value="{{ h.name }}">#{{ h.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <br><br>
+
+        <label>
+            <input type="checkbox" id="delay-checkbox" name="is_delayed" {% if todo.delayed_until %}checked{% endif %}
+                onchange="toggleDelayDate(this)">
+            Defer until
+        </label>
+        <input type="date" id="delay-date" name="delayed_until"
+            value="{% if todo.delayed_until %}{{ todo.delayed_until.strftime('%Y-%m-%d') }}{% endif %}" {% if not
+            todo.delayed_until %}disabled{% endif %}>
+        <br><br>
+
+        <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 20px;">
+            <h3>Alarm Settings</h3>
+
+            <div>
+                <label>
+                    <input type="radio" name="alarm_mode" value="none" {% if not todo.alarm_start %}checked{% endif %}
+                        onchange="toggleAlarmMode()"> No Alarm
+                </label>
+                <label>
+                    <input type="radio" name="alarm_mode" value="range" {% if todo.alarm_start and todo.alarm_end and
+                        todo.alarm_start !=todo.alarm_end %}checked{% endif %} onchange="toggleAlarmMode()"> Time Range
+                </label>
+                <label>
+                    <input type="radio" name="alarm_mode" value="tolerance" {% if todo.alarm_start and
+                        (todo.alarm_start==todo.alarm_end) %}checked{% endif %} onchange="toggleAlarmMode()"> Single
+                    Time (+/- Minutes)
+                </label>
+                <!-- We use a heuristic: if start == end (or close), it might be single/tolerance. 
+                      Actually, calculating tolerance from stored start/end is tricky if we don't store the mode.
+                      Let's stick to "Range" vs "Tolerance" as *input methods* but populate fields based on stored values.
+                      If stored start != end, we show Range by default. If start == end (or similar), we show Tolerance/Single?
+                      Actually, "Single Time (+/- N minutes)" implies a range [T-N, T+N]. So start != end.
+                      If the user set 5pm +/- 15, current DB has 4:45 and 5:15.
+                      When editing, it's hard to distinguish "Manual Range 4:45-5:15" vs "Tolerance".
+                      So, let's default to "Range" view if set, users can switch to "Tolerance" to reset it easily.
+                  -->
+            </div>
+
+            <div id="alarm-range-inputs" style="display:none; margin-top:10px;">
+                <label>Start: <input type="datetime-local" name="alarm_start_range"
+                        value="{% if todo.alarm_start %}{{ todo.alarm_start.strftime('%Y-%m-%dT%H:%M') }}{% endif %}"></label><br>
+                <label>End: &nbsp;&nbsp;<input type="datetime-local" name="alarm_end_range"
+                        value="{% if todo.alarm_end %}{{ todo.alarm_end.strftime('%Y-%m-%dT%H:%M') }}{% endif %}"></label>
+            </div>
+
+            <div id="alarm-tolerance-inputs" style="display:none; margin-top:10px;">
+                <label>Target Time: <input type="datetime-local" name="alarm_target_time"></label><br>
+                <label>+/- Minutes: <input type="number" name="alarm_minutes" value="120" min="0"></label>
+            </div>
+        </div>
+
+        <button type="submit">Save Changes</button>
+    </form>
+
+    <script>
+        function toggleDelayDate(checkbox) {
+            const dateInput = document.getElementById('delay-date');
+            dateInput.disabled = !checkbox.checked;
+            if (checkbox.checked && !dateInput.value) {
+                // Default to tomorrow if checked and empty
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                dateInput.value = tomorrow.toISOString().split('T')[0];
+            }
+        }
+
+        function toggleAlarmMode() {
+            const mode = document.querySelector('input[name="alarm_mode"]:checked').value;
+            const rangeDiv = document.getElementById('alarm-range-inputs');
+            const tolDiv = document.getElementById('alarm-tolerance-inputs');
+
+            rangeDiv.style.display = 'none';
+            tolDiv.style.display = 'none';
+
+            if (mode === 'range') {
+                rangeDiv.style.display = 'block';
+            } else if (mode === 'tolerance') {
+                tolDiv.style.display = 'block';
+            }
+        }
+
+        // Init state
+        toggleAlarmMode();
+    </script>
+
+    <details>
+        <summary style="cursor: pointer;">
+            <h3 style="display: inline; margin: 0;">Links</h3>
+        </summary>
+        {% if todo.links %}
+        <ul>
+            {% for link in todo.links %}
+            <li>
+                <a href="{{ link.url }}" target="_blank">{{ link.title or link.url }}</a>
+                <form action="{{ request.scope.root_path }}/api/link/{{ link.id }}/delete" method="post" style="display:inline;">
+                    <button type="submit" style="background:none; border:none; cursor:pointer; color:red;">[x]</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <form action="{{ request.scope.root_path }}/api/link/create" method="post" style="margin-top: 10px; border: 1px solid #ccc; padding: 10px;">
+            <input type="hidden" name="todo_id" value="{{ todo.id }}">
+            <label>URL: <input type="url" name="url" required style="width: 100%;"></label><br>
+            <label>Title (optional): <input type="text" name="title" style="width: 100%;"></label><br>
+            <button type="submit">Add Link</button>
+        </form>
+    </details>
+
+    <p class="dates">Created: {{ todo.created_at_formatted }} | Modified: {{ todo.modified_at_formatted }}</p>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

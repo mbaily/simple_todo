@@ -1,0 +1,106 @@
+{% macro render_tree_nodes(folders, lists, parent_folder=None) %}
+<ul class="folder-tree-view">
+    {# Render Folders first #}
+    {% for folder in folders %}
+    <li class="tree-item folder-item" data-type="folder" data-id="{{ folder.id }}" data-parent-id="{{ folder.parent_id or '' }}">
+        <div class="folder-row"
+             draggable="true"
+             @dragstart="onDragStart($event)"
+             @dragover="onDragOver($event)"
+             @dragleave="onDragLeave($event)"
+             @drop="onDrop($event)"
+             @dragend="onDragEnd($event)">
+            
+            <!-- Drag Handle -->
+            <span class="drag-handle" title="Drag to move or reorder">☰</span>
+
+            <!-- Selection checkbox for tagged / batch ops -->
+            <input type="checkbox" class="select-item"
+                onchange="toggleSelection(this, 'folder', {{ folder.id }}, '{{ folder.name|e }}')">
+
+            <!-- Collapse toggle -->
+            <span class="item-icon collapse-arrow" style="cursor:pointer;"
+                  @click.prevent="toggleCollapse({{ folder.id }}, $el)"
+                  title="Expand / Collapse">
+                {% if folder.is_collapsed %}▶{% else %}▼{% endif %}
+            </span>
+
+            <span class="item-icon">📁</span>
+
+            <!-- Inline Renaming wrapper -->
+            <span class="folder-name-container" id="folder-name-{{ folder.id }}">
+                <a href="{{ request.scope.root_path }}/?folder_id={{ folder.id }}" draggable="false" style="color:inherit; text-decoration:none;">
+                    <strong>{{ folder.name }}</strong>
+                </a>
+            </span>
+
+            <!-- Actions toolbar (compact, subtle icons) -->
+            <span class="item-actions">
+                <button type="button" class="btn-action" title="Rename folder"
+                        @click="startRename({{ folder.id }}, '{{ folder.name|e }}')">✏️</button>
+                <button type="button" class="btn-action" title="Create subfolder"
+                        @click="showCreateSubfolder({{ folder.id }})">➕</button>
+                <button type="button" class="btn-action" title="Delete folder (contents move to root)"
+                        @click="deleteFolder({{ folder.id }}, '{{ folder.name|e }}')">🗑️</button>
+                {% if settings.active_folder_id == folder.id %}
+                <button type="button" class="btn-action active-star" title="Active folder (click to clear)"
+                        @click="setActive(0)">★</button>
+                {% else %}
+                <button type="button" class="btn-action star-btn" title="Set as active folder"
+                        @click="setActive({{ folder.id }})">☆</button>
+                {% endif %}
+            </span>
+        </div>
+
+        <!-- Inline subfolder creation form -->
+        <div id="subfolder-create-{{ folder.id }}" style="display:none; margin: 4px 0 4px 28px;">
+            <input type="text" id="subfolder-input-{{ folder.id }}" placeholder="New folder name"
+                   style="font-size: 0.9rem; padding: 2px 4px;"
+                   @keydown.enter.prevent="submitCreateFolder({{ folder.id }})"
+                   @keydown.escape.prevent="hideCreateSubfolder({{ folder.id }})">
+            <button type="button" class="btn-mini" @click="submitCreateFolder({{ folder.id }})">Create</button>
+            <button type="button" class="btn-mini" @click="hideCreateSubfolder({{ folder.id }})">Cancel</button>
+        </div>
+
+        {# Subtree container: rendered in DOM so client toggle works instantly #}
+        <div id="folder-children-{{ folder.id }}" class="folder-children" data-folder-id="{{ folder.id }}" {% if folder.is_collapsed %}style="display:none;"{% endif %}>
+            {% if folder.children or folder.lists %}
+            {{ render_tree_nodes(folder.children, folder.lists, folder) }}
+            {% else %}
+            <ul class="folder-tree-view empty-folder-dropzone" data-parent-folder-id="{{ folder.id }}"
+                @dragover="onDragOverDropzone($event)" @dragleave="onDragLeaveDropzone($event)" @drop="onDropIntoFolder({{ folder.id }}, $event)">
+                <li class="dates drop-hint" style="list-style: none;">(empty folder - drop items here)</li>
+            </ul>
+            {% endif %}
+        </div>
+    </li>
+    {% endfor %}
+
+    {# Render Lists in this folder #}
+    {% for lst in lists %}
+    {% if not lst.archived %}
+    <li class="tree-item list-item" data-type="list" data-id="{{ lst.id }}" data-parent-id="{{ parent_folder.id if parent_folder else '' }}">
+        <div class="folder-row"
+             draggable="true"
+             @dragstart="onDragStart($event)"
+             @dragover="onDragOver($event)"
+             @dragleave="onDragLeave($event)"
+             @drop="onDrop($event)"
+             @dragend="onDragEnd($event)">
+            
+            <!-- Drag Handle -->
+            <span class="drag-handle" title="Drag to move list">☰</span>
+
+            <input type="checkbox" class="select-item"
+                onchange="toggleSelection(this, 'list', {{ lst.id }}, '{{ lst.name|e }}')">
+            <span class="item-icon" style="visibility:hidden"></span>
+            <span class="item-icon">📝</span>
+            <a href="{{ request.scope.root_path }}/list/{{ lst.id }}{% if parent_folder %}?folder_id={{ parent_folder.id }}{% endif %}"
+                draggable="false"
+                style="color:inherit; text-decoration:none; flex-grow:1;">{{ lst.name }}</a>
+        </div>
+    </li>
+    {% endif %}
+    {% endfor %}
+</ul>
+{% endmacro %}

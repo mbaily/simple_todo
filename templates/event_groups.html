@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Event Groups</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20260311" crossorigin="anonymous">
+</head>
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h2>Event Groups</h2>
+    <p><a href="{{ request.scope.root_path }}/classic/calendar">Back to Calendar</a></p>
+
+    <form action="{{ request.scope.root_path }}/calendar/groups/create" method="post" style="margin: 15px 0;">
+        <label>New event group: <input type="text" name="name" required maxlength="255"></label>
+        <button type="submit">Add</button>
+    </form>
+
+    {% if groups %}
+    <ul>
+        {% for group in groups %}
+        <li>
+            {{ group.name }} <span class="dates">({{ group_counts.get(group.id, 0) }} events)</span>
+            <form action="{{ request.scope.root_path }}/calendar/groups/{{ group.id }}/delete" method="post" style="display: inline;"
+                onsubmit="return confirm('Delete {{ group.name }}? Its events will become ungrouped.');">
+                <button type="submit">Delete</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No event groups yet.</p>
+    {% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+</html>

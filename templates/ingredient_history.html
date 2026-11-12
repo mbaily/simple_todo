@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Ingredient History</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .back-link {
+            text-decoration: none;
+            font-size: 1.5rem;
+            color: #6b7280;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            color: #4b5563;
+            font-weight: 500;
+        }
+
+        input,
+        select {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        button.primary {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        button.primary:hover {
+            background: #1d4ed8;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .history-table th {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .history-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-bought {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-ran_out {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-reset {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #ef4444;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .delete-btn:hover {
+            background: #fee2e2;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container" data-todo-id="{{ todo.id }}" data-msg-confirm="{{ t('msg_confirm_delete_history') }}"
+        data-msg-error-unknown="{{ t('msg_error_unknown') }}" data-msg-failed-add="{{ t('msg_failed_add') }}"
+        data-msg-failed-delete="{{ t('msg_failed_delete') }}" data-msg-error-delete="{{ t('msg_error_delete') }}">
+        <div class="header">
+            <a href="{{ request.scope.root_path }}/pantry" class="back-link" title="{{ t('title_back_pantry') }}">←</a>
+            <div>
+                <h1 style="margin: 0;">{{ group_name if is_grouped else todo.title }}</h1>
+                <div style="color: #6b7280; font-size: 0.9rem;">
+                    {% if is_grouped %}
+                    {{ t('text_group_history') }}
+                    {% else %}
+                    {{ t('text_individual_history') }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top: 0;">{{ t('label_add_event') }}</h3>
+            <form id="add-event-form" onsubmit="addEvent(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>{{ t('label_date') }}</label>
+                        <input type="date" id="event-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>{{ t('label_event_type') }}</label>
+                        <select id="event-type">
+                            <option value="bought">{{ t('btn_bought') }}</option>
+                            <option value="ran_out">{{ t('btn_ran_out') }}</option>
+                            <option value="reset">Reset</option> <!-- TODO: Add translation if needed -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>{{ t('label_qty') }}</label>
+                        <input type="number" id="event-qty" value="1" min="1" style="width: 80px;">
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="primary">{{ t('btn_add_entry') }}</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top: 0;">{{ t('header_history') }}</h3>
+            {% if events %}
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>{{ t('label_date') }}</th>
+                        <th>{{ t('label_event_type') }}</th>
+                        <th>{{ t('label_qty') }}</th>
+                        <th>{{ t('label_actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                    <tr>
+                        <td>{{ event.event_date_formatted }}</td>
+                        <td>
+                            <span class="badge badge-{{ event.event_type }}">{{ event.event_type|replace('_', ' ')|title
+                                }}</span>
+                        </td>
+                        <td>{{ event.quantity }}</td>
+                        <td>
+                            <button onclick="deleteEvent({{ event.id }})" class="delete-btn"
+                                title="{{ t('title_delete_entry') }}">🗑️</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #6b7280; font-style: italic;">{{ t('text_no_history') }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Set default date to today
+        document.getElementById('event-date').valueAsDate = new Date();
+
+        async function addEvent(e) {
+            e.preventDefault();
+
+            const date = document.getElementById('event-date').value;
+            const type = document.getElementById('event-type').value;
+            const qty = parseInt(document.getElementById('event-qty').value);
+
+            const todoId = document.querySelector('.container').dataset.todoId;
+
+            try {
+                const response = await SimpleTodo.fetch(`/api/todo/${todoId}/ingredient_event`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event_type: type,
+                        quantity: qty,
+                        event_date: date
+                    })
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    const data = await response.json();
+                    const msg = document.querySelector('.container').dataset.msgErrorUnknown;
+                    alert('Error: ' + (data.error || msg));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                const msg = document.querySelector('.container').dataset.msgFailedAdd;
+                alert(msg);
+            }
+        }
+
+        async function deleteEvent(eventId) {
+            const confirmMsg = document.querySelector('.container').dataset.msgConfirm;
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            try {
+                const response = await SimpleTodo.fetch(`/api/ingredient_event/${eventId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    const msg = document.querySelector('.container').dataset.msgFailedDelete;
+                    alert(msg);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                const msg = document.querySelector('.container').dataset.msgErrorDelete;
+                alert(msg);
+            }
+        }
+    </script>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

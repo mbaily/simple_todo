@@ -1,0 +1,85 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% from 'daisyui_test/_folder_menu.html' import folder_menu with context %}
+{% set rp = request.scope.root_path %}
+{% macro folder_options(selected=None, top_label='Top level') %}
+<option value="0" {% if selected == 0 %}selected{% endif %}>{{ top_label }}</option>
+{% for option in all_folders %}<option value="{{ option.id }}" {% if selected == option.id %}selected{% endif %}>{{ option.path_name }}</option>{% endfor %}
+{% endmacro %}
+{% macro list_row(item, depth) %}
+<li class="list-row item-row folder-list-row" data-item-key="list:{{ item.id }}" style="--depth: {{ depth }}">
+    <label class="selection-control" title="Select {{ item.name }}"><input class="checkbox checkbox-sm selection-checkbox" type="checkbox" name="items" value="list:{{ item.id }}" form="daisy-bulk-form" data-created="{{ item.created_at_formatted }}" data-modified="{{ item.modified_at_formatted }}" aria-label="Select {{ item.name }}"></label>
+    <span class="folder-symbol">{{ icon('list', 15) }}</span>
+    <div class="item-content"><div class="item-title-line">
+        <a class="item-title {{ 'is-completed-title' if item.completed else '' }}" href="{{ prototype_url }}/list/{{ item.id }}?sort=user&amp;folder_id={{ item.folder_id or 0 }}">{{ item.name }}</a>
+        <span class="badge badge-ghost task-count" aria-label="{{ uncompleted_counts.get(item.id, 0) }} remaining tasks">{{ uncompleted_counts.get(item.id, 0) }}<span class="count-label"> remaining</span></span>
+    </div></div>
+    <div class="row-actions"><button type="button" class="btn btn-ghost btn-sm move-button" data-command="move-item" data-key="list:{{ item.id }}" aria-label="Move {{ item.name }}">{{ icon('arrow', 14) }}<span>Move</span></button></div>
+</li>
+{% endmacro %}
+{% macro folder_node(folder, depth, siblings) %}
+{% set child_lists = lists_by_folder.get(folder.id, []) %}
+{% set has_content = folder.children or child_lists %}
+{% set is_default = active_folder_id == folder.id %}
+<li class="folder-node">
+    <div class="list-row item-row folder-row {{ 'is-default-folder' if is_default else '' }}" data-item-key="folder:{{ folder.id }}" style="--depth: {{ depth }}">
+        <label class="selection-control" title="Select {{ folder.name }}"><input class="checkbox checkbox-sm selection-checkbox" type="checkbox" name="items" value="folder:{{ folder.id }}" form="daisy-bulk-form" data-created="{{ folder.created_at.strftime('%-d %b %Y') if folder.created_at else '' }}" data-modified="" aria-label="Select folder {{ folder.name }}"></label>
+        <button type="button" class="btn btn-ghost btn-square btn-xs folder-toggle" data-command="toggle-folder" data-collapse-url="{{ prototype_url }}/folders/{{ folder.id }}/collapse" aria-controls="folder-children-{{ folder.id }}" aria-expanded="{{ 'false' if folder.is_collapsed else 'true' }}" aria-label="{{ 'Expand' if folder.is_collapsed else 'Collapse' }} {{ folder.name }}" {% if not has_content %}disabled{% endif %}>{{ icon('chevron', 14) }}</button>
+        <span class="folder-symbol">{{ icon('folder', 16) }}</span>
+        <div class="item-content"><div class="item-title-line">
+            <a class="item-title" href="{{ prototype_url }}?sort=user&amp;folder_id={{ folder.id }}" title="Open {{ folder.name }} in the overview">{{ folder.name }}</a>
+            {% if is_default %}<span class="badge badge-outline badge-sm default-badge">Default view</span>{% endif %}
+            <span class="item-context">{{ child_lists|length }} {{ 'list' if child_lists|length == 1 else 'lists' }}{% if folder.children %} · {{ folder.children|length }} {{ 'subfolder' if folder.children|length == 1 else 'subfolders' }}{% endif %}</span>
+        </div></div>
+        <div class="row-actions">
+            {{ folder_menu(folder, siblings, is_default) }}
+        </div>
+    </div>
+    {% if has_content %}
+    <div id="folder-children-{{ folder.id }}" class="folder-children" {% if folder.is_collapsed %}hidden{% endif %}>
+        {% if folder.children %}<ul class="folder-tree">{% for child in folder.children %}{{ folder_node(child, depth + 1, folder.children) }}{% endfor %}</ul>{% endif %}
+        {% if child_lists %}<ul class="list">{% for item in child_lists %}{{ list_row(item, depth + 1) }}{% endfor %}</ul>{% endif %}
+    </div>
+    {% endif %}
+</li>
+{% endmacro %}
+{% set unfiled = lists_by_folder.get(None, []) %}
+<div id="daisy-workspace" data-scope="folders" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Folders</h1><span class="eyebrow">{{ all_folders|length }} {{ 'folder' if all_folders|length == 1 else 'folders' }} · {{ list_total }} {{ 'list' if list_total == 1 else 'lists' }}</span></div>
+        <div class="page-heading-actions">
+            <span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
+            <a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/lists/reorder">{{ icon('list', 15) }} Reorder lists</a>
+            <button type="button" class="btn btn-ghost btn-sm select-mode-button" data-command="toggle-selection" aria-pressed="false">{{ icon('select', 16) }} <span>Select</span></button>
+        </div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+
+    <details id="create-folder-details" class="collapse capture-collapse" data-persist="create-folder" {% if not all_folders %}open{% endif %}>
+        <summary class="collapse-title capture-summary">{{ icon('plus', 18) }} New folder{{ icon('down', 16) }}</summary>
+        <div class="collapse-content">
+            <form id="create-folder-form" data-draft action="{{ prototype_url }}/folders{{ query }}" method="post" hx-post="{{ prototype_url }}/folders{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button[type=submit]">
+                <div class="inline-fields"><input id="new-folder-name" class="input input-sm grow-input" name="name" placeholder="Folder name" aria-label="Folder name" required maxlength="255" autocomplete="off"><label for="new-folder-parent">Inside</label><select id="new-folder-parent" class="select select-sm" name="parent_id">{{ folder_options(0) }}</select><button class="btn btn-primary" type="submit">Add folder</button></div>
+            </form>
+        </div>
+    </details>
+
+    <section class="section-panel" aria-labelledby="folder-tree-heading">
+        <header class="section-heading"><div><h2 id="folder-tree-heading">{{ icon('folder', 19) }} Folder tree</h2>{% if not active_folder_id %}<p>Overview opens the default view.</p>{% endif %}</div></header>
+        {% if root_folders %}<ul class="folder-tree">{% for folder in root_folders %}{{ folder_node(folder, 0, root_folders) }}{% endfor %}</ul>
+        {% else %}<div class="empty-state"><h3>No folders yet. Create one to group your lists.</h3></div>{% endif %}
+    </section>
+
+    <section class="section-panel" aria-labelledby="unfiled-heading">
+        <header class="section-heading"><div><h2 id="unfiled-heading">{{ icon('list', 19) }} Unfiled lists <span class="section-count">{{ unfiled|length }}</span></h2></div><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}?sort=user&amp;folder_id=0">Open in overview {{ icon('arrow', 15) }}</a></header>
+        {% if unfiled %}<ul class="list">{% for item in unfiled %}{{ list_row(item, 0) }}{% endfor %}</ul>{% endif %}
+    </section>
+
+    <form id="daisy-bulk-form" class="bulk-toolbar" action="{{ prototype_url }}/bulk{{ query }}" method="post" hx-post="{{ prototype_url }}/bulk{{ query }}" hx-target:inherited="#daisy-workspace" hx-swap:inherited="outerMorph" hx-disable="find button" aria-label="Selection actions" hidden>
+        <div class="selection-summary"><strong id="selection-count" aria-live="polite">0 selected</strong><div class="selection-links"><button type="button" data-command="select-all">Select all</button><span>·</span><button type="button" data-command="clear-selection">Clear</button></div><small id="selected-dates" hidden></small></div>
+        <div class="bulk-buttons">
+            <button type="button" class="btn btn-sm btn-primary" data-command="move-to-folder" data-requires-selection>{{ icon('arrow', 15) }} Move…</button>
+            <button class="btn btn-sm" name="action" value="archive" data-lists-only>Archive</button>
+            <button type="button" class="btn btn-ghost btn-square btn-sm" data-command="toggle-selection" aria-label="Exit selection mode">{{ icon('close', 16) }}</button>
+        </div>
+    </form>
+</div>

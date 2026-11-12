@@ -1,0 +1,4 @@
+pytest>=9.1.1,<10
+# Keep the TestClient HTTP API and browser tooling within their tested series.
+httpx>=0.28.1,<0.29
+playwright>=1.63.0,<1.64

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Uncompleted Items</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    {% from "macros.html" import render_links, nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h3 style="margin:0;">Uncompleted Items</h3>
+
+    {% set list_todo_indent = 20 %}
+    {% macro render_todo(todo, depth=0) %}
+    <div style="display: flex; align-items: baseline;">
+        <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+            data-created="{{ todo.created_at_formatted }}" data-modified="{{ todo.modified_at_formatted }}"
+            onchange="updateSelectionCount()" style="margin-right: 5px; flex-shrink: 0;">
+        <div style="margin-left: {{ list_todo_indent + (depth * 20) }}px; flex-grow: 1;">
+            <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+                onchange="toggleItem(this)">
+            {% if todo.pinned %}📌{% endif %}
+            <span
+                style="color: {% if todo.color and todo.color|lower not in ['#000000', '#ffffff'] %}{{ todo.color }}{% else %}inherit{% endif %}">{{
+                todo.title }}</span>
+            {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit" title="Edit todo (note)">📝</a>{%
+            endif %}
+            {{ render_links(todo.links, "inherit") }}
+            {% for hashtag in todo.hashtags %}
+            <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    {% for child in todo.children|selectattr('completed', 'false')|list|sort(attribute='created_at', reverse=true) %}
+    {{ render_todo(child, depth + 1) }}
+    {% endfor %}
+    {% endmacro %}
+
+    {% from "macros.html" import render_tree_node with context %}
+
+    {% if todo_tree and (todo_tree.lists or todo_tree.folder_nodes) %}
+    {{ render_tree_node(todo_tree) }}
+
+    <h3 style="margin:0;">Operations</h3>
+    <p style="margin-top:0;"><span id="selection-count">0 selected</span> | <button type="button"
+            onclick="selectAll()">Select All</button> <button type="button" onclick="selectNone()">Select None</button>
+    </p>
+    <p id="selected-dates" class="dates" style="display:none;"></p>
+    <p>
+        Todos: <button type="button" onclick="bulkPin('todo')">Pin</button>
+        <button type="button" onclick="bulkUnpin('todo')">Unpin</button>
+        <button type="button" onclick="bulkEdit('todo')">Edit</button>
+        <button type="button" onclick="bulkDelete('todo')">Delete</button>
+    </p>
+    <p>
+        Lists: <button type="button" onclick="bulkEdit('list')">Edit</button>
+        <button type="button" onclick="bulkDelete('list')">Delete</button>
+    </p>
+    {% else %}
+    <p>No uncompleted items.</p>
+    {% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

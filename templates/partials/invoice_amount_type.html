@@ -1,0 +1,5 @@
+<label><select name="amount_type" onchange="const net = this.value === 'net'; this.form.elements.invoice_date.required = net; this.form.elements.credit_applied.disabled = !net; this.form.querySelector('.invoice-credit').hidden = !net;"><option value="gross">Invoice charge before credit</option><option value="net">Amount owing after credit</option></select></label>
+<label class="invoice-credit" hidden>Credit applied shown on invoice
+    <input name="credit_applied" type="text" inputmode="decimal" disabled style="width:100px;" placeholder="Optional">
+    <span class="dates">Enter this when payments or other charges share the issue date. Enter zero if no credit was applied.</span>
+</label>

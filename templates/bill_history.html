@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>{{ bill.name }} — Payment History</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20260311" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <style>
+        h2 { margin: 0; }
+        p { margin: 0; }
+
+        .history-table {
+            border-collapse: collapse;
+            width: 100%;
+            max-width: 700px;
+            margin-top: 10px;
+        }
+
+        .history-table th,
+        .history-table td {
+            border: 1px solid #d1d5db;
+            padding: 6px 10px;
+            text-align: left;
+            font-size: 0.9em;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .history-table th,
+            .history-table td {
+                border-color: #4b5563;
+            }
+        }
+
+        .history-table th {
+            background: #f3f4f6;
+            font-weight: 600;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .history-table th {
+                background: #374151;
+            }
+        }
+
+        .history-stats {
+            font-size: 0.9em;
+            margin: 8px 0;
+            color: #374151;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .history-stats { color: #d1d5db; }
+        }
+
+        .late-badge {
+            font-size: 0.75em;
+            color: #dc2626;
+            font-weight: bold;
+        }
+
+        .bill-auto-badge {
+            font-size: 0.75em;
+            background: #dbeafe;
+            color: #1d4ed8;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-auto-badge { background: #1e3a5f; color: #93c5fd; }
+        }
+
+        .bill-confirmed-badge {
+            font-size: 0.72em;
+            background: #dcfce7;
+            color: #15803d;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-confirmed-badge { background: #14532d; color: #86efac; }
+        }
+
+        .bill-est-badge {
+            font-size: 0.72em;
+            background: #f3f4f6;
+            color: #6b7280;
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-est-badge { background: #374151; color: #9ca3af; }
+        }
+
+        .bill-category {
+            font-size: 0.75em;
+            background: #f3f4f6;
+            color: #374151;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-category { background: #374151; color: #d1d5db; }
+        }
+    </style>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h2>{% if bill.color and bill.color != '#000000' %}<span style="color: {{ bill.color }}">{{ bill.name }}</span>{% else %}{{ bill.name }}{% endif %} — Payment History</h2>
+    {% if bill.payee %}<p class="dates">Payee: {{ bill.payee }}</p>{% endif %}
+    {% if bill.note %}<p class="dates">Note: {{ bill.note }}</p>{% endif %}
+
+    <div class="history-stats">
+        <strong>{{ payments | length }}</strong> payments recorded |
+        Total paid: <strong>{% if has_paid_amounts %}{{ bill.currency_symbol }}{{ "%.2f"|format(total_paid) }}{% else %}—{% endif %}</strong> |
+        {% if refunds_total %}Refunded: <strong>{{ bill.currency_symbol }}{{ '%.2f'|format(refunds_total) }}</strong> | Net paid: <strong>{{ bill.currency_symbol }}{{ '%.2f'|format(total_paid - refunds_total) }}</strong> |{% endif %}
+        Average: <strong>{% if has_paid_amounts %}{{ bill.currency_symbol }}{{ "%.2f"|format(avg_amount) }}{% else %}—{% endif %}</strong>
+        {% if bill.amount_strategy == 'rolling_avg' %}
+            | Strategy: <strong>Variable (Rolling Avg)</strong>
+            {% if bill.effective_amount is not none %} | Next Est: <strong>~{{ bill.currency_symbol }}{{ "%.2f"|format(bill.effective_amount) }}</strong>{% endif %}
+        {% elif bill.amount_strategy == 'last_payment' %}
+            | Strategy: <strong>Variable (Last Payment)</strong>
+            {% if bill.effective_amount is not none %} | Next Est: <strong>~{{ bill.currency_symbol }}{{ "%.2f"|format(bill.effective_amount) }}</strong>{% endif %}
+        {% else %}
+            {% if bill.expected_amount is not none %} | Expected: <strong>{{ bill.currency_symbol }}{{ "%.2f"|format(bill.expected_amount) }}</strong>{% endif %}
+        {% endif %}
+    </div>
+
+    <p class="dates">
+        {% if bill.next_due_date %}
+            Next due: <strong>{{ bill.next_due_date_formatted }}</strong>
+            {% if bill.is_due_date_confirmed %}
+                <span class="bill-confirmed-badge">Invoice confirmed</span>
+            {% else %}
+                <span class="bill-est-badge">Est.</span>
+            {% endif %}
+        {% else %}
+            Next due: <em>None scheduled</em>
+        {% endif %}
+        {% if not bill.is_active %}<span class="bill-est-badge" style="background:#fee2e2; color:#991b1b;">Inactive</span>{% endif %}
+        {% if bill.is_auto_pay %}<span class="bill-auto-badge">auto</span>{% endif %}
+        {% if bill.category %}<span class="bill-category">{{ bill.category }}</span>{% endif %}
+        ({{ bill.frequency_label }})
+    </p>
+
+    {% include "bill_account.html" %}
+
+    {% if payments %}
+    <table class="history-table">
+        <thead>
+            <tr>
+                <th>Due Date</th>
+                <th>Paid Date</th>
+                <th>Amount</th>
+                <th>Timing</th>
+                <th>Status</th>
+                <th>Note</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in payments %}
+            <tr>
+                <td>{% if p.amount_cents is not none and not p.invoice_id %}Account credit{% elif p.invoice_id and p.invoice and not p.invoice.due_date %}Unknown{% else %}{{ p.due_date_formatted }}{% endif %}</td>
+                <td>{{ p.paid_date_formatted }}</td>
+                <td>{% if p.amount_paid is not none %}{{ p.currency_symbol }}{{ "%.2f"|format(p.amount_paid) }}{% else %}—{% endif %}{% if p.payment_method %}<p class="dates">{{ p.payment_method }}</p>{% endif %}</td>
+                <td>
+                    {% if p.due_date and p.paid_date and (p.amount_cents is none or (p.invoice and p.invoice.due_date)) %}
+                        {% if p.days_difference > 0 %}
+                            <span style="color: #16a34a; font-weight: 500;">{{ p.timing_label }}</span>
+                        {% elif p.days_difference == 0 %}
+                            <span style="color: #16a34a;">On time</span>
+                        {% elif p.is_late_overridden %}
+                            <span style="color: #16a34a;">{{ p.timing_label }} (Override)</span>
+                        {% else %}
+                            <span style="color: #dc2626; font-weight: bold;">{{ p.timing_label }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span style="color: #6b7280;">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if p.due_date and p.paid_date and (p.amount_cents is none or (p.invoice and p.invoice.due_date)) %}
+                        {% if p.days_difference < 0 and not p.is_late_overridden %}
+                        <span class="late-badge">LATE</span>
+                        <form method="post" action="{{ request.scope.root_path }}/bills/payments/{{ p.id }}/toggle-late-override" style="display:inline;">
+                            <button type="submit" title="Mark as on time" style="font-size:0.75em; margin-left:4px; cursor:pointer;">Not late</button>
+                        </form>
+                        {% elif p.days_difference < 0 and p.is_late_overridden %}
+                        <span style="color: #16a34a;">✓</span> <span style="font-size:0.75em; color:#6b7280;">(Marked on time)</span>
+                        <form method="post" action="{{ request.scope.root_path }}/bills/payments/{{ p.id }}/toggle-late-override" style="display:inline;">
+                            <button type="submit" title="Undo override" style="font-size:0.75em; margin-left:4px; cursor:pointer;">Undo</button>
+                        </form>
+                        {% else %}
+                        <span style="color: #16a34a;">✓</span>
+                        {% endif %}
+                    {% else %}
+                        <span style="color: #6b7280;">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% for n in p.notes_list %}
+                    <div style="font-size:0.85em; margin-bottom:2px;">
+                        {{ n.text }}
+                        {% if n.created_at %}<span style="color:#9ca3af; font-size:0.8em;"> {{ n.created_at }}</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                    <button type="button" onclick="toggleNoteForm({{ p.id }})" style="font-size:0.75em; margin-top:2px;">Add</button>
+                    <div id="note-form-{{ p.id }}" style="display:none; margin-top:4px;">
+                        <form method="post" action="{{ request.scope.root_path }}/bills/payments/{{ p.id }}/add-note">
+                            <input type="text" name="note_text" placeholder="Add a note..." required style="width:140px; font-size:0.9em;">
+                            <button type="submit" style="font-size:0.85em;">Save</button>
+                        </form>
+                    </div>
+                </td>
+                <td>
+                    <button type="button" onclick="toggleEditPaymentForm({{ p.id }})" style="font-size:0.75em;">Edit</button>
+                    {% if loop.first and not bill.ledger_enabled %}
+                    <form method="post" action="{{ request.scope.root_path }}/bills/payments/{{ p.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this payment? Invoice balances and account credit will be recalculated.');">
+                        <input type="hidden" name="restore_due_date" value="true">
+                        <button type="submit" style="font-size:0.75em; color:#dc2626; cursor:pointer;">Delete</button>
+                    </form>
+                    {% else %}
+                    <form method="post" action="{{ request.scope.root_path }}/bills/payments/{{ p.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this historical payment record?');">
+                        <button type="submit" style="font-size:0.75em; color:#dc2626; cursor:pointer;">Delete</button>
+                    </form>
+                    {% endif %}
+                    <div id="edit-payment-form-{{ p.id }}" style="display:none; margin-top:6px; border:1px solid #ccc; padding:6px; border-radius:4px; font-size:0.85em;">
+                        <form method="post" action="{{ request.scope.root_path }}/bills/payments/{{ p.id }}/edit" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+                            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+                            {% if p.invoice %}
+                            <span>Invoice due date: {{ p.due_date_formatted or 'Unknown' }}. Update it using Edit invoice above.</span><br>
+                            {% elif p.amount_cents is not none %}
+                            <input type="hidden" name="due_date" value="">
+                            {% else %}
+                            <label>Due date: <input type="date" name="due_date" value="{{ p.due_date_iso }}" required></label><br>
+                            {% endif %}
+                            <label>Paid date: <input type="date" name="paid_date" value="{{ p.paid_date_iso }}" max="{{ today_iso }}" required></label><br>
+                            <label>Amount: <input type="text" name="amount_paid" value="{{ '%.2f'|format(p.amount_paid) if p.amount_paid is not none else '' }}" style="width:70px;"></label><br>
+                            <label>Note: <input type="text" name="note" value="{{ p.display_note }}" placeholder="optional" style="width:140px;"></label>{% if p.note %}<label style="margin-left:4px;"><input type="checkbox" name="clear_note" value="true"> Clear</label>{% endif %}<br>
+                            <button type="submit" style="font-size:0.8em; margin-top:4px;">Save Changes</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="dates" style="margin-top: 10px;">No payments recorded yet.</p>
+    {% endif %}
+
+    <br>
+    <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/edit">Edit Bill</a> | <a href="{{ request.scope.root_path }}/classic/bills">Back to Bills</a>
+
+    <script>
+        function toggleNoteForm(paymentId) {
+            var form = document.getElementById('note-form-' + paymentId);
+            if (form) {
+                form.style.display = form.style.display !== 'block' ? 'block' : 'none';
+            }
+        }
+        function toggleEditPaymentForm(paymentId) {
+            var form = document.getElementById('edit-payment-form-' + paymentId);
+            if (form) {
+                form.style.display = form.style.display !== 'block' ? 'block' : 'none';
+            }
+        }
+    </script>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

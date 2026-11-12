@@ -1,0 +1,7 @@
+{# Errors always show; confirmations such as "Task added." can be turned off in Customize. #}
+{% if message and (is_error or message_always or show_confirmations(request)) %}
+<div class="alert {{ 'alert-error' if is_error else 'alert-success' }} feedback" role="{{ 'alert' if is_error else 'status' }}">
+    <span>{{ message }}</span>
+    <button type="button" class="btn btn-ghost btn-sm" data-command="dismiss-feedback" aria-label="Dismiss message">×</button>
+</div>
+{% endif %}

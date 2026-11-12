@@ -1,0 +1,33 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set action = prototype_url ~ ('/bills/' ~ bill.id ~ '/edit' if bill else '/bills/new') ~ query %}
+{% set has_color = bill and bill.color and bill.color != '#000000' %}
+<div id="daisy-workspace" data-scope="bill-edit:{{ bill.id if bill else 'new' }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <header class="page-heading editor-heading">
+        <div class="page-title"><h1>{{ 'Edit bill' if bill else 'New bill' }}</h1>{% if bill %}<span class="editor-item-title">{{ bill.name }}</span>{% endif %}</div>
+        <div class="detail-actions">
+            <span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
+            <button id="bill-save" type="submit" form="bill-form" class="btn btn-primary">{{ icon('check', 16) }} {{ 'Save changes' if bill else 'Create bill' }}</button>
+            <a class="btn" href="{{ prototype_url }}/bills{{ '/' ~ bill.id if bill else '' }}">Cancel</a>
+            {% if bill %}<form action="{{ prototype_url }}/bills/{{ bill.id }}/delete{{ query }}" method="post" hx-post="{{ prototype_url }}/bills/{{ bill.id }}/delete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete {{ bill.name }} with all its payments, invoices and adjustments? This cannot be undone. Deactivate it instead to keep the history."><button class="btn delete-button">{{ icon('trash', 15) }} Delete</button></form>{% endif %}
+        </div>
+    </header>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    <form id="bill-form" data-draft action="{{ action }}" method="post" hx-post="{{ action }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="#bill-save" class="editor-form section-panel bill-editor">
+        <label class="editor-field" for="bill-name"><span>Name</span><input id="bill-name" class="input input-sm" name="name" value="{{ bill.name if bill else '' }}" required maxlength="255" autocomplete="off"></label>
+        <label class="editor-field" for="bill-payee"><span>Payee</span><input id="bill-payee" class="input input-sm" name="payee" value="{{ bill.payee or '' if bill else '' }}" placeholder="Optional"></label>
+        <div class="editor-field"><span>{{ 'Forecast amount' if bill and bill.ledger_enabled else 'Expected amount' }}</span><div class="inline-fields"><input class="input input-sm amount-input" name="expected_amount" inputmode="decimal" value="{{ '%.2f'|format(bill.expected_amount) if bill and bill.expected_amount is not none else '' }}" placeholder="e.g. 180.00" aria-label="Expected amount"><select class="select select-sm" name="currency" aria-label="Currency">{% for code, label in currencies.items() %}<option value="{{ code }}" {% if (bill.currency if bill else 'AUD') == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div><small>Leave blank if unknown. Up to two decimal places.</small></div>
+        <label class="editor-field" for="bill-strategy"><span>Amount</span><select id="bill-strategy" class="select select-sm" name="amount_strategy">{% for value, label in strategies.items() %}<option value="{{ value }}" {% if (bill.amount_strategy if bill else 'fixed') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label class="editor-field" for="bill-due"><span>Next due date</span><input id="bill-due" class="input input-sm" type="date" name="next_due_date" value="{{ bill.next_due_date_iso if bill else '' }}"></label>
+        <div class="editor-field bill-frequency"><span>Repeats</span><div class="inline-fields"><select class="select select-sm" name="frequency" aria-label="Frequency" data-bill-frequency>{% for value, label in frequencies.items() %}<option value="{{ value }}" {% if (bill.frequency if bill else 'monthly') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><label class="repeat-builder custom-days">N = <input class="input input-sm interval-input" type="number" name="frequency_days" min="1" value="{{ bill.frequency_days or '' if bill else '' }}" aria-label="Days between bills"></label><label class="repeat-builder">anchor day <input class="input input-sm interval-input" type="number" name="anchor_day" min="1" max="31" value="{{ bill.anchor_day or '' if bill else '' }}" placeholder="auto" aria-label="Anchor day of month"></label></div><small>The anchor day keeps monthly bills on the same day, such as the 31st.</small></div>
+        <label class="editor-field" for="bill-category"><span>Category</span><input id="bill-category" class="input input-sm" name="category" value="{{ bill.category or '' if bill else '' }}" placeholder="e.g. Utilities"></label>
+        <div class="editor-field"><span>Display</span><div class="option-row"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" data-colour-toggle {% if has_color %}checked{% endif %}> Custom colour</label><input class="colour-input" type="color" value="{{ bill.color if has_color else '#3b82f6' }}" aria-label="Bill colour" data-colour-picker><input type="hidden" name="color" value="{{ bill.color if has_color else '' }}" data-colour-value></div></div>
+        <div class="editor-field editor-wide"><span>Options</span><div class="option-row">
+            <label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="is_auto_pay" value="true" {% if bill and bill.is_auto_pay %}checked{% endif %}> Auto-pay</label>
+            <label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="is_due_date_confirmed" value="true" {% if bill and bill.is_due_date_confirmed %}checked{% endif %}> The bill has arrived (due date confirmed)</label>
+            {% if bill and bill.ledger_enabled %}<input type="hidden" name="ledger_enabled" value="true"><span class="item-context">Invoices, payments and credit are tracked; that history is kept.</span>
+            {% else %}<label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="ledger_enabled" value="true"> Track invoices, payments and account credit</label>{% endif %}
+        </div></div>
+        <label class="editor-field editor-wide" for="bill-note"><span>Note</span><textarea id="bill-note" class="textarea textarea-sm" name="note" rows="2">{{ bill.note or '' if bill else '' }}</textarea></label>
+    </form>
+    {% if bill %}<p class="page-hint">To stop tracking this bill without losing its history, use Deactivate in the dashboard's ⋯ menu.</p>{% endif %}
+</div>

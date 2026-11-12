@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>🥫 Pantry - All Ingredients</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <style>
+        /* Minimalist Pantry */
+        .pantry-header {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--input-border);
+            margin-bottom: 20px;
+        }
+
+        .summary-bar {
+            display: flex;
+            gap: 16px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--input-border);
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            font-size: 0.95rem;
+        }
+
+        .summary-item {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .summary-number {
+            font-weight: 700;
+        }
+
+        .section-header {
+            margin-top: 40px;
+            border-bottom: 1px solid var(--input-border);
+            padding-bottom: 8px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .pantry-item {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--input-border);
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+        }
+
+        .item-title {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text-color);
+            word-wrap: break-word;
+        }
+
+        .item-meta {
+            font-size: 0.85rem;
+            color: var(--dates-color);
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .item-sub-list {
+            margin: 8px 0;
+            padding-left: 10px;
+            border-left: 2px solid var(--input-border);
+        }
+
+        .sub-item {
+            padding: 4px 0;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Status colors */
+        .status-ran-out {
+            color: #ef4444;
+            font-weight: 500;
+        }
+
+        .status-likely-low {
+            color: #f59e0b;
+        }
+
+        .status-new {
+            color: #6366f1;
+        }
+
+        .status-in-stock {
+            color: #10b981;
+        }
+
+        /* Buttons and Inputs */
+        button {
+            background: transparent;
+            border: 1px solid var(--input-border);
+            color: var(--text-color);
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: var(--button-bg);
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .btn-buy {
+            color: #10b981;
+            border-color: #10b981;
+        }
+
+        .btn-buy:hover {
+            background: #ecfdf5;
+        }
+
+        .btn-warn {
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+
+        .btn-warn:hover {
+            background: #fef2f2;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .btn-buy:hover {
+                background: rgba(16, 185, 129, 0.1);
+            }
+
+            .btn-warn:hover {
+                background: rgba(239, 68, 68, 0.1);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div style="margin-bottom: 10px;">
+        <a href="{{ request.scope.root_path }}/classic" class="nav-icon" title="{{ t('title_home') }}">🏠</a>
+    </div>
+
+    <div class="pantry-header">
+        <div class="row">
+            <h1 style="margin-bottom: 0;">🥫 {{ t('header_pantry') }}</h1>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <a href="{{ request.scope.root_path }}/shopping_list" style="text-decoration: none; margin-right: 15px;">🛒 {{ t('header_shopping_list')
+                }}</a>
+            <a href="{{ request.scope.root_path }}/classic" style="text-decoration: none;">🏠 Home</a>
+        </div>
+
+        {% if grouped_ingredients %}
+        <h2 class="section-header" style="margin-top: 10px;">{{ t('header_grouped') }}</h2>
+        {% endif %}
+
+        {% set total_ingredients = ungrouped_todos|length + grouped_ingredients|length %}
+        {% set grouped_count = grouped_ingredients|length %}
+        {% set ungrouped_count = ungrouped_todos|length %}
+        {% set suggestion_count = suggestions|length %}
+
+        <div class="summary-bar">
+            <div class="summary-item">
+                <span class="summary-number">{{ total_ingredients }}</span> Total
+            </div>
+            {% if grouped_count > 0 %}
+            <div class="summary-item">
+                <span class="summary-number">{{ grouped_count }}</span> Linked
+            </div>
+            {% endif %}
+            {% if ungrouped_count > 0 %}
+            <div class="summary-item">
+                <span class="summary-number">{{ ungrouped_count }}</span> Individual
+            </div>
+            {% endif %}
+            {% if suggestion_count > 0 %}
+            <div class="summary-item" style="color: #f59e0b;">
+                <span class="summary-number">💡 {{ suggestion_count }}</span> Suggested
+            </div>
+            {% endif %}
+        </div>
+
+        {% if recipe_lists|length == 0 %}
+        <div class="empty-state">
+            <h2>No Recipe Lists Yet</h2>
+            <p>Enable Recipe Mode on a list to start tracking ingredients.</p>
+            <p><a href="{{ request.scope.root_path }}/classic">Go to your lists →</a></p>
+        </div>
+        {% else %}
+
+        <!-- Suggestions Section -->
+        {% if suggestions %}
+        <h2 class="section-header">💡 {{ t('label_matches') }}</h2>
+        <p style="color: var(--dates-color); margin-bottom: 12px; font-size: 0.9em;">
+            These ingredients have similar names.
+        </p>
+
+        {% for suggestion in suggestions %}
+        {% set suggestion_idx = loop.index %}
+        <div class="pantry-item" id="suggestion-{{ suggestion_idx }}">
+            <div class="item-header">
+                <div class="item-title">{{ suggestion.todos[0].title }} ({{ suggestion.todos|length }})</div>
+            </div>
+            <div class="item-meta">
+                {{ t('label_found_in') }}: {{ suggestion.recipes|join(', ') }}
+            </div>
+
+            <div class="item-sub-list">
+                {% for todo in suggestion.todos %}
+                <div class="sub-item">
+                    <input type="checkbox" class="suggestion-checkbox-{{ suggestion_idx }}" data-todo-id="{{ todo.id }}"
+                        checked>
+                    <span>{{ todo.title }}</span>
+                    <a href="{{ request.scope.root_path }}/list/{{ todo.list.id }}" style="color: var(--dates-color); text-decoration: none;"
+                        title="{{ t('tip_view_recipe') }}">📝 {{ todo.list.name }}</a>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="item-actions">
+                <input type="text" class="suggestion-name-{{ suggestion_idx }}" value="{{ suggestion.todos[0].title }}"
+                    placeholder="Ingredient name" style="width: 200px;">
+                <button onclick="linkSuggestion({{ suggestion_idx }})" style="border-color: #10b981; color: #10b981;">
+                    {{ t('btn_link_selected') }}
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Linked Groups Section -->
+        {% if grouped_ingredients %}
+        <h2 class="section-header">🔗 {{ t('header_linked_groups') }}</h2>
+
+        {% for item in grouped_ingredients %}
+        <div class="pantry-item" id="group-{{ item.group.id }}">
+            <div class="item-header">
+                <div class="item-title" id="group-name-{{ item.group.id }}">{{ item.group.canonical_name }}</div>
+                <div>
+                    {% if item.stats.last_event_type == 'ran_out' %}
+                    <span class="status-ran-out">🚨 {{ t('status_ran_out') }}</span>
+                    {% elif not item.stats.days_since_bought and not item.stats.total_bought %}
+                    <span class="status-new">🆕 {{ t('status_new') }}</span>
+                    {% elif item.stats.likely_to_run_out %}
+                    <span class="status-likely-low">⚠️ {{ t('status_likely_low') }}</span>
+                    {% else %}
+                    <span class="status-in-stock">✅ {{ t('status_stocked') }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="item-meta">
+                <div>{{ t('label_used_in') }}: {{ item.recipes|join(', ') }}</div>
+                <div style="margin-top: 4px;">
+                    {% if item.stats.days_since_bought is not none %}
+                    📅 {{ item.stats.days_since_bought }} {{ t('text_days_ago') }}
+                    {% else %}
+                    📅 {{ t('text_never') }}
+                    {% endif %}
+                    • <a href="{{ request.scope.root_path }}/ingredient/{{ item.todos[0].id }}/history"
+                        style="color: #2563eb; text-decoration: none;">📜 {{ t('btn_history') }}</a>
+                    {% if item.stats.average_cycle %}
+                    • 🔄 ~{{ item.stats.average_cycle }} {{ t('text_day_cycle') }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="item-sub-list">
+                {% for todo in item.todos %}
+                <div class="sub-item">
+                    <span>{{ todo.title }}</span>
+                    <a href="{{ request.scope.root_path }}/list/{{ todo.list.id }}" style="color: var(--dates-color); text-decoration: none;"
+                        title="{{ t('tip_view_recipe') }}">📝 {{ todo.list.name }}</a>
+                    <button onclick="unlinkIngredient({{ todo.id }})"
+                        style="border: none; color: #ef4444; padding: 0 4px;"
+                        title="{{ t('tip_remove_from_group') }}">✕</button>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="item-actions">
+                <input type="number" class="quantity-input" id="group-qty-{{ item.group.id }}" value="1" min="1"
+                    title="{{ t('tip_quantity') }}" style="width: 50px;">
+                <button onclick="buyGroup({{ item.group.id }})" class="btn-buy" title="{{ t('tip_mark_bought') }}">
+                    {{ t('btn_bought') }}
+                </button>
+                <button onclick="ranOutGroup({{ item.group.id }})" class="btn-warn" title="{{ t('tip_mark_ran_out') }}">
+                    {{ t('btn_ran_out') }}
+                </button>
+                <button onclick="renameGroup({{ item.group.id }})" title="{{ t('tip_rename_group') }}">
+                    ✏️ {{ t('btn_rename') }}
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Ungrouped Items Section -->
+        {% if ungrouped_todos %}
+        <h2 class="section-header">{{ t('header_ungrouped') }}</h2>
+
+        <div>
+            {% for todo in ungrouped_todos %}
+            {% set stats = get_ingredient_stats(todo, now) %}
+            <div class="pantry-item" id="ungrouped-{{ todo.id }}">
+                <div class="item-header">
+                    <div class="item-title">{{ todo.title }}</div>
+                    <div>
+                        {% if stats.last_event_type == 'ran_out' %}
+                        <span class="status-ran-out">🚨 {{ t('status_ran_out') }}</span>
+                        {% elif stats.days_since_bought is none and stats.total_bought == 0 %}
+                        <span class="status-new">🆕 {{ t('status_new') }}</span>
+                        {% elif stats.likely_to_run_out %}
+                        <span class="status-likely-low">⚠️ {{ t('status_likely_low') }}</span>
+                        {% else %}
+                        <span class="status-in-stock">✅ {{ t('status_stocked') }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="item-meta">
+                    {% if stats.days_since_bought is not none %}
+                    📅 {{ stats.days_since_bought }} {{ t('text_days_ago') }}
+                    {% else %}
+                    📅 {{ t('text_never') }}
+                    {% endif %}
+                    • <a href="{{ request.scope.root_path }}/ingredient/{{ todo.id }}/history" style="color: #2563eb; text-decoration: none;">📜 {{
+                        t('btn_history') }}</a>
+                    <div style="margin-top: 4px;">
+                        <a href="{{ request.scope.root_path }}/list/{{ todo.list.id }}" style="color: var(--dates-color); text-decoration: none;"
+                            title="{{ t('tip_view_recipe') }}">📝 {{ todo.list.name }}</a>
+                    </div>
+                </div>
+
+                <div class="item-actions">
+                    <button onclick="buyTodo({{ todo.id }})" class="btn-buy"
+                        title="{{ t('tip_mark_bought') }}">🛒</button>
+                    <button onclick="ranOutTodo({{ todo.id }})" class="btn-warn"
+                        title="{{ t('tip_mark_ran_out') }}">⚠️</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% endif %}
+
+        <script>
+            async function linkSuggestion(suggestionIndex) {
+                const checkboxes = document.querySelectorAll(`.suggestion-checkbox-${suggestionIndex}:checked`);
+                const todoIds = Array.from(checkboxes).map(cb => parseInt(cb.dataset.todoId, 10));
+
+                if (todoIds.length < 2) {
+                    alert('Select at least 2 items to link');
+                    return;
+                }
+
+                const nameInput = document.querySelector(`.suggestion-name-${suggestionIndex}`);
+                const canonicalName = nameInput ? nameInput.value.trim() : '';
+
+                if (!canonicalName) {
+                    alert('Please enter a name for this ingredient');
+                    return;
+                }
+
+                try {
+                    const response = await SimpleTodo.fetch('/api/ingredient/create_group', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            canonical_name: canonicalName,
+                            todo_ids: todoIds
+                        })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const data = await response.json();
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to link ingredients');
+                }
+            }
+
+            async function unlinkIngredient(todoId) {
+                if (!confirm('Remove this item from the group?')) {
+                    return;
+                }
+
+                try {
+                    const response = await SimpleTodo.fetch('/api/ingredient/unlink', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ todo_id: todoId })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const data = await response.json();
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to unlink ingredient');
+                }
+            }
+
+            async function buyGroup(groupId) {
+                const quantity = parseInt(document.getElementById('group-qty-' + groupId).value) || 1;
+
+                try {
+                    const response = await SimpleTodo.fetch(`/api/ingredient/buy_group/${groupId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ quantity: quantity })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const data = await response.json();
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to record purchase');
+                }
+            }
+
+            async function ranOutGroup(groupId) {
+                const quantity = parseInt(document.getElementById('group-qty-' + groupId).value) || 1;
+
+                try {
+                    const response = await SimpleTodo.fetch(`/api/ingredient/ran_out_group/${groupId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ quantity: quantity })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const data = await response.json();
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to record event');
+                }
+            }
+
+            async function renameGroup(groupId) {
+                const currentName = document.getElementById('group-name-' + groupId).textContent;
+                const newName = prompt('Enter new name:', currentName);
+
+                if (!newName || newName === currentName) {
+                    return;
+                }
+
+                try {
+                    const response = await SimpleTodo.fetch('/api/ingredient/rename_group', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            group_id: groupId,
+                            canonical_name: newName
+                        })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to rename group');
+                }
+            }
+
+            async function buyTodo(todoId) {
+                try {
+                    const response = await SimpleTodo.fetch(`/api/todo/${todoId}/ingredient_event`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ event_type: 'bought', quantity: 1 })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const data = await response.json();
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to record purchase');
+                }
+            }
+
+            async function ranOutTodo(todoId) {
+                try {
+                    const response = await SimpleTodo.fetch(`/api/todo/${todoId}/ingredient_event`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ event_type: 'ran_out', quantity: 1 })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const data = await response.json();
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to record event');
+                }
+            }
+
+        </script>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

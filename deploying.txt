@@ -1,0 +1,75 @@
+# Deploying on Debian 13 behind Caddy
+
+Python 3.11 or newer is required. Runtime dependencies are in requirements.txt;
+development and test tools are in requirements-dev.txt. Dependency ranges allow
+patch updates for FastAPI, Uvicorn and SQLAlchemy, and updates within the current
+major version for Starlette, Pydantic, Jinja2, python-dateutil and pytest.
+Passlib stays on its tested authentication release.
+
+To update a local development environment within those ranges:
+
+.venv/bin/python -m pip install --upgrade -r requirements.txt -r requirements-dev.txt
+.venv/bin/python -m playwright install chromium
+.venv/bin/python -m pip check
+
+For external per-user databases and all persistent server settings, see
+docs/STORAGE.md. Use `sudo ./deploy.py --no-restart /opt/simple_todo /var/lib/simple_todo`
+to generate a service that keeps state outside the deployment directory.
+Existing deployment data must be migrated before starting that service.
+
+The backend binds to 127.0.0.1 on plain HTTP port 3102. Caddy handles public HTTPS.
+For the public URL https://example.com/simple_todo/, configure /opt/simple_todo/.env:
+
+SIMPLE_TODO_HOST=127.0.0.1
+SIMPLE_TODO_PORT=3102
+SIMPLE_TODO_ROOT_PATH=/simple_todo
+
+For an installation at https://example.com/, set SIMPLE_TODO_ROOT_PATH= (empty).
+The prefix has no trailing slash. Backend routes remain /, /api/..., /static/..., etc.
+SIMPLE_TODO_HTTPS and SIMPLE_TODO_TLS_* are no longer used by the launchers.
+
+Merge Caddyfile.example into the site's existing Caddy block, using your DNS name.
+Caddy handle_path strips /simple_todo before proxying to 127.0.0.1:3102:
+https://caddyserver.com/docs/caddyfile/directives/handle_path
+
+Uvicorn trusts forwarded headers from loopback by default. If Caddy is on another
+host, set FORWARDED_ALLOW_IPS in the backend .env to Caddy's IP address so HTTPS
+redirects and secure login cookies reflect the browser-facing scheme.
+
+Deploy and install the generated service for the first time or when changing its configuration:
+
+git pull
+sudo ./deploy.py --no-restart
+sudo install -m 644 /opt/simple_todo/simple_todo.service /etc/systemd/system/simple_todo.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now simple_todo
+sudo systemctl restart simple_todo
+
+For routine updates, run `git pull` followed by `sudo ./deploy.py` (or `./update.sh`).
+deploy.py automatically detects Python 3.15 if installed (e.g. in /usr/local/bin/python3.15
+or ~/.local/bin/python3.15) and falls back to the system Python. You can also specify an
+explicit interpreter using `--python /path/to/python3.15` or the `PYTHON` environment
+variable. If the target Python version differs from the existing .venv (or if `--clear-venv`
+is passed), deploy.py automatically recreates the virtual environment with `--clear`.
+
+Package dependencies are installed with `uv` by default for fast installation if `uv` is
+found in PATH or standard system/user locations (/usr/local/bin/uv, ~/.local/bin/uv).
+An explicit path can be specified via `--uv /path/to/uv` or the `UV` environment variable,
+or `--no-uv` can be passed to use traditional `pip`.
+
+deploy.py restarts the installed service after files, dependencies and permissions
+are updated successfully. A restart failure makes deployment exit with an error.
+Use --no-restart when preparing files before installing a unit or migrating data.
+
+When Python 3.15 is installed in a user's home directory (e.g. ~deploy/.local), ensure the
+invoking user's home directory and .local tree have search/read permissions for `www-data`
+(chmod a+rx ~deploy). Alternatively, install Python 3.15 system-wide using `make altinstall`
+into /usr/local/bin/python3.15.
+
+deploy.py preserves existing keys in /opt/simple_todo/.env. Update existing PORT
+and ROOT_PATH values there when migrating; redeploying does not replace them.
+If using another deployment directory, replace /opt/simple_todo in these commands.
+
+For local development, ./run_dev.sh loads the local .env. The local .env is not
+tracked by git; .env.example documents the settings. To run directly without the
+shell script, export the settings before running .venv/bin/python main.py.

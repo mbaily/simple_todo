@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Customization</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h2>Customization</h2>
+
+    {% if request.query_params.get("saved") %}
+    <div style="color: green; margin-bottom: 20px;">
+        Settings saved successfully!
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get("import_success") %}
+    <div style="color: green; margin-bottom: 20px;">
+        Import successful! Created: {{ request.query_params.get("created") }}, Updated: {{
+        request.query_params.get("updated") }}
+    </div>
+    {% endif %}
+    {% if request.query_params.get("import_error") %}
+    <div style="color: red; margin-bottom: 20px;">
+        Import Error: {{ request.query_params.get("import_error") }}
+    </div>
+    {% endif %}
+
+    <form action="{{ request.scope.root_path }}/customization" method="post">
+        <h3>Global Filters</h3>
+        <p class="dates">These filters apply to the Home page and all List views.</p>
+
+        <label for="inc_hashtags" style="display:block; margin-bottom:5px;">Include Hashtags (Whitelist)</label>
+        <input type="text" id="inc_hashtags" name="filter_inc_hashtags" value="{{ settings.filter_inc_hashtags or '' }}"
+            placeholder="e.g. work, important" style="margin-bottom: 15px;">
+        <p class="dates" style="margin-top:-10px; margin-bottom:15px;">Only show items containing these hashtags.</p>
+
+        <label for="exc_hashtags" style="display:block; margin-bottom:5px;">Exclude Hashtags (Blacklist)</label>
+        <input type="text" id="exc_hashtags" name="filter_exc_hashtags" value="{{ settings.filter_exc_hashtags or '' }}"
+            placeholder="e.g. archived, someday" style="margin-bottom: 15px;">
+        <p class="dates" style="margin-top:-10px; margin-bottom:15px;">Hide items containing these hashtags.</p>
+
+        <button type="submit">Save Changes</button>
+    </form>
+    <hr>
+    <h3>Data Management</h3>
+    <a href="{{ request.scope.root_path }}/api/export" class="button" download style="margin-right: 20px;">Export Data (JSON)</a>
+
+    <h4 style="margin-top: 20px;">Import Data</h4>
+    <p class="dates">Upload a modified JSON export to update your data. Existing IDs will be updated; new IDs (or
+        missing IDs) will be inserted. If any record fails, the entire import is rolled back and the error identifies what to correct.</p>
+    <p class="dates">Existing tags and filter selections are preserved when omitted from the file. An empty list clears the corresponding selection.</p>
+    <form action="{{ request.scope.root_path }}/api/import" method="post" enctype="multipart/form-data"
+        style="border: 1px solid #ccc; padding: 10px; border-radius: 4px;">
+        <input type="file" name="file" accept=".json" required>
+        <p><label><input type="checkbox" name="restore_history" value="true"> Restore historical refunds from a full backup</label></p>
+        <p class="dates">Use only when restoring Export Data backups. Preserves historical refunds even if later corrections removed their funding. Ordinary imports check available credit for new or changed refunds.</p>
+        <button type="submit">Import Changes</button>
+    </form>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

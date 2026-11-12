@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Categories</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14px;
+            margin: 10px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        a {
+            color: #6cb6ff;
+        }
+
+        a:visited {
+            color: #a88bfa;
+        }
+
+        input[type="text"] {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14px;
+            padding: 2px 4px;
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+            border: 1px solid #555;
+        }
+
+        button {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14px;
+            background-color: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 2px 8px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #444;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid #444;
+        }
+    </style>
+</head>
+
+<body>
+    <a href="{{ request.scope.root_path }}/classic">Home</a> | <a href="{{ request.scope.root_path }}/categories">Categories</a>
+    <hr>
+
+    <h2>Categories</h2>
+
+    <form action="{{ request.scope.root_path }}/categories/create" method="post" style="margin-bottom: 15px;">
+        <input type="text" name="name" placeholder="New category" required size="25">
+        <button type="submit">Add</button>
+    </form>
+
+    {% if categories %}
+    <ul style="list-style: none; padding-left: 0; margin: 0;">
+        {% for cat in categories %}
+        <li style="margin-bottom: 4px;">
+            {{ cat.name }} ({{ cat.list_count }})
+            <a href="javascript:void(0)" onclick="renameCategory('{{ cat.name }}')">Rn</a>
+            <a href="javascript:void(0)" onclick="deleteCategory('{{ cat.name }}')" style="color: #ff6b6b;">D</a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No categories.</p>
+    {% endif %}
+
+    <hr>
+    <p><small>Deleting a category removes it from all lists.</small></p>
+
+    <!-- Hidden forms for rename and delete -->
+    <form id="rename-form" action="{{ request.scope.root_path }}/categories/rename" method="post" style="display:none;">
+        <input type="hidden" name="old_name" id="rename-old-name">
+        <input type="hidden" name="new_name" id="rename-new-name">
+    </form>
+    <form id="delete-form" action="{{ request.scope.root_path }}/categories/delete" method="post" style="display:none;">
+        <input type="hidden" name="name" id="delete-name">
+    </form>
+
+    <script>
+        function renameCategory(oldName) {
+            var newName = prompt('Rename "' + oldName + '" to:', oldName);
+            if (newName && newName.trim() && newName !== oldName) {
+                document.getElementById('rename-old-name').value = oldName;
+                document.getElementById('rename-new-name').value = newName.trim();
+                document.getElementById('rename-form').submit();
+            }
+        }
+
+        function deleteCategory(name) {
+            if (confirm('Delete "' + name + '"?')) {
+                document.getElementById('delete-name').value = name;
+                document.getElementById('delete-form').submit();
+            }
+        }
+    </script>
+
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

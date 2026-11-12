@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>#{{ hashtag.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <style>
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+
+<body>
+    {% from "macros.html" import render_links, nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h1>#{{ hashtag.name }}</h1>
+    <p>
+        <label>
+            <input type="checkbox" {% if hashtag.show_completed %}checked{% endif %}
+                onchange="toggleHashtagShowCompleted(this, {{ hashtag.id }})">
+            Show completed items
+        </label>
+    </p>
+
+    {% if calendar_events %}
+    <h3>Calendar Events</h3>
+    {% for ev in calendar_events %}
+    <div>
+        <span class="dates">{{ ev.display_start_at | date_format }}</span>
+        {% if ev.rrule %}
+        {{ ev.title }} <span class="dates">(recurring)</span>
+        {% else %}
+        <span class="calendar-title-nonrecurring">{{ ev.title }}</span>
+        {% endif %}
+        {% if ev.note %}<span class="dates">- {{ ev.note }}</span>{% endif %}
+        {% for h in ev.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+        {% endfor %}
+        <a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit" class="note-icon" title="Edit event">📝</a>
+    </div>
+    {% endfor %}
+    <br>
+    {% endif %}
+
+    <h3>Lists</h3>
+    {% if lists %}
+    {% for list in lists %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="list" data-id="{{ list.id }}"
+            data-created="{{ list.created_at_formatted }}" data-modified="{{ list.modified_at_formatted }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="list" data-id="{{ list.id }}" {% if list.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        <a href="{{ request.scope.root_path }}/list/{{ list.id }}">{{ list.name }}</a>
+        {{ render_links(list.links, "inherit") }}
+        {% for h in list.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+        {% endfor %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>No lists with this hashtag.</p>
+    {% endif %}
+
+    <h3>Todos</h3>
+
+    {% from "macros.html" import render_tree_node with context %}
+
+    {% if todo_tree and (todo_tree.lists or todo_tree.folder_nodes) %}
+    {{ render_tree_node(todo_tree) }}
+    {% else %}
+    <p>No todos with this hashtag.</p>
+    {% endif %}
+
+    {% if lists or (todo_tree and (todo_tree.lists or todo_tree.folder_nodes)) %}
+    <h3>Operations</h3>
+    <p><span id="selection-count">0 selected</span> | <button type="button" onclick="selectAll()">Select All</button>
+        <button type="button" onclick="selectNone()">Select None</button>
+    </p>
+    <p id="selected-dates" class="dates" style="display:none;"></p>
+    <p>
+        Todos: <button type="button" onclick="bulkPin('todo')">Pin</button>
+        <button type="button" onclick="bulkUnpin('todo')">Unpin</button>
+        <button type="button" onclick="bulkEdit('todo')">Edit</button>
+        <button type="button" onclick="bulkDelete('todo')">Delete</button>
+    </p>
+    <p>
+        Lists: <button type="button" onclick="bulkEdit('list')">Edit</button>
+        <button type="button" onclick="bulkDelete('list')">Delete</button>
+    </p>
+    {% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

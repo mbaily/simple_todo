@@ -1,0 +1,53 @@
+<div class="dates cal-week-navigation" aria-label="Week navigation">
+    <a href="{{ request.scope.root_path }}/classic/calendar?week={{ prev_week_str }}" aria-label="Previous week">⬅️</a>
+    <span>{{ week_start | date_format }} → {{ week_end | date_format }}</span>
+    <a href="{{ request.scope.root_path }}/classic/calendar?week={{ next_week_str }}" aria-label="Next week">➡️</a>
+    <a href="{{ request.scope.root_path }}/classic/calendar">Today</a>
+</div>
+<div class="cal-week-toolbar">
+    <button type="button" onclick="toggleCreateEventForm()">Add event</button>
+    {% include "_calendar_views.html" %}
+    {% include "_calendar_sort.html" %}
+    <form action="{{ request.scope.root_path }}/calendar/set-filter" method="post">
+        <input type="hidden" name="week" value="{{ current_week_str }}">
+        <label>Events:
+            <select name="calendar_event_filter" onchange="this.form.submit()">
+                <option value="all" {% if calendar_event_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="non_recurring" {% if calendar_event_filter == 'non_recurring' %}selected{% endif %}>Non-recurring only</option>
+                <option value="recurring" {% if calendar_event_filter == 'recurring' %}selected{% endif %}>Recurring only</option>
+                {% for group in event_groups %}<option value="group:{{ group.id }}" {% if calendar_event_filter == 'group:' ~ group.id %}selected{% endif %}>{{ group.name }}</option>{% endfor %}
+            </select>
+        </label>
+    </form>
+    <a href="{{ request.scope.root_path }}/calendar/groups">Event groups</a>
+</div>
+{% include "_calendar_create_form.html" %}
+<p class="dates">Select a time slot to add an event. Duration is optional.</p>
+<div class="cal-week-scroll" tabindex="0" role="region" aria-label="Weekly calendar, 1-hour time slots">
+    <div class="cal-week-grid">
+        <div class="cal-week-heading">Time</div>
+        {% for day in week_days %}
+        <div class="cal-week-heading{% if day.date == today_local %} cal-week-today{% endif %}"{% if day.date == today_local %} aria-current="date"{% endif %}>
+            {{ day.date.strftime('%a') }}<br>{{ day.date.strftime('%d %b') }}
+        </div>
+        {% endfor %}
+        <div class="cal-week-all-day-label">All-day</div>
+        {% for day in week_days %}
+        <div class="cal-week-all-day{% if day.date == today_local %} cal-week-today{% endif %}" data-date="{{ day.date.strftime('%Y-%m-%d') }}">
+            {% for row in day.all_day %}{% set timed = False %}{% include "_calendar_week_event.html" %}{% endfor %}
+            <button type="button" class="cal-week-add-all-day" data-date="{{ day.date.strftime('%Y-%m-%d') }}" onclick="addWeekEvent(this)" aria-label="Add all-day event on {{ day.date.strftime('%Y-%m-%d') }}">+</button>
+        </div>
+        {% endfor %}
+        <div class="cal-week-time-labels" aria-hidden="true">
+            {% for label in slots %}<div>{{ label }}</div>{% endfor %}
+        </div>
+        {% for day in week_days %}
+        <div class="cal-week-day{% if day.date == today_local %} cal-week-today{% endif %}" data-date="{{ day.date.strftime('%Y-%m-%d') }}">
+            {% for label in slots %}
+            <button type="button" class="cal-week-slot" data-date="{{ day.date.strftime('%Y-%m-%d') }}" data-time="{{ label }}" onclick="addWeekEvent(this)" aria-label="Add event on {{ day.date.strftime('%Y-%m-%d') }} at {{ label }}"></button>
+            {% endfor %}
+            {% for row in day.timed %}{% set timed = True %}{% include "_calendar_week_event.html" %}{% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+</div>

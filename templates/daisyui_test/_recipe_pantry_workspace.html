@@ -1,0 +1,47 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% from 'daisyui_test/_recipe_macros.html' import ingredient_row, hx with context %}
+<div id="daisy-workspace" data-scope="recipe:pantry" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Pantry</h1><span class="eyebrow">{{ recipe_lists|length }} {{ 'recipe' if recipe_lists|length == 1 else 'recipes' }} · {{ grouped_ingredients|length }} shared · {{ ungrouped_todos|length }} single</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span></div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    <p class="page-hint">Group the same ingredient across recipes so buying or running out counts for all of them. Recipes: {% for item in recipe_lists %}<a href="{{ prototype_url }}/list/{{ item.id }}/shopping">{{ item.name }}</a>{{ ', ' if not loop.last }}{% else %}none yet — turn on recipe mode in a list's options{% endfor %}.</p>
+
+    {% if suggestions %}
+    <section class="section-panel" aria-labelledby="suggestions-heading">
+        <header class="section-heading"><div><h2 id="suggestions-heading">{{ icon('info', 17) }} Possible matches <span class="section-count">{{ suggestions|length }}</span></h2><p>These look like the same ingredient in different recipes.</p></div></header>
+        <ul class="list">{% for s in suggestions %}
+            <li class="list-row bill-row"><div class="bill-main"><div class="item-title-line">{% for todo in s.todos %}<span class="badge badge-sm badge-outline">{{ todo.title }} · {{ todo.list.name }}</span>{% endfor %}</div></div>
+                <form class="inline-fields group-suggest" {{ hx('group-create') }}><input type="hidden" name="back" value="pantry">{% for todo in s.todos %}<input type="hidden" name="todo_ids" value="{{ todo.id }}">{% endfor %}<input class="input input-sm" name="canonical_name" value="{{ s.todos[0].title }}" maxlength="255" required aria-label="Name for {{ s.todos[0].title }} group"><button class="btn btn-primary btn-sm">Group {{ s.todos|length }}</button></form></li>
+        {% endfor %}</ul>
+    </section>
+    {% endif %}
+
+    <section class="section-panel" aria-labelledby="groups-heading">
+        <header class="section-heading"><div><h2 id="groups-heading">{{ icon('layers', 17) }} Shared ingredients <span class="section-count">{{ grouped_ingredients|length }}</span></h2></div></header>
+        {% if grouped_ingredients %}<ul class="list">{% for g in grouped_ingredients %}
+            <li class="list-row bill-row" id="group-{{ g.group.id }}">
+                <div class="bill-main"><div class="item-title-line"><span class="item-title">{{ g.group.canonical_name }}</span>{% if g.stats.likely_to_run_out %}<span class="badge badge-sm badge-warning">Running low</span>{% endif %}<span class="item-context">in {{ g.recipes|join(', ') }}</span></div>
+                    <div class="item-context">{{ g.stats|ingredient_stats }}</div>
+                    <div class="item-tags">{% for todo in g.todos %}<form class="member-chip" {{ hx('group-unlink') }} hx-confirm="Remove {{ todo.title }} ({{ todo.list.name }}) from {{ g.group.canonical_name }}?"><input type="hidden" name="back" value="pantry"><input type="hidden" name="todo_id" value="{{ todo.id }}"><span class="badge badge-sm badge-ghost">{{ todo.title }} · {{ todo.list.name }}<button class="chip-remove" aria-label="Remove {{ todo.title }} from {{ g.group.canonical_name }}">×</button></span></form>{% endfor %}</div></div>
+                <div class="row-actions bill-actions">
+                    <form {{ hx('group-bought') }}><input type="hidden" name="back" value="pantry"><input type="hidden" name="group_id" value="{{ g.group.id }}"><button class="btn btn-sm {{ 'btn-primary' if g.stats.likely_to_run_out else '' }}">Bought</button></form>
+                    <form {{ hx('group-ran-out') }}><input type="hidden" name="back" value="pantry"><input type="hidden" name="group_id" value="{{ g.group.id }}"><button class="btn btn-ghost btn-sm">Ran out</button></form>
+                    <button type="button" class="btn btn-ghost btn-sm" data-command="bill-panel" data-panel="rename-group-{{ g.group.id }}" aria-expanded="false">Rename</button>
+                    <a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/ingredient/{{ g.todos[0].id }}/history" aria-label="History of {{ g.group.canonical_name }}">{{ icon('clock', 15) }}</a>
+                </div>
+                <div id="rename-group-{{ g.group.id }}" class="bill-panel" hidden><form class="bill-form inline-fields" {{ hx('group-rename') }}><input type="hidden" name="back" value="pantry"><input type="hidden" name="group_id" value="{{ g.group.id }}"><input class="input input-sm grow-input" name="canonical_name" value="{{ g.group.canonical_name }}" required maxlength="255" aria-label="New name for {{ g.group.canonical_name }}"><button class="btn btn-sm">Save</button></form></div>
+            </li>
+        {% endfor %}</ul>{% else %}<p class="section-empty">No shared ingredients yet.</p>{% endif %}
+    </section>
+
+    <section class="section-panel" aria-labelledby="single-heading">
+        <header class="section-heading"><div><h2 id="single-heading">{{ icon('list', 17) }} Single-recipe ingredients <span class="section-count">{{ ungrouped_todos|length }}</span></h2></div></header>
+        {% if ungrouped_todos %}<ul class="list">{% for todo in ungrouped_todos|sort(attribute='title') %}
+            <li class="list-row bill-row"><div class="bill-main"><div class="item-title-line"><span class="item-title">{{ todo.title }}</span><a class="item-context" href="{{ prototype_url }}/list/{{ todo.list_id }}/shopping">{{ todo.list.name }}</a></div></div>
+                <div class="row-actions bill-actions">{% if all_groups %}<form class="inline-fields" {{ hx('group-link') }}><input type="hidden" name="back" value="pantry"><input type="hidden" name="todo_id" value="{{ todo.id }}"><select class="select select-sm" name="group_id" aria-label="Group for {{ todo.title }}">{% for item in all_groups %}<option value="{{ item.id }}">{{ item.canonical_name }}</option>{% endfor %}</select><button class="btn btn-ghost btn-sm">Add to group</button></form>{% endif %}
+                    <a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/ingredient/{{ todo.id }}/history" aria-label="History of {{ todo.title }}">{{ icon('clock', 15) }}</a></div></li>
+        {% endfor %}</ul>{% else %}<p class="section-empty">Every ingredient is shared.</p>{% endif %}
+    </section>
+</div>

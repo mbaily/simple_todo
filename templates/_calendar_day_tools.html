@@ -1,0 +1,12 @@
+<div class="cal-day-toolbar">
+    <button type="button" class="cal-day-number cal-day-date" onclick="openCalendarDay('{{ cell.date }}')" aria-label="Open day {{ cell.date }}">{{ cell.day }}</button>
+    <div class="cal-day-actions">
+        <button type="button" class="cal-day-add" onclick="addCalendarDayEvent('{{ cell.date }}')" aria-label="Add event on {{ cell.date }}" title="Add event">+</button>
+        <button type="button" class="cal-day-open" onclick="openCalendarDay('{{ cell.date }}')" aria-label="Open details for {{ cell.date }}" title="Open day">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" /></svg>
+        </button>
+        <button type="button" class="cal-day-more" onclick="showCalendarDayMenu(this)" aria-label="More actions for {{ cell.date }}" title="More day actions" aria-haspopup="true" aria-controls="calendar-day-menu">⋯</button>
+    </div>
+</div>
+<button type="button" class="cal-day-count" onclick="openCalendarDay('{{ cell.date }}')" aria-label="Open day {{ cell.date }}: {{ cell.events | length }} events · {{ cell.remaining }} remaining" title="{{ cell.events | length }} event{{ '' if cell.events | length == 1 else 's' }} · {{ cell.remaining }} remaining{% if cell.note %} · Day note{% endif %}"><span class="cal-day-count-full">{{ cell.events | length }} event{{ '' if cell.events | length == 1 else 's' }} · {{ cell.remaining }} remaining{% if cell.note %} · 📝{% endif %}</span><span class="cal-day-count-short" aria-hidden="true">{{ cell.events | length }}</span></button>
+<button type="button" class="cal-day-marker" data-count="{{ cell.remaining if cell.hide_completed else cell.events | length }}" onclick="openCalendarDay('{{ cell.date }}')" aria-label="Open day {{ cell.date }}: {{ cell.events | length }} events · {{ cell.remaining }} remaining" title="{{ cell.events | length }} events · {{ cell.remaining }} remaining"><span aria-hidden="true">●</span></button>

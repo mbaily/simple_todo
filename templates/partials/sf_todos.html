@@ -1,0 +1,149 @@
+{% macro render_nested_todo(todo, depth=0) %}
+<div style="display: flex; align-items: baseline;">
+    <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+        data-created="{{ todo.created_at_formatted }}" data-modified="{{ todo.modified_at_formatted }}"
+        onchange="updateSelectionCount()" style="margin-right: 5px; flex-shrink: 0;">
+    <div style="margin-left: {{ depth * 20 }}px; flex-grow: 1;">
+        <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        {% if todo.pinned %}📌{% endif %}
+        <span
+            style="color: {% if todo.color and todo.color|lower not in ['#000000', '#ffffff'] %}{{ todo.color }}{% else %}inherit{% endif %}">{{
+            todo.title }}</span>
+        {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit" title="Edit todo (note)">📝</a>{%
+        endif %}
+        {{ render_links(todo.links) }}
+        {% if todo.dokuwiki_link %}
+        <a href="{{ todo.dokuwiki_link }}" class="dokuwiki-link" target="_blank" title="Open in DokuWiki"
+            style="color: inherit; text-decoration: none;" onclick="trackDokuWikiClick('todo', {{ todo.id }})">{{
+            dokuwiki_icon(todo.dokuwiki_confirmed) }}</a>
+        {% endif %}
+        {% if folder.dokuwiki_links_enabled and todo.dokuwiki_page_enabled and dokuwiki_item_link_fn %}
+        <a href="{{ dokuwiki_item_link_fn('todo', todo.id) }}" target="_blank" title="Open DokuWiki page"
+            style="text-decoration: none;">{{ dokuwiki_page_icon('#3498db') }}</a>
+        {% endif %}
+        {% for hashtag in todo.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+        {% if not folder.group_todos_by_list %}
+        <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}" title="{{ todo.list.name }}" style="text-decoration:none;">📂</a>
+        {% endif %}
+    </div>
+</div>
+{% set children = (todo.children|selectattr('completed', 'false')|list) if folder.uncompleted_only else
+(todo.children|list) %}
+{% for child in children|sort(attribute=todo_sort_attr, reverse=todo_sort_reverse) %}
+{% if not folder.strict_nesting or not matching_ids or child.id in matching_ids %}
+{{ render_nested_todo(child, depth + 1) }}
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+{% if folder.show_todos %}
+<h3 style="margin-bottom:0;margin-top:0;">Todos ({{ todos|length }})
+    {% if folder.group_todos_by_list %}<span
+        style="font-size: 0.7em; font-weight: normal; color: var(--text-muted, #888);">(sorted by todo dates, not list
+        dates)</span>{% endif %}
+</h3>
+
+{% if todos %}
+{% if folder.group_todos_by_list %}
+{% from "macros.html" import render_tree_node with context %}
+{% macro render_smart_folder_item(todo) %}
+{% if folder.nest_subtodos %}
+{{ render_nested_todo(todo, 0) }}
+{% else %}
+{# Render single item using the same HTML structure as render_nested_todo but no children loop #}
+<div style="display: flex; align-items: baseline;">
+    <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+        data-created="{{ todo.created_at_formatted }}" data-modified="{{ todo.modified_at_formatted }}"
+        onchange="updateSelectionCount()" style="margin-right: 5px; flex-shrink: 0;">
+    <div style="margin-left: 0px; flex-grow: 1;">
+        <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        {% if todo.pinned %}📌{% endif %}
+        <span
+            style="color: {% if todo.color and todo.color|lower not in ['#000000', '#ffffff'] %}{{ todo.color }}{% else %}inherit{% endif %}">{{
+            todo.title }}</span>
+        {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit" title="Edit todo (note)">📝</a>{%
+        endif %}
+        {{ render_links(todo.links) }}
+        {% if todo.dokuwiki_link %}
+        <a href="{{ todo.dokuwiki_link }}" class="dokuwiki-link" target="_blank" title="Open in DokuWiki"
+            style="color: inherit; text-decoration: none;" onclick="trackDokuWikiClick('todo', {{ todo.id }})">{{
+            dokuwiki_icon(todo.dokuwiki_confirmed) }}</a>
+        {% endif %}
+        {% if folder.dokuwiki_links_enabled and todo.dokuwiki_page_enabled and dokuwiki_item_link_fn %}
+        <a href="{{ dokuwiki_item_link_fn('todo', todo.id) }}" target="_blank" title="Open DokuWiki page"
+            style="text-decoration: none;">{{ dokuwiki_page_icon('#3498db') }}</a>
+        {% endif %}
+        {% for hashtag in todo.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+        <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}" title="{{ todo.list.name }}" style="text-decoration:none;">📂</a>
+    </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{{ render_tree_node(todo_tree, render_smart_folder_item) }}
+{% else %} {# not folder.group_todos_by_list #}
+{% if folder.nest_subtodos %}
+{% for todo in todos %}
+{{ render_nested_todo(todo, 0) }}
+{% endfor %}
+{% else %}
+{% for todo in todos %}
+<div>
+    <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+        data-created="{{ todo.created_at_formatted }}" data-modified="{{ todo.modified_at_formatted }}"
+        onchange="updateSelectionCount()">
+    <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+        onchange="toggleItem(this)">
+    {% if todo.pinned %}📌{% endif %}
+    <span
+        style="color: {% if todo.color and todo.color|lower not in ['#000000', '#ffffff'] %}{{ todo.color }}{% else %}inherit{% endif %}">{{
+        todo.title }}</span>
+    {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit" title="Edit todo (note)">📝</a>{%
+    endif %}
+    {% if todo.links %}
+    {% if todo.links|length == 1 %}
+    <a href="{{ todo.links[0].url }}" target="_blank" title="{{ todo.links[0].title or todo.links[0].url }}"
+        style="text-decoration:none;">🔗</a>
+    {% else %}
+    <details style="display:inline; position:relative;">
+        <summary style="list-style:none; cursor:pointer;" title="Links">🔗</summary>
+        <div
+            style="position:absolute; background:var(--bg-color); border:1px solid var(--border-color); padding:5px; z-index:10; min-width:200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+            {% for link in todo.links %}
+            <div style="margin-bottom:4px;">
+                <a href="{{ link.url }}" target="_blank"
+                    style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{
+                    link.title or link.url }}</a>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+    {% endif %}
+    {% if todo.dokuwiki_link %}
+    <a href="{{ todo.dokuwiki_link }}" class="dokuwiki-link" target="_blank" title="Open in DokuWiki"
+        style="color: inherit; text-decoration: none;" onclick="trackDokuWikiClick('todo', {{ todo.id }})">{{
+        dokuwiki_icon(todo.dokuwiki_confirmed) }}</a>
+    {% endif %}
+    {% if folder.dokuwiki_links_enabled and todo.dokuwiki_page_enabled and dokuwiki_item_link_fn %}
+    <a href="{{ dokuwiki_item_link_fn('todo', todo.id) }}" target="_blank" title="Open DokuWiki page"
+        style="text-decoration: none;">{{ dokuwiki_page_icon('#3498db') }}</a>
+    {% endif %}
+    {% for hashtag in todo.hashtags %}
+    <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+    {% endfor %}
+    <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}" title="{{ todo.list.name }}" style="text-decoration:none;">📂</a>
+</div>
+{% endfor %}
+{% endif %}
+{% endif %}
+{% else %}
+<p>No matching todos.</p>
+{% endif %}
+{% endif %}

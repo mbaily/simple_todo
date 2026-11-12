@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <meta charset="utf-8">
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Calendar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20261030-calendar-time" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261030-calendar-time" crossorigin="anonymous"></script>
+    {% if traditional_view %}
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/calendar_days.css?v=20261027-toolbar-layout">
+    <script src="{{ request.scope.root_path }}/static/calendar_days.js?v=20261027-toolbar-layout" defer></script>
+    {% endif %}
+    {% if weekly_view %}
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/calendar_week.css?v=20261030-hour-slots">
+    <script src="{{ request.scope.root_path }}/static/calendar_week.js?v=20261030-page-scroll" defer></script>
+    {% endif %}
+    <style>
+        h2 {
+            margin: 0;
+        }
+
+        p {
+            margin: 0;
+        }
+
+        .calendar-title-nonrecurring {
+            color: #0f766e;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .calendar-title-nonrecurring {
+                color: #5eead4;
+            }
+        }
+
+        /* Traditional calendar grid styles */
+        .cal-grid-container {
+            margin-top: 10px;
+        }
+
+        .cal-grid {
+            display: grid;
+            /* Let longer titles widen columns while reserving space for every weekday. */
+            grid-template-columns: repeat(7, minmax(max(2rem, 8%), auto));
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .cal-grid {
+                border-color: #555;
+            }
+        }
+
+        .cal-grid-header {
+            background: #e5e7eb;
+            font-weight: bold;
+            text-align: center;
+            padding: 6px 2px;
+            font-size: 0.85em;
+            border-bottom: 1px solid #ccc;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .cal-grid-header {
+                background: #374151;
+                border-color: #555;
+            }
+        }
+
+        .cal-day {
+            min-width: 0;
+            min-height: 80px;
+            border: 1px solid #e5e7eb;
+            padding: 4px;
+            vertical-align: top;
+            font-size: 0.85em;
+            position: relative;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .cal-day {
+                border-color: #444;
+            }
+        }
+
+        .cal-day-empty {
+            background: #f3f4f6;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .cal-day-empty {
+                background: #242424;
+            }
+        }
+
+        .cal-day-number {
+            font-weight: bold;
+            font-size: 1em;
+            margin-bottom: 2px;
+            color: #374151;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .cal-day-number {
+                color: #d1d5db;
+            }
+        }
+
+        .cal-day-today {
+            background: #fef3c7;
+            box-shadow: inset 0 0 0 2px #b45309;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .cal-day-today {
+                background: #493510;
+                box-shadow: inset 0 0 0 2px #fbbf24;
+            }
+        }
+
+        .cal-day-today .cal-day-number {
+            color: #92400e;
+            border-bottom: 2px solid #b45309;
+            display: inline-block;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .cal-day-today .cal-day-number {
+                color: #fde68a;
+                border-color: #fbbf24;
+            }
+        }
+
+        .cal-event {
+            padding: 1px 3px;
+            margin: 1px 0;
+            border-radius: 3px;
+            font-size: 0.9em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .cal-event-completed {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
+        .cal-event input[type="checkbox"] {
+            margin: 0;
+            flex-shrink: 0;
+        }
+
+        .cal-event-title {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .cal-grid-wrap .cal-event {
+            align-items: flex-start;
+        }
+
+        .cal-grid-wrap .cal-event-title {
+            min-width: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .cal-month-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .cal-month-nav a {
+            text-decoration: none;
+        }
+
+        .cal-toggle-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            user-select: none;
+        }
+
+        .cal-view-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            padding: 6px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .cal-view-toggle[aria-pressed="true"] {
+            color: var(--link-color);
+            border-color: currentColor;
+            box-shadow: inset 0 0 0 1px currentColor;
+        }
+
+        .cal-view-toggle:hover {
+            background: var(--pill-hover);
+        }
+
+        .cal-view-toggle:focus-visible {
+            outline: 2px solid var(--link-color);
+            outline-offset: 2px;
+        }
+
+        @media (max-width: 600px) {
+            .cal-day {
+                min-height: 50px;
+                padding: 2px;
+                font-size: 0.75em;
+            }
+
+            .cal-grid-header {
+                padding: 4px 1px;
+                font-size: 0.75em;
+            }
+
+            .cal-event {
+                font-size: 0.8em;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    {% if invalid_recurrences %}
+    <div role="alert" style="margin: 10px 0;">
+        <p>Some events have an invalid calendar recurrence. Edit their recurrence to show them in the calendar.</p>
+        <ul>
+            {% for row in invalid_recurrences %}
+            <li>
+                <a href="{{ request.scope.root_path }}/calendar/event/{{ row.event.id }}/edit{% if traditional_view %}?view_month={{ current_month_str }}{% endif %}">{{ row.event.title }}</a>:
+                {{ row.error }}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    <h2>Calendar</h2>
+
+    {% if duplicated_id %}
+    <div class="alert-success">
+        ✅ <strong>Duplicated {% if duplicated_title %}“{{ duplicated_title }}”{% else %}event{% endif %} to {{ duplicated_date }}!</strong>
+        <a href="{{ request.scope.root_path }}/calendar/event/{{ duplicated_id }}/edit">Edit new event</a>
+        <span style="margin: 0 4px;">|</span>
+        <a href="{{ request.scope.root_path }}/classic/calendar#cal-{{ duplicated_date }}">Jump to date</a>
+    </div>
+    {% endif %}
+
+    {% if weekly_view %}
+    {% include "_calendar_week.html" %}
+    {% elif traditional_view %}
+    {# ---- Traditional monthly grid view ---- #}
+    <div class="cal-month-nav">
+        <a href="{{ request.scope.root_path }}/classic/calendar?month={{ prev_month_str }}" title="Previous Month">⬅️</a>
+        <strong>{{ month_name }} {{ year }}</strong>
+        <a href="{{ request.scope.root_path }}/classic/calendar?month={{ next_month_str }}" title="Next Month">➡️</a>
+        <span style="margin-left: 5px;">|</span>
+        <a href="{{ request.scope.root_path }}/classic/calendar#calendar-today" style="text-decoration:none; margin-left: 5px;">Today</a>
+    </div>
+    <div style="font-size: 1.2rem; padding-bottom: 5px; margin-bottom: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+        <span onclick="toggleCreateEventForm()" title="Create New Event"
+            style="cursor: pointer; user-select: none;">➕</span>
+        {% include "_calendar_views.html" %}
+        {% include "_calendar_sort.html" %}
+        <form action="{{ request.scope.root_path }}/calendar/toggle-word-wrap" method="post" style="display: inline; margin: 0;">
+            <input type="hidden" name="month" value="{{ current_month_str }}">
+            <button type="submit" class="cal-view-toggle cal-wrap-toggle" aria-label="Wrap event titles" aria-pressed="{{ 'true' if calendar_word_wrap else 'false' }}" title="{{ 'Disable' if calendar_word_wrap else 'Enable' }} word wrapping">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M3 6h18M3 12h13a3 3 0 0 1 0 6h-4m3-3-3 3 3 3M3 18h4" />
+                </svg>
+            </button>
+        </form>
+        <form action="{{ request.scope.root_path }}/calendar/toggle-counts" method="post" style="display: inline; margin: 0;">
+            <input type="hidden" name="month" value="{{ current_month_str }}">
+            <button type="submit" class="cal-view-toggle cal-counts-toggle" aria-label="Show daily event counts" aria-pressed="{{ 'true' if calendar_show_counts else 'false' }}" title="{{ 'Hide' if calendar_show_counts else 'Show' }} daily event counts">
+                <span aria-hidden="true">n</span>
+            </button>
+        </form>
+        <form action="{{ request.scope.root_path }}/calendar/set-filter" method="post" style="display: inline; margin: 0;">
+            <label class="cal-toggle-label">
+                Events:
+                <select name="calendar_event_filter" onchange="this.form.submit()">
+                    <option value="all" {% if calendar_event_filter == 'all' %}selected{% endif %}>All</option>
+                    <option value="non_recurring" {% if calendar_event_filter == 'non_recurring' %}selected{% endif %}>Non-recurring only</option>
+                    <option value="recurring" {% if calendar_event_filter == 'recurring' %}selected{% endif %}>Recurring only</option>
+                    {% for group in event_groups %}
+                    <option value="group:{{ group.id }}" {% if calendar_event_filter == 'group:' ~ group.id %}selected{% endif %}>{{ group.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </form>
+        <a href="{{ request.scope.root_path }}/calendar/groups" style="font-size: 0.85em;">Event groups</a>
+    </div>
+    {% include "_calendar_create_form.html" %}
+
+    <div class="cal-grid-container">
+        <div class="cal-grid{% if calendar_word_wrap %} cal-grid-wrap{% endif %}{% if not calendar_show_counts %} cal-grid-hide-counts{% endif %}">
+            <div class="cal-grid-header">Mon</div>
+            <div class="cal-grid-header">Tue</div>
+            <div class="cal-grid-header">Wed</div>
+            <div class="cal-grid-header">Thu</div>
+            <div class="cal-grid-header">Fri</div>
+            <div class="cal-grid-header">Sat</div>
+            <div class="cal-grid-header">Sun</div>
+            {% for week in weeks %}
+            {% for cell in week %}
+            {% if cell.day == 0 %}
+            <div class="cal-day cal-day-empty"></div>
+            {% else %}
+            <div class="cal-day{% if cell.is_today %} cal-day-today{% endif %}" data-date="{{ cell.date }}" data-note="{{ cell.note }}" data-hide-completed="{{ 'true' if cell.hide_completed else 'false' }}"{% if cell.is_today %} id="calendar-today" aria-current="date"{% endif %}>
+                {% include "_calendar_day_tools.html" %}
+                {% for row in cell.events %}
+                {% set ev = row.event %}
+                <div class="cal-event{% if row.completed %} cal-event-completed{% endif %}{% if row.is_important %} cal-event-important{% endif %}" data-event-id="{{ ev.id }}" data-day="{{ cell.date }}" data-occurrence="{{ row.occurrence_at.isoformat() }}" data-note="{{ ev.note or '' }}">
+                    <input type="checkbox" {% if row.completed %}checked{% endif %}
+                        onchange="toggleCalendarDayOccurrence(this)">
+                    <a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit?view_month={{ current_month_str }}{% if row.occurrence_at %}&occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{% endif %}" class="cal-event-title"
+                        {% if ev.color %}style="color: {{ ev.color }}"{% elif not ev.rrule %}class="calendar-title-nonrecurring"{% endif %}
+                        title="{{ ev.title }}{% if ev.rrule %} (recurring){% endif %}{% if ev.note %} — {{ ev.note }}{% endif %}">
+                        {% if not ev.all_day %}{{ row.occurrence_at.strftime('%H:%M') }} {% endif %}{{ ev.title }}
+                    </a>
+                    {% if row.is_important %}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+
+    {% include "_calendar_day_dialogs.html" %}
+
+    {% else %}
+    {# ---- Original list view ---- #}
+    <div class="dates" style="margin-bottom: 10px;">
+        <a href="{{ request.scope.root_path }}/classic/calendar?offset={{ prev_offset }}" style="text-decoration:none; margin-right: 5px;"
+            title="Previous Month">⬅️</a>
+        Showing {{ range_start | date_format }} → {{ range_end | date_format }}
+        <a href="{{ request.scope.root_path }}/classic/calendar?offset={{ next_offset }}" style="text-decoration:none; margin-left: 5px;"
+            title="Next Month">➡️</a>
+        {% if offset != 0 %}
+        <span style="margin-left: 10px;">|</span>
+        <a href="{{ request.scope.root_path }}/classic/calendar" style="text-decoration:none; margin-left: 5px;">Today</a>
+        {% endif %}
+    </div>
+    <div style="font-size: 1.2rem; padding-bottom: 5px; margin-bottom: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+        <span onclick="toggleCreateEventForm()" title="Create New Event"
+            style="cursor: pointer; user-select: none;">➕</span>
+        {% include "_calendar_views.html" %}
+        {% include "_calendar_sort.html" %}
+        <form action="{{ request.scope.root_path }}/calendar/set-filter" method="post" style="display: inline; margin: 0;">
+            <label class="cal-toggle-label">
+                Events:
+                <select name="calendar_event_filter" onchange="this.form.submit()">
+                    <option value="all" {% if calendar_event_filter == 'all' %}selected{% endif %}>All</option>
+                    <option value="non_recurring" {% if calendar_event_filter == 'non_recurring' %}selected{% endif %}>Non-recurring only</option>
+                    <option value="recurring" {% if calendar_event_filter == 'recurring' %}selected{% endif %}>Recurring only</option>
+                    {% for group in event_groups %}
+                    <option value="group:{{ group.id }}" {% if calendar_event_filter == 'group:' ~ group.id %}selected{% endif %}>{{ group.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </form>
+        <a href="{{ request.scope.root_path }}/calendar/groups" style="font-size: 0.85em;">Event groups</a>
+    </div>
+    {% include "_calendar_create_form.html" %}
+    {% if occurrences %}
+    <hr>
+    <div class="calendar-occurrences">
+    {% set today_heading_shown = namespace(value=False) %}
+    {% for row in occurrences %}
+    {% if not today_heading_shown.value and row.occurrence_at >= today_local %}
+    <div class="calendar-today-heading"><span class="calendar-today-label">Today </span><span class="calendar-occurrence-date">{{ today_local | date_format }}</span>
+    </div>
+    {% set today_heading_shown.value = True %}
+    {% endif %}
+    {% set ev = row.event %}
+    <div id="cal-{{ row.occurrence_at.strftime('%Y-%m-%d') }}" class="calendar-occurrence{% if row.is_important %} calendar-occurrence-important{% endif %}">
+        <span class="calendar-event-prefix">
+            <input type="checkbox" class="select-item" data-type="calendar_event" data-id="{{ ev.id }}"
+                data-occurrence="{% if row.occurrence_at %}{{ row.occurrence_at.strftime('%Y-%m-%d') }}{% endif %}"
+                data-created="{{ ev.created_at_formatted }}" data-modified="{{ ev.modified_at_formatted }}"
+                onchange="updateSelectionCount()">
+            <input type="checkbox" {% if row.completed %}checked{% endif %}
+                onchange="toggleCalendarOccurrence({{ ev.id }}, '{{ row.occurrence_at.isoformat() }}', this)">
+            <span class="dates calendar-occurrence-date">{{ row.occurrence_at.strftime('%a') }} {{ row.occurrence_at | date_format }}</span>
+        </span>
+        <span class="calendar-occurrence-content">
+            {% if not ev.all_day %}<time>{{ row.occurrence_at.strftime('%H:%M') }}{% if ev.duration_minutes %} · {{ ev.duration_minutes }} min{% endif %}</time>{% endif %}
+            {% if ev.color %}
+            <span style="color: {{ ev.color }}">{{ ev.title }}</span>
+            {% elif ev.rrule %}
+            {{ ev.title }}
+            {% else %}
+            <span class="calendar-title-nonrecurring">{{ ev.title }}</span>
+            {% endif %}
+            {% if ev.rrule %}<span class="dates">(recurring)</span>{% endif %}
+            {% if row.is_important %}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{% endif %}
+            {% if ev.note or ev.notes %}<a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit{% if row.occurrence_at %}?occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{% endif %}" class="note-icon" title="Edit event (note)">📝</a>{%
+            endif %}
+            {% for h in ev.hashtags %}
+            <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+            {% endfor %}
+        </span>
+    </div>
+    {% for note in ev.notes %}
+    {% if not note.occurrence_at or note.occurrence_at.strftime('%Y-%m-%d') == row.occurrence_at.strftime('%Y-%m-%d') %}
+    <div style="margin-left: 25px; margin-bottom: 4px;">
+        <span style="margin-right: 5px;" title="Note">📝</span>
+        {% if note.name %}<strong style="margin-right: 5px;">{{ note.name }}:</strong>{% endif %}
+        <span style="white-space: pre-wrap; word-break: break-word;">{{ note.text }}</span>
+        {% if note.occurrence_at %}<span class="dates">({{ note.occurrence_at | date_format }})</span>{% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% endfor %}
+    </div>
+    <hr>
+    <h2>Operations</h2>
+    <p style="margin-top:0;"><span id="selection-count">0 selected</span> | <button type="button"
+            onclick="selectAll('calendar_event')">Select All</button> <button type="button"
+            onclick="selectNone('calendar_event')">Select None</button></p>
+    <p id="selected-dates" class="dates" style="display:none;"></p>
+    <p>
+        Events: <button type="button" onclick="bulkEditCalendarEvent()">Edit</button>
+        <button type="button" onclick="bulkDelete('calendar_event')">Delete</button>
+        <button type="button" onclick="showSubnoteForm()">+ Subnote</button>
+        <button type="button" onclick="showDuplicateForm()">Duplicate</button>
+    </p>
+    <form id="duplicate-form" action="" method="post"
+        style="display:none; margin-top: 10px; border: 1px solid #ccc; padding: 10px; border-radius: 4px;">
+        <input type="hidden" name="return_to" value="calendar">
+        <input type="hidden" name="offset" value="{{ offset }}">
+        <p style="margin-top:0; font-weight:bold;">Duplicate Event: <span id="duplicate-event-title"></span></p>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <label>Days in future:
+                <input type="number" id="cal-duplicate-days" min="1" value="30" style="width: 70px;" oninput="updateCalDuplicateDate(this.value)">
+            </label>
+            <div style="display: inline-flex; gap: 4px;">
+                <button type="button" onclick="setCalDuplicateDays(7)">+7d</button>
+                <button type="button" onclick="setCalDuplicateDays(14)">+14d</button>
+                <button type="button" onclick="setCalDuplicateDays(30)">+30d</button>
+                <button type="button" onclick="setCalDuplicateDays(60)">+60d</button>
+                <button type="button" onclick="setCalDuplicateDays(90)">+90d</button>
+            </div>
+        </div>
+        <label>Target Date:
+            <input type="date" id="cal-duplicate-target-date" name="target_date" required onchange="updateCalDuplicateDays(this.value)">
+        </label>
+        <br><br>
+        <button type="submit">Confirm Duplicate</button>
+        <button type="button" onclick="hideDuplicateForm()">Cancel</button>
+    </form>
+    <form id="subnote-form" action="{{ request.scope.root_path }}/note/create" method="post"
+        style="display:none; margin-top: 10px; border: 1px solid #ccc; padding: 10px;">
+        <input type="hidden" name="calendar_event_id" id="subnote-event-id" value="">
+        <input type="hidden" name="occurrence_at" id="subnote-occurrence-at" value="">
+        <label>Name (optional): <input type="text" name="name" style="width: 100%;"></label><br>
+        <label>Text: <textarea name="text" rows="3" required style="width: 100%;"></textarea></label><br>
+        <div id="occurrence-only-option" style="display:none; margin: 8px 0;">
+            <label>
+                <input type="checkbox" id="occurrence-only-checkbox" checked onchange="toggleOccurrenceOnly(this)">
+                This occurrence only <span id="occurrence-date-label" class="dates"></span>
+            </label>
+        </div>
+        <button type="submit">Add Note</button>
+        <button type="button" onclick="hideSubnoteForm()">Cancel</button>
+    </form>
+
+    {% else %}
+    <p>No events in range.</p>
+    {% endif %}
+    {% endif %}
+
+    <script>
+        (function init() {
+            const forms = document.getElementsByTagName('form');
+            if (forms && forms.length) {
+                // Initialize rrule UI on the create-event form
+                var createForm = document.getElementById('create-event-form');
+                if (createForm) {
+                    initRRuleUI(createForm);
+                }
+            }
+        })();
+
+        function toggleCreateEventForm() {
+            var form = document.getElementById('create-event-form');
+            if (form.style.display === 'none') {
+                form.style.display = 'block';
+            } else {
+                form.style.display = 'none';
+            }
+        }
+
+        function showSubnoteForm() {
+            const selected = document.querySelectorAll('.select-item[data-type="calendar_event"]:checked');
+            if (selected.length !== 1) {
+                alert('Please select exactly one calendar event to add a note to.');
+                return;
+            }
+            const checkbox = selected[0];
+            const eventId = checkbox.getAttribute('data-id');
+            document.getElementById('subnote-event-id').value = eventId;
+
+            // Find the occurrence date from the nearest parent div with id starting with "cal-"
+            let parent = checkbox.closest('div[id^="cal-"]');
+            let occurrenceDate = '';
+            if (parent && parent.id.startsWith('cal-')) {
+                occurrenceDate = parent.id.replace('cal-', '');
+            }
+
+            // Check if this event is recurring by looking for (recurring) text in the row
+            const row = checkbox.closest('div');
+            const isRecurring = row && row.textContent.includes('(recurring)');
+
+            const occOption = document.getElementById('occurrence-only-option');
+            const occCheckbox = document.getElementById('occurrence-only-checkbox');
+            const occHidden = document.getElementById('subnote-occurrence-at');
+            const occLabel = document.getElementById('occurrence-date-label');
+
+            if (isRecurring && occurrenceDate) {
+                occOption.style.display = 'block';
+                occLabel.textContent = '(' + occurrenceDate + ')';
+                occCheckbox.checked = true;
+                occHidden.value = occurrenceDate;
+            } else {
+                occOption.style.display = 'none';
+                occHidden.value = '';
+            }
+
+            document.getElementById('subnote-form').style.display = 'block';
+        }
+
+        function hideSubnoteForm() {
+            document.getElementById('subnote-form').style.display = 'none';
+        }
+
+        function updateCalDuplicateDate(days) {
+            days = parseInt(days, 10);
+            if (isNaN(days) || days < 1) days = 1;
+            const target = new Date();
+            target.setDate(target.getDate() + days);
+            const yyyy = target.getFullYear();
+            const mm = String(target.getMonth() + 1).padStart(2, '0');
+            const dd = String(target.getDate()).padStart(2, '0');
+            const targetInput = document.getElementById('cal-duplicate-target-date');
+            if (targetInput) targetInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+
+        function setCalDuplicateDays(days) {
+            const daysInput = document.getElementById('cal-duplicate-days');
+            if (daysInput) daysInput.value = days;
+            updateCalDuplicateDate(days);
+        }
+
+        function updateCalDuplicateDays(dateStr) {
+            if (!dateStr) return;
+            const target = new Date(dateStr + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const diffTime = target.getTime() - today.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            const daysInput = document.getElementById('cal-duplicate-days');
+            if (daysInput) daysInput.value = Math.max(1, diffDays);
+        }
+
+        function showDuplicateForm() {
+            const selected = document.querySelectorAll('.select-item[data-type="calendar_event"]:checked');
+            if (selected.length !== 1) {
+                alert('Please select exactly one calendar event to duplicate.');
+                return;
+            }
+            const checkbox = selected[0];
+            const eventId = checkbox.getAttribute('data-id');
+            const form = document.getElementById('duplicate-form');
+            form.action = '{{ request.scope.root_path }}/calendar/event/' + eventId + '/duplicate';
+
+            const row = checkbox.closest('.calendar-occurrence');
+            let title = '';
+            if (row) {
+                const titleEl = row.querySelector('.calendar-occurrence-content');
+                if (titleEl) {
+                    title = titleEl.innerText.trim();
+                }
+            }
+            const titleSpan = document.getElementById('duplicate-event-title');
+            if (titleSpan) titleSpan.textContent = title;
+
+            setCalDuplicateDays(30);
+            form.style.display = 'block';
+            form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function hideDuplicateForm() {
+            document.getElementById('duplicate-form').style.display = 'none';
+        }
+
+        function toggleOccurrenceOnly(checkbox) {
+            const occHidden = document.getElementById('subnote-occurrence-at');
+            const occLabel = document.getElementById('occurrence-date-label');
+            if (checkbox.checked) {
+                // Restore the occurrence date from the label
+                const dateMatch = occLabel.textContent.match(/\d{4}-\d{2}-\d{2}/);
+                if (dateMatch) {
+                    occHidden.value = dateMatch[0];
+                }
+            } else {
+                occHidden.value = '';
+            }
+        }
+    </script>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

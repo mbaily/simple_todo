@@ -1,0 +1,45 @@
+{% macro balance(cents) -%}
+    {% if cents is none %}Unknown{% else %}{{ bill.currency_symbol }}{{ cents|abs|cents }} {% if cents < 0 %}credit{% elif cents > 0 %}owing{% else %}balanced{% endif %}{% endif %}
+{%- endmacro %}
+<section id="reconciliation" style="margin-top:24px; max-width:1200px;">
+    <h3>Check against supplier statement</h3>
+    <p class="dates">Compare the supplier's balance with recorded events through the end of the selected date. Later invoices and payments are excluded. Check posting dates if the supplier and app processed a payment on different days. Recording a statement does not change money owed or paid.</p>
+    <details style="margin:12px 0;"><summary>Record supplier balance</summary>
+        <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/statements" method="post" style="margin-top:8px;" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input name="request_token" type="hidden" value="{{ new_invoice_token() }}">
+            <label>Supplier balance <input name="amount" type="text" inputmode="decimal" required style="width:100px;"></label>
+            <select name="balance_type" aria-label="Supplier balance type"><option value="owing">Owing</option><option value="credit">Credit</option></select>
+            <label>As of date <input name="as_of_date" type="date" value="{{ today_iso }}" required></label><br>
+            <label>Note <input name="note" type="text" style="width:280px;" placeholder="Statement or website balance"></label>
+            <button type="submit">Check supplier balance</button>
+        </form>
+    </details>
+    {% if statement_comparisons %}<div style="overflow-x:auto;">
+    <table class="history-table" style="max-width:1200px; min-width:700px;">
+        <thead><tr><th>Date / source</th><th>Supplier balance</th><th>App balance on date</th><th>Supplier minus app</th><th>Result / actions</th></tr></thead>
+        <tbody>{% for row in statement_comparisons %}<tr>
+            <td>{{ row.as_of_date.strftime('%Y-%m-%d') if row.as_of_date else 'Unknown' }}<p class="dates">{{ row.source }}</p></td>
+            <td>{{ balance(row.supplier_cents) }}</td>
+            <td>{{ balance(row.app_cents) }}</td>
+            <td>{% if row.difference_cents is none %}—{% else %}{{ '+' if row.difference_cents > 0 else '-' if row.difference_cents < 0 else '' }}{{ bill.currency_symbol }}{{ row.difference_cents|abs|cents }}{% endif %}</td>
+            <td><strong style="color:{{ '#15803d' if row.status == 'Match' else '#b45309' }};">{{ row.status }}</strong>
+                {% if row.status == 'Missing invoice issue dates' %}<p class="dates">Provisional comparison. Enter missing invoice issue dates for an accurate dated balance.</p>{% endif %}
+                {% if row.note %}<p class="dates">{{ row.note }}</p>{% endif %}
+                {% if row.invoice %}<p><a href="#invoice-{{ row.invoice.id }}">Edit invoice statement</a></p>{% else %}
+                <details><summary>Edit supplier balance</summary>
+                    <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/statements" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+                        <input name="request_token" type="hidden" value="{{ new_invoice_token() }}">
+                        <input name="statement_id" type="hidden" value="{{ row.statement.id }}">
+                        <label>Balance <input name="amount" type="text" inputmode="decimal" required value="{{ row.supplier_cents|abs|cents }}" style="width:100px;"></label>
+                        <select name="balance_type" aria-label="Supplier balance type"><option value="owing">Owing</option><option value="credit" {% if row.supplier_cents < 0 %}selected{% endif %}>Credit</option></select><br>
+                        <label>As of date <input name="as_of_date" type="date" value="{{ row.as_of_date.strftime('%Y-%m-%d') }}" required></label><br>
+                        <label>Note <input name="note" type="text" value="{{ row.note or '' }}"></label>
+                        <button type="submit">Save supplier balance</button>
+                    </form>
+                </details>
+                <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/statements/{{ row.statement.id }}/delete" method="post" onsubmit="return confirm('Delete this supplier balance observation?');"><button type="submit">Delete supplier balance</button></form>
+                {% endif %}
+            </td>
+        </tr>{% endfor %}</tbody>
+    </table></div>{% endif %}
+</section>

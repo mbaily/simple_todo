@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Check invoice — {{ bill.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20260311">
+</head>
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+    <h2>{% if same_number %}Invoice number already recorded{% else %}Possible duplicate invoice{% endif %} — {{ bill.name }}</h2>
+    {% if same_number %}<p>This supplier invoice number is already recorded for this account. Edit the existing invoice or check the number on the new invoice.</p>
+    {% else %}<p>An invoice with matching dates or details is already recorded. This submission has not added another charge.</p>{% endif %}
+    {% if existing %}
+    <p>Existing charge: <strong>{{ bill.currency_symbol }}{{ existing.amount_cents|cents }}</strong>
+        {% if existing.invoice_number %} · Invoice {{ existing.invoice_number }}{% endif %}
+        · Due {{ existing.due_date_iso or 'unknown' }}
+        · {% if existing.outstanding_cents %}Outstanding{% else %}Settled{% endif %}</p>
+    {% endif %}
+    <p><a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history#invoice-{{ existing.id if existing else '' }}">View or edit the existing invoice</a></p>
+    {% if not same_number %}<form action="{{ request.scope.root_path }}{{ action }}" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+        {% for name, value in fields.items() %}{% if value is not none %}
+        <input type="hidden" name="{{ name }}" value="{{ value }}">
+        {% endif %}{% endfor %}
+        <input type="hidden" name="allow_duplicate" value="true">
+        <p>If the provider issued a separate invoice with these details, you can record it separately.</p>
+        <button type="submit">Record as a separate invoice</button>
+        <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history">Cancel</a>
+    </form>{% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+</html>

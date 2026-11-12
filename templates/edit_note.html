@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Edit Note</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h1>Edit Note</h1>
+
+    <form action="{{ request.scope.root_path }}/note/{{ note.id }}/edit" method="post">
+        <label>Name (optional):<br>
+            <input type="text" name="name" value="{{ note.name or '' }}">
+        </label><br><br>
+
+        <label>Text:<br>
+            <textarea name="text" rows="10" required style="width:100%;">{{ note.text }}</textarea>
+        </label><br><br>
+
+        <button type="submit">Save Changes</button>
+    </form>
+
+    <details style="margin-top: 20px;">
+        <summary style="cursor: pointer;">
+            <h3 style="display: inline; margin: 0;">Links</h3>
+        </summary>
+        {% if note.links %}
+        <ul>
+            {% for link in note.links %}
+            <li>
+                <a href="{{ link.url }}" target="_blank">{{ link.title or link.url }}</a>
+                <form action="{{ request.scope.root_path }}/api/link/{{ link.id }}/delete" method="post" style="display:inline;">
+                    <button type="submit" style="background:none; border:none; cursor:pointer; color:red;">[x]</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <form action="{{ request.scope.root_path }}/api/link/create" method="post" style="margin-top: 10px; border: 1px solid #ccc; padding: 10px;">
+            <input type="hidden" name="note_id" value="{{ note.id }}">
+            <label>URL: <input type="url" name="url" required style="width: 100%;"></label><br>
+            <label>Title (optional): <input type="text" name="title" style="width: 100%;"></label><br>
+            <button type="submit">Add Link</button>
+        </form>
+    </details>
+
+    <div style="margin-top: 20px;">
+        <form action="{{ request.scope.root_path }}/note/{{ note.id }}/delete" method="post" onsubmit="return confirm('Delete note?');">
+            <button type="submit" style="background-color: #ffcccc;">Delete Note</button>
+        </form>
+    </div>
+
+    <p class="dates">Created: {{ note.created_at_formatted }} | Modified: {{ note.modified_at_formatted }}</p>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

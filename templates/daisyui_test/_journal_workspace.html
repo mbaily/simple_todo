@@ -1,0 +1,46 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set rp = request.scope.root_path %}
+{% macro target(entry) %}
+{%- set id = entry.entity_id -%}
+{%- if not id or 'Deleted' in entry.action -%}{% if 'Deleted' in entry.action %}<span class="item-context">Deleted</span>{% endif %}
+{%- elif entry.entity_type == 'list' %}<a href="{{ prototype_url }}/list/{{ id }}">Open list</a>
+{%- elif entry.entity_type == 'todo' %}<a href="{{ prototype_url }}/todo/{{ id }}/edit?back=home">Edit task</a>
+{%- elif entry.entity_type == 'note' %}<a href="{{ prototype_url }}/note/{{ id }}/edit?back=home">Edit note</a>
+{%- elif entry.entity_type == 'calendar_event' %}<a href="{{ prototype_url }}/calendar/event/{{ id }}/edit">Edit event</a>
+{%- elif entry.entity_type == 'smart_folder' %}<a href="{{ prototype_url }}/smart-folder/{{ id }}">Open smart folder</a>
+{%- elif entry.entity_type == 'hashtag' %}<a href="{{ prototype_url }}/hashtag/{{ id }}">Open hashtag</a>
+{%- elif entry.entity_type == 'folder' %}<a href="{{ prototype_url }}/folders">Folders</a>
+{%- elif entry.entity_type == 'bill' %}<a href="{{ prototype_url }}/bills/{{ id }}">Open bill</a>
+{%- endif -%}
+{% endmacro %}
+<div id="daisy-workspace" data-scope="journal" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}">
+    <div class="page-heading">
+        <div class="page-title"><h1>Journal</h1><span class="eyebrow">{{ total }} {{ 'entry' if total == 1 else 'entries' }}{% if kind or q %} matching{% endif %}</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span></div>
+    </div>
+    <form id="journal-filter" class="search-form" role="search" method="get" action="{{ journal_url }}" hx-get="{{ journal_url }}" hx-trigger="submit, change from:#journal-kind" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true" hx-indicator="#workspace-loading">
+        <select id="journal-kind" class="select select-sm" name="kind" aria-label="Entry type"><option value="">All entries</option>{% for value, label in journal_types.items() %}<option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>{% endfor %}<option value="other" {% if kind == 'other' %}selected{% endif %}>Other</option></select>
+        <label class="input search-input">{{ icon('search', 16) }}<input type="search" name="q" value="{{ q }}" maxlength="200" placeholder="Search actions and details" aria-label="Search the journal"></label>
+        <button class="btn btn-sm">Filter</button>
+        {% if kind or q %}<a class="btn btn-ghost btn-sm" href="{{ journal_url }}" hx-get="{{ journal_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ icon('close', 14) }} Clear</a>{% endif %}
+    </form>
+    {% if days %}
+    {% for day in days %}
+    <section class="section-panel journal-day" aria-label="{{ day.date.strftime('%A %-d %B %Y') if day.date else 'Undated' }}">
+        <header class="section-heading"><div><h2>{{ day.date.strftime('%a %-d %b %Y') if day.date else 'Undated' }}</h2><span class="section-count">{{ day.entries|length }}</span></div></header>
+        <ul class="list">{% for entry, local in day.entries %}
+            <li class="list-row journal-row"><time class="calendar-time" datetime="{{ local.isoformat() if local else '' }}">{{ local.strftime('%H:%M') if local else '' }}</time><div class="item-content"><span class="journal-action">{{ entry.action }}</span>{% if entry.details %}<span class="journal-details">{{ entry.details }}</span>{% endif %}</div><span class="journal-link">{{ target(entry) }}</span></li>
+        {% endfor %}</ul>
+    </section>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state"><h3>{{ 'No entries match the filter.' if kind or q else 'No journal entries yet.' }}</h3></div>
+    {% endif %}
+    {% if pages > 1 %}
+    <nav class="journal-pages" aria-label="Journal pages">
+        {% if newer_url %}<a class="btn btn-sm" href="{{ newer_url }}" hx-get="{{ newer_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">‹ Newer</a>{% endif %}
+        <span class="item-context">Page {{ page }} of {{ pages }}</span>
+        {% if older_url %}<a class="btn btn-sm" href="{{ older_url }}" hx-get="{{ older_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">Older ›</a>{% endif %}
+    </nav>
+    {% endif %}
+</div>

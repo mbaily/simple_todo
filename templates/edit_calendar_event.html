@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Edit Event</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20260311" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261030-calendar-time" crossorigin="anonymous"></script>
+    <style>
+        h2 {
+            margin: 0;
+        }
+
+        p {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h2>Edit Event</h2>
+
+    {% if duplicated_id %}
+    <div class="alert-success">
+        ✅ <strong>Event duplicated successfully for {{ duplicated_date }}!</strong>
+        <a href="{{ request.scope.root_path }}/calendar/event/{{ duplicated_id }}/edit">Edit new event</a>
+        <span style="margin: 0 4px;">|</span>
+        <a href="{{ request.scope.root_path }}/classic/calendar#cal-{{ duplicated_date }}">View in calendar</a>
+    </div>
+    {% endif %}
+
+    <form action="{{ request.scope.root_path }}/calendar/event/{{ event.id }}/update" method="post" oninput="updateRRulePreview(this)"
+        onchange="updateRRulePreview(this)">
+        <input type="hidden" name="view_month" value="{{ view_month }}">
+        <input type="hidden" name="view_week" value="{{ view_week }}">
+        <label>Title:<br>
+            <input type="text" name="title" value="{{ event.title }}" required>
+        </label>
+        <label style="margin-left: 10px;">Color:
+            <input type="color" name="color" value="{{ event.color or '#000000' }}">
+        </label><br>
+        <label>Event group:
+            <select name="event_group_id">
+                <option value="">None</option>
+                {% for group in event_groups %}
+                <option value="{{ group.id }}" {% if event.event_group_id == group.id %}selected{% endif %}>{{ group.name }}</option>
+                {% endfor %}
+            </select>
+        </label><br>
+        <button type="submit" onclick="return prepareRRuleForSubmit(this.form)">Save Changes</button>
+        <br><br>
+
+        <label>Hashtags:<br>
+            <input type="text" id="hashtags-edit" name="hashtags"
+                value="{% for h in event.hashtags %}#{{ h.name }} {% endfor %}" placeholder="example tags (or #tags)">
+        </label>
+        {% if all_hashtags %}
+        <select onchange="addHashtagFromSelect(this, 'hashtags-edit')">
+            <option value="">Add existing...</option>
+            {% for h in all_hashtags %}
+            <option value="{{ h.name }}">#{{ h.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <br><br>
+
+        <label>Date:<br>
+            <input type="date" name="start_at" value="{{ event.start_at.strftime('%Y-%m-%d') }}" required>
+        </label><br><br>
+
+        <label>Start time:
+            <input type="time" name="start_time" step="60" value="{{ event.start_at.strftime('%H:%M') if not event.all_day else '' }}">
+        </label>
+        <label>Duration (minutes, optional):
+            <input type="number" name="duration_minutes" min="1" max="10080" step="1" value="{{ event.duration_minutes or '' }}" style="width:90px;">
+        </label>
+        <span class="dates">Leave time blank for an all-day event.</span><br><br>
+
+        <label>
+            <input type="checkbox" name="important_if_late" value="1" {% if event.important_if_late %}checked{% endif %}>
+            Mark as important if late and unchecked
+        </label><br><br>
+
+        <fieldset style="border:1px solid #ccc; padding:8px;">
+            <legend>Recurrence</legend>
+
+            <label>
+                Frequency:
+                <select name="rrule_freq" data-rrule-field="freq">
+                    <option value="">None</option>
+                    <option value="DAILY">Daily</option>
+                    <option value="WEEKLY">Weekly</option>
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="YEARLY">Yearly</option>
+                </select>
+            </label>
+
+            <label>
+                Interval:
+                <input type="number" name="rrule_interval" data-rrule-field="interval" min="1" value="1"
+                    style="width:80px;">
+            </label>
+
+            <div data-rrule-weekly style="margin-top:6px; display:none;">
+                Days:
+                <label><input type="checkbox" value="MO" data-rrule-byday> Mon</label>
+                <label><input type="checkbox" value="TU" data-rrule-byday> Tue</label>
+                <label><input type="checkbox" value="WE" data-rrule-byday> Wed</label>
+                <label><input type="checkbox" value="TH" data-rrule-byday> Thu</label>
+                <label><input type="checkbox" value="FR" data-rrule-byday> Fri</label>
+                <label><input type="checkbox" value="SA" data-rrule-byday> Sat</label>
+                <label><input type="checkbox" value="SU" data-rrule-byday> Sun</label>
+            </div>
+
+            <div data-rrule-until-container style="margin-top:6px; display:none;">
+                <label>End date (optional):
+                    <input type="date" data-rrule-field="until" style="width: 160px;">
+                </label>
+                {% if event.rrule %}
+                <button type="button" onclick="endRecurrenceNow(this.form)"
+                    style="margin-left: 8px; color: #b91c1c; cursor: pointer;"
+                    title="Sets the end date to yesterday so no future occurrences are generated">End Recurrence Now</button>
+                {% endif %}
+            </div>
+
+            <input type="hidden" name="rrule" value="{{ event.rrule or '' }}" data-rrule-output>
+            <p class="dates" data-rrule-preview></p>
+        </fieldset>
+
+        <br>
+
+        <label>Note:<br>
+            <textarea name="note" rows="6">{{ event.note or '' }}</textarea>
+        </label>
+
+        <br>
+        <button type="submit" onclick="return prepareRRuleForSubmit(this.form)">Save Changes</button>
+    </form>
+
+    <form action="{{ request.scope.root_path }}/calendar/event/{{ event.id }}/delete" method="post"
+        data-confirm="Delete “{{ event.title }}”{% if event.rrule %} and its entire recurring series{% endif %}, including notes and completion history? This cannot be undone."
+        onsubmit="return confirm(this.dataset.confirm);" style="margin-top: 12px;">
+        <input type="hidden" name="view_month" value="{{ view_month }}">
+        <input type="hidden" name="view_week" value="{{ view_week }}">
+        <button type="submit" style="color: #b91c1c;">Delete Event</button>
+    </form>
+
+    <details open>
+        <summary style="cursor: pointer;">
+            <h3 style="display: inline; margin: 0;">Notes</h3>
+        </summary>
+        {% if event.notes %}
+        <ul style="margin-top: 5px;">
+            {% for note in event.notes %}
+            <li style="margin-bottom: 8px;">
+                {% if note.name %}<strong>{{ note.name }}:</strong> {% endif %}
+                <span style="white-space: pre-wrap; word-break: break-word;">{{ note.text }}</span>
+                {% if note.occurrence_at %}
+                <span class="dates">(occurrence: {{ note.occurrence_at.strftime('%Y-%m-%d') }})</span>
+                {% endif %}
+                <form action="{{ request.scope.root_path }}/note/{{ note.id }}/delete" method="post" style="display:inline;">
+                    <input type="hidden" name="return_to" value="{{ request.scope.root_path }}{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                    <button type="submit" style="background:none; border:none; cursor:pointer; color:red;">[x]</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="dates">No notes yet.</p>
+        {% endif %}
+        <form action="{{ request.scope.root_path }}/note/create" method="post"
+            style="margin-top: 10px; border: 1px solid #ccc; padding: 10px; border-radius: 4px;">
+            <input type="hidden" name="calendar_event_id" value="{{ event.id }}">
+            <input type="hidden" name="return_to" value="{{ request.scope.root_path }}{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+            <label>Name (optional): <input type="text" name="name" style="width: 100%;"></label><br>
+            <label>Text: <textarea name="text" rows="3" required style="width: 100%;"></textarea></label><br>
+            {% if event.rrule %}
+            <div style="margin: 8px 0;">
+                <label>
+                    <input type="checkbox" id="edit-note-occurrence-only" {% if occurrence_at %}checked{% endif %} onchange="toggleEditOccurrenceOnly(this)">
+                    This occurrence only{% if occurrence_at %} ({{ occurrence_at }}){% endif %}
+                </label>
+                <div id="edit-note-occurrence-container" style="margin-top: 4px; {% if not occurrence_at %}display: none;{% endif %}">
+                    <label>Occurrence Date:
+                        <input type="date" id="edit-note-occurrence-at" name="occurrence_at" value="{{ occurrence_at or '' }}" {% if not occurrence_at %}disabled{% endif %}>
+                    </label>
+                </div>
+            </div>
+            {% endif %}
+            <button type="submit">Add Note</button>
+        </form>
+    </details>
+
+    <hr style="margin: 20px 0;">
+
+    <details open style="border: 1px solid #ccc; padding: 10px; border-radius: 4px; margin-bottom: 20px;">
+        <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
+            Duplicate Event in the Future
+        </summary>
+        <form action="{{ request.scope.root_path }}/calendar/event/{{ event.id }}/duplicate" method="post" style="margin-top: 10px;">
+            <input type="hidden" name="return_to" value="edit">
+            <input type="hidden" name="view_month" value="{{ view_month }}">
+            <input type="hidden" name="view_week" value="{{ view_week }}">
+            
+            <p style="margin-bottom: 8px;">Create an uncompleted one-time copy of this event at a future date:</p>
+            
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <label>Days in future:
+                    <input type="number" id="duplicate-days" min="1" value="30" style="width: 70px;" oninput="updateDuplicateDateFromDays(this.value)">
+                </label>
+                <div style="display: inline-flex; gap: 4px;">
+                    <button type="button" onclick="setDuplicateDays(7)">+7d</button>
+                    <button type="button" onclick="setDuplicateDays(14)">+14d</button>
+                    <button type="button" onclick="setDuplicateDays(30)">+30d</button>
+                    <button type="button" onclick="setDuplicateDays(60)">+60d</button>
+                    <button type="button" onclick="setDuplicateDays(90)">+90d</button>
+                </div>
+            </div>
+            
+            <label>Target Date:<br>
+                <input type="date" id="duplicate-target-date" name="target_date" required onchange="updateDuplicateDaysFromDate(this.value)">
+            </label>
+            <br><br>
+            <button type="submit">Duplicate Event</button>
+        </form>
+    </details>
+
+    <p class="dates">Created: {{ event.created_at_formatted }} | Modified: {{ event.modified_at_formatted }}</p>
+
+    <script>
+        // Initialize recurrence UI from existing RRULE
+        (function init() {
+            initRRuleUI(document.forms[0]);
+            setDuplicateDays(30);
+        })();
+
+        function updateDuplicateDateFromDays(days) {
+            days = parseInt(days, 10);
+            if (isNaN(days) || days < 1) days = 1;
+            const target = new Date();
+            target.setDate(target.getDate() + days);
+            const yyyy = target.getFullYear();
+            const mm = String(target.getMonth() + 1).padStart(2, '0');
+            const dd = String(target.getDate()).padStart(2, '0');
+            const targetInput = document.getElementById('duplicate-target-date');
+            if (targetInput) targetInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+
+        function setDuplicateDays(days) {
+            const daysInput = document.getElementById('duplicate-days');
+            if (daysInput) daysInput.value = days;
+            updateDuplicateDateFromDays(days);
+        }
+
+        function updateDuplicateDaysFromDate(dateStr) {
+            if (!dateStr) return;
+            const target = new Date(dateStr + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const diffTime = target.getTime() - today.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            const daysInput = document.getElementById('duplicate-days');
+            if (daysInput) daysInput.value = Math.max(1, diffDays);
+        }
+
+        function endRecurrenceNow(form) {
+            if (!confirm('This will end the recurrence as of yesterday. Past occurrences and completions are preserved. Continue?')) {
+                return;
+            }
+            // Set UNTIL to yesterday
+            const now = new Date();
+            now.setDate(now.getDate() - 1);
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const yesterday = `${yyyy}-${mm}-${dd}`;
+
+            const untilEl = form.querySelector('input[data-rrule-field="until"]');
+            if (untilEl) {
+                untilEl.value = yesterday;
+            }
+            // Update the hidden RRULE and submit
+            prepareRRuleForSubmit(form);
+            form.submit();
+        }
+
+        function toggleEditOccurrenceOnly(cb) {
+            const container = document.getElementById('edit-note-occurrence-container');
+            const input = document.getElementById('edit-note-occurrence-at');
+            if (!container || !input) return;
+            if (cb.checked) {
+                container.style.display = 'block';
+                input.disabled = false;
+                if (!input.value) {
+                    const eventDate = document.querySelector('input[name="start_at"]')?.value;
+                    input.value = eventDate || new Date().toISOString().split('T')[0];
+                }
+            } else {
+                container.style.display = 'none';
+                input.disabled = true;
+            }
+        }
+    </script>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

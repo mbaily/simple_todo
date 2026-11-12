@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>{{ list.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    {% from "macros.html" import folder_icon, dokuwiki_icon, dokuwiki_page_icon, render_links, collation_dot %}
+</head>
+
+<body>
+    {% set back_folder_id = folder_id or list.folder_id %}
+    <div style="margin-bottom: 5px; display: flex; align-items: center;">
+        <!-- Home / Folder -->
+        {% if back_folder_id %}
+        <a href="{{ request.scope.root_path }}/?folder_id={{ back_folder_id }}{% if sort and sort != 'user' %}&sort={{ sort }}{% endif %}"
+            class="nav-icon" title="{{ t('tooltip_back_to_folder') }}">📂</a>
+        {% else %}
+        <a href="{{ request.scope.root_path }}/{% if sort and sort != 'user' %}?sort={{ sort }}{% endif %}" class="nav-icon"
+            title="{{ t('tooltip_back_to_lists') }}">🏠</a>
+        {% endif %}
+
+        <!-- First -->
+        {% if first_list_id %}
+        <a href="{{ request.scope.root_path }}/list/{{ first_list_id }}{% if folder_id %}?folder_id={{ folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}"
+            class="nav-icon" title="{{ t('tooltip_first_list') }}">⏮️</a>
+        {% else %}
+        <span class="nav-icon" title="{{ t('tooltip_first_list') }}">⏮️</span>
+        {% endif %}
+
+        <!-- Previous -->
+        {% if prev_list_id %}
+        <a href="{{ request.scope.root_path }}/list/{{ prev_list_id }}{% if folder_id %}?folder_id={{ folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}"
+            class="nav-icon" title="{{ t('tooltip_previous_list') }}">⬅️</a>
+        {% else %}
+        <span class="nav-icon" title="{{ t('tooltip_previous_list') }}">⬅️</span>
+        {% endif %}
+
+        <!-- Next -->
+        {% if next_list_id %}
+        <a href="{{ request.scope.root_path }}/list/{{ next_list_id }}{% if folder_id %}?folder_id={{ folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}"
+            class="nav-icon" title="{{ t('tooltip_next_list') }}">➡️</a>
+        {% else %}
+        <span class="nav-icon" title="{{ t('tooltip_next_list') }}">➡️</span>
+        {% endif %}
+
+        {% if total_active_lists %}
+        <span class="nav-counter">
+            {% if active_list_index is not none %}{{ active_list_index + 1 }}{% else %}?{% endif %} / {{
+            total_active_lists }}
+        </span>
+        {% endif %}
+
+        {% if list.is_recipe %}
+        <a href="{{ request.scope.root_path }}/pantry" class="nav-icon" title="{{ t('tooltip_pantry_all_ingredients') }}">🥫</a>
+        {% endif %}
+    </div>
+    <div style="margin: 5px 0;">
+        <h2 style="margin:0; display:inline; vertical-align:middle;">{{ list.name }}</h2>
+        {% if enable_dokuwiki_links and list.show_dokuwiki_item_links %}
+        {% if list_dokuwiki_item_link %}
+        <a href="{{ list_dokuwiki_item_link }}" target="_blank" title="Open DokuWiki page for this list"
+            style="text-decoration: none; vertical-align: middle;">{{ dokuwiki_page_icon() }}</a>
+        {% endif %}
+        <button type="button" onclick="toggleListDokuWikiPage({{ list.id }})"
+            title="{% if list.dokuwiki_page_enabled %}Disable{% else %}Enable{% endif %} DokuWiki page for this list"
+            style="background:none; border:none; cursor:pointer; padding:0; font-size:0.8rem; vertical-align:middle; opacity:0.6;">{%
+            if list.dokuwiki_page_enabled %}➖{% else %}➕{% endif %}</button>
+        {% endif %}
+        {% if list.hashtags %}
+        {% for hashtag in list.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill" style="vertical-align:middle;">#{{ hashtag.name }}</a>
+        {% endfor %}
+        {% endif %}
+    </div>
+    <span class="dates">Created: {{ list.created_at_formatted }} | Modified: {{ list.modified_at_formatted }}</span>
+
+    <div class="add-forms-container" style="margin: 10px 0;">
+        <div class="add-icons"
+            style="display: flex; gap: 15px; font-size: 1.2rem; cursor: pointer; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+            <span onclick="toggleAddForm('todo')" title="{{ t('tooltip_add_todo') }}"
+                style="user-select: none;">➕</span>
+            <span onclick="toggleAddForm('note')" title="{{ t('tooltip_add_note') }}"
+                style="user-select: none;">📝</span>
+            <span onclick="document.getElementById('create-header-form').submit()"
+                title="{{ t('tooltip_add_divider') }}" style="user-select: none;">📅</span>
+        </div>
+
+        <form id="create-header-form" action="{{ request.scope.root_path }}/datetime-header/create" method="post" style="display:none;">
+            <input type="hidden" name="list_id" value="{{ list.id }}">
+        </form>
+
+        {% if show_quick_add_forms %}
+        <!-- Quick Add Todo (always visible) -->
+        <form id="quick-add-todo-form" onsubmit="return handleQuickTodoSubmit(event)"
+            style="display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 8px;">
+            <input type="hidden" name="list_id" value="{{ list.id }}">
+            <input type="text" id="quick-todo-title" name="title" placeholder="{{ t('label_title') }}" required
+                style="flex: 1; min-width: 120px; padding: 4px 8px; font-size: 0.95rem;">
+            {% if all_hashtags %}
+            <select id="quick-todo-hashtags" multiple size="1"
+                style="min-width: 150px; max-width: 200px; padding: 4px; font-size: 0.9rem;">
+                {% for h in all_hashtags %}
+                <option value="{{ h.id }}" data-name="{{ h.name }}">#{{ h.name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            <button type="submit" style="padding: 4px 12px; font-size: 0.95rem;">{{ t('btn_add_todo') }}</button>
+        </form>
+        {% endif %}
+
+        <div id="add-form-todo" class="add-form-section"
+            style="display: none; margin-top: 10px; border: 1px solid #eee; padding: 10px; border-radius: 4px;">
+            <h3 style="margin-top: 0;">{{ t('title_add_todo') }}</h3>
+            <form id="reactive-todo-form" onsubmit="return handleReactiveTodoSubmit(event)">
+                <input type="hidden" name="list_id" value="{{ list.id }}">
+                <label>{{ t('label_title') }}: <input type="text" id="reactive-todo-title" name="title"
+                        required></label>
+                <label>{{ t('label_hashtags') }}: <input type="text" id="hashtags-create" name="hashtags"
+                        placeholder="#example #tags"></label>
+                {% if all_hashtags %}
+                <select onchange="addHashtagFromSelect(this, 'hashtags-create')">
+                    <option value="">{{ t('opt_add_existing') }}</option>
+                    {% for h in all_hashtags %}
+                    <option value="{{ h.name }}">#{{ h.name }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                <button type="submit">{{ t('btn_add_todo') }}</button>
+            </form>
+        </div>
+
+        <div id="add-form-note" class="add-form-section"
+            style="display: none; margin-top: 10px; border: 1px solid #eee; padding: 10px; border-radius: 4px;">
+            <h3 style="margin-top: 0;">{{ t('title_add_note') }}</h3>
+            <form action="{{ request.scope.root_path }}/note/create" method="post">
+                <input type="hidden" name="list_id" value="{{ list.id }}">
+                <label>{{ t('label_name_optional') }}: <input type="text" name="name"></label>
+                <br>
+                <label style="vertical-align: top;">{{ t('label_text') }}: <textarea name="text" rows="3" required
+                        style="width: 100%; max-width: 500px; display: block; margin-bottom: 5px;"></textarea></label>
+                <button type="submit">{{ t('btn_add_note') }}</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // List settings for reactive rendering
+        const LIST_ID = {{ list.id }};
+        const SORT_ASCENDING = {{ list.sort_ascending | tojson }};
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderTodoRow(todo) {
+            const hashtagsHtml = (todo.hashtags || []).map(h =>
+                `<a href="{{ request.scope.root_path }}/hashtag/${h.id}" class="pill">#${escapeHtml(h.name)}</a>`
+            ).join('');
+
+            return `
+            <div id="todo-row-${todo.id}" style="display: flex; align-items: baseline; margin-left: 0px;">
+                <input type="checkbox" class="select-item" data-type="todo" data-id="${todo.id}"
+                    data-list-id="${todo.list_id || LIST_ID}"
+                    data-created="${todo.created_at || ''}" data-modified="${todo.created_at || ''}"
+                    onchange="handleTodoSelection(this, ${todo.id})" style="margin-right: 5px; flex-shrink: 0;">
+                <div style="flex-grow: 1;">
+                    <input type="checkbox" data-type="todo" data-id="${todo.id}"
+                        onchange="toggleItem(this)">
+                    <span style="color: ${todo.color && !['#000000', '#ffffff'].includes(todo.color?.toLowerCase()) ? todo.color : 'inherit'}; overflow-wrap: break-word;">${escapeHtml(todo.title)}</span>
+                    ${hashtagsHtml}
+                </div>
+            </div>`
+        }
+
+        function handleQuickTodoSubmit(event) {
+            event.preventDefault();
+
+            const titleInput = document.getElementById('quick-todo-title');
+            const hashtagsSelect = document.getElementById('quick-todo-hashtags');
+
+            const title = titleInput.value.trim();
+            if (!title) return false;
+
+            // Collect selected hashtag names from multi-select
+            let hashtagsStr = '';
+            if (hashtagsSelect) {
+                const selectedOptions = Array.from(hashtagsSelect.selectedOptions);
+                hashtagsStr = selectedOptions.map(opt => '#' + opt.dataset.name).join(' ');
+            }
+
+            const payload = {
+                list_id: LIST_ID,
+                title: title,
+                hashtags: hashtagsStr
+            };
+
+            SimpleTodo.fetch('/api/todo/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(response => response.json())
+                .then(todo => {
+                    if (todo.error) {
+                        alert('Error: ' + todo.error);
+                        return;
+                    }
+
+                    // Render and insert the new todo
+                    const todoHtml = renderTodoRow(todo);
+
+                    // Create or find the "New Items" container
+                    let newContainer = document.getElementById('newly-added-container');
+
+                    if (!newContainer) {
+                        newContainer = document.createElement('div');
+                        newContainer.id = 'newly-added-container';
+                        newContainer.style.marginTop = '10px';
+
+                        // Insert into the add-forms-container
+                        const addFormsContainer = document.querySelector('.add-forms-container');
+                        const quickForm = document.getElementById('quick-add-todo-form');
+
+                        if (addFormsContainer && quickForm) {
+                            addFormsContainer.insertBefore(newContainer, quickForm.nextSibling);
+                        } else {
+                            const buttons = document.querySelector('.add-icons');
+                            if (buttons && buttons.parentNode) {
+                                buttons.parentNode.insertBefore(newContainer, buttons.nextSibling);
+                            } else {
+                                document.body.appendChild(newContainer);
+                            }
+                        }
+                    }
+
+                    // Prepare the new todo element
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = todoHtml;
+                    const newRow = tempDiv.firstElementChild;
+
+                    // Add "New" Icon
+                    const titleSpan = newRow.querySelector('span[style*="overflow-wrap"]');
+                    if (titleSpan) {
+                        const icon = document.createElement('span');
+                        icon.textContent = 'NEW';
+                        icon.title = 'Newly added';
+                        Object.assign(icon.style, {
+                            color: 'white',
+                            backgroundColor: 'black',
+                            border: '1px solid white',
+                            padding: '1px 3px',
+                            fontSize: '0.7em',
+                            fontWeight: 'bold',
+                            marginRight: '6px',
+                            verticalAlign: 'text-bottom',
+                            borderRadius: '2px',
+                            display: 'inline-block',
+                            lineHeight: '1'
+                        });
+                        titleSpan.prepend(icon);
+                    }
+
+                    newContainer.appendChild(newRow);
+
+                    // Clear form for next entry
+                    titleInput.value = '';
+                    if (hashtagsSelect) {
+                        // Clear multi-select selection
+                        Array.from(hashtagsSelect.options).forEach(opt => opt.selected = false);
+                    }
+                    titleInput.focus();
+                })
+                .catch(error => {
+                    console.error('Error creating todo:', error);
+                    alert('Failed to create todo');
+                });
+
+            return false;
+        }
+
+        function handleReactiveTodoSubmit(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const titleInput = document.getElementById('reactive-todo-title');
+            const hashtagsInput = document.getElementById('hashtags-create');
+
+            const title = titleInput.value.trim();
+            if (!title) return false;
+
+            const payload = {
+                list_id: LIST_ID,
+                title: title,
+                hashtags: hashtagsInput.value
+            };
+
+            SimpleTodo.fetch('/api/todo/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(response => response.json())
+                .then(todo => {
+                    if (todo.error) {
+                        alert('Error: ' + todo.error);
+                        return;
+                    }
+
+                    // Render and insert the new todo
+                    const todoHtml = renderTodoRow(todo);
+
+                    // Create or find the "New Items" container
+                    let newContainer = document.getElementById('newly-added-container');
+
+                    if (!newContainer) {
+                        newContainer = document.createElement('div');
+                        newContainer.id = 'newly-added-container';
+                        newContainer.style.marginTop = '10px';
+
+                        // Insert into the add-forms-container, above the Add Todo form
+                        const addFormsContainer = document.querySelector('.add-forms-container');
+                        const addTodoForm = document.getElementById('add-form-todo');
+
+                        if (addFormsContainer && addTodoForm) {
+                            addFormsContainer.insertBefore(newContainer, addTodoForm);
+                        } else {
+                            // Fallback if structure changes
+                            const buttons = document.querySelector('.add-icons');
+                            if (buttons && buttons.parentNode) {
+                                buttons.parentNode.insertBefore(newContainer, buttons.nextSibling);
+                            } else {
+                                document.body.appendChild(newContainer);
+                            }
+                        }
+                    }
+
+                    // Prepare the new todo element
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = todoHtml;
+                    const newRow = tempDiv.firstElementChild;
+
+                    // Add "New" Icon
+                    const titleSpan = newRow.querySelector('span[style*="overflow-wrap"]');
+                    if (titleSpan) {
+                        // Insert styled icon span
+                        const icon = document.createElement('span');
+                        icon.textContent = 'NEW';
+                        icon.title = 'Newly added';
+                        // Style: White text, Black background, White outline square
+                        Object.assign(icon.style, {
+                            color: 'white',
+                            backgroundColor: 'black',
+                            border: '1px solid white',
+                            padding: '1px 3px',
+                            fontSize: '0.7em',
+                            fontWeight: 'bold',
+                            marginRight: '6px',
+                            verticalAlign: 'text-bottom', // Align with text baseline better
+                            borderRadius: '2px', // Slight rounding or keep square? User said "square".
+                            display: 'inline-block',
+                            lineHeight: '1'
+                        });
+                        // "Square" usually implies shape, but with text "NEW" it will be rectangular.
+                        // Maybe they meant "Box"? I'll stick to the box model.
+
+                        titleSpan.prepend(icon);
+                    }
+
+                    // Append to the new container (Reactive adds always go to bottom of this specific container? 
+                    // Or follow sort? User asked for "own section". Let's append to keep them in order of addition.)
+                    newContainer.appendChild(newRow);
+
+                    // Clear form but keep it open for next entry
+                    titleInput.value = '';
+                    // Keep hashtags as user may want same tags for multiple todos
+                    titleInput.focus();
+                })
+                .catch(error => {
+                    console.error('Error creating todo:', error);
+                    alert('Failed to create todo');
+                });
+
+            return false;
+        }
+
+        function toggleAddForm(type) {
+            const types = ['todo', 'note'];
+            const targetId = 'add-form-' + type;
+            const targetEl = document.getElementById(targetId);
+            const quickForm = document.getElementById('quick-add-todo-form');
+
+            // Check if currently open before closing all
+            const wasOpen = targetEl.style.display !== 'none';
+
+            // Close all
+            types.forEach(t => document.getElementById('add-form-' + t).style.display = 'none');
+
+            // Toggle
+            if (!wasOpen) {
+                targetEl.style.display = 'block';
+                // Hide quick form when full panel is open
+                if (quickForm && type === 'todo') quickForm.style.display = 'none';
+                // Focus the title input when opening todo form
+                if (type === 'todo') {
+                    const titleInput = document.getElementById('reactive-todo-title');
+                    if (titleInput) titleInput.focus();
+                }
+            } else {
+                // Show quick form when full panel is closed
+                if (quickForm) quickForm.style.display = 'flex';
+            }
+        }
+
+        function toggleIntersperseCollated(checkbox, listId) {
+            SimpleTodo.fetch(`/list/${listId}/toggle_intersperse_collated`, { method: 'POST' })
+                .then(() => window.location.reload());
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const highlightId = {{ highlight_id | tojson
+        }};
+        if (highlightId) {
+            const el = document.getElementById('todo-row-' + highlightId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Optional: Add a temporary border or background if needed, but user requested no flashing.
+                // el.style.backgroundColor = '#fffacd'; 
+            }
+        }
+        });
+
+        function updateCategory(value) {
+            const formData = new FormData();
+            formData.append('category', value);
+
+            SimpleTodo.fetch(`/api/list/${LIST_ID}/update-category`, {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating category:', error);
+                    alert('Failed to update category');
+                });
+        }
+    </script>
+
+    <label title="{{ t('tooltip_show_hide_completed') }}" style="margin-right: 15px;">
+        <input type="checkbox" {% if list.show_completed %}checked{% endif %}
+            onchange="toggleShowCompleted(this, {{ list.id }})"> ✅
+    </label>
+    <label title="{{ t('tooltip_show_hide_deferred') }}" style="margin-right: 15px;">
+        <input type="checkbox" {% if list.show_delayed %}checked{% endif %}
+            onchange="toggleShowDelayed(this, {{ list.id }})"> ⏳
+    </label>
+    <label title="{{ t('tooltip_collation_list') }}" style="margin-right: 15px;">
+        <input type="checkbox" {% if list.is_collation %}checked{% endif %}
+            onchange="toggleCollationListFlag(this, {{ list.id }})"> 🧺
+    </label>
+    <label title="{{ t('tooltip_manual_ordering') }}" style="margin-right: 15px;">
+        <input type="checkbox" {% if list.manual_sorting %}checked{% endif %}
+            onchange="toggleManualSorting(this, {{ list.id }})"> 🔢
+    </label>
+    {% if enable_dokuwiki_links %}
+    <label title="Show/hide DokuWiki item page links" style="margin-right: 15px;">
+        <input type="checkbox" {% if list.show_dokuwiki_item_links %}checked{% endif %}
+            onchange="toggleShowDokuWikiItemLinks(this, {{ list.id }})"> 📄
+    </label>
+    {% endif %}
+    {% if list.manual_sorting %}
+    <label title="{{ t('tooltip_recipe_mode') }}" style="margin-right: 15px;">
+        <input type="checkbox" {% if list.is_recipe %}checked{% endif %}
+            onchange="toggleRecipeMode(this, {{ list.id }})"> 🍳
+    </label>
+    {% endif %}
+    {% if list.is_collation %}
+    <label title="{{ t('tooltip_intersperse_collated') }}" style="margin-right: 15px;">
+        <input type="checkbox" {% if list.intersperse_collated_todos %}checked{% endif %}
+            onchange="toggleIntersperseCollated(this, {{ list.id }})"> 🔀
+    </label>
+    {% endif %}
+    {% if list.is_recipe %}
+    <a href="{{ request.scope.root_path }}/list/{{ list.id }}/shopping_list" style="margin-left: 5px; text-decoration: none;"
+        title="{{ t('tip_view_shopping_list') }}">🛒</a>
+    <a href="{{ request.scope.root_path }}/list/{{ list.id }}/ingredient_report" style="margin-left: 5px; text-decoration: none;"
+        title="{{ t('header_ingredient_report') }}">📊</a>
+    {% endif %}
+
+    <hr id="list-top-hr">
+
+    <div id="reorder-container"
+        style="display:{% if list.manual_sorting %}block{% else %}none{% endif %}; margin: 0 0 5px 20px;">
+        <button id="reorder-btn-icon" onclick="reorderTodos()" title="{{ t('tooltip_reorder_selected') }}" disabled
+            style="background:none; border:none; cursor:pointer; font-size:1.5rem; opacity: 0.3;">🔃</button>
+    </div>
+
+    {% from "macros.html" import link_icon, render_links, folder_icon, dokuwiki_icon, dokuwiki_page_icon, collation_dot,
+    list_icon %}
+
+    {% macro render_todo(todo, depth=0) %}
+    <div id="todo-row-{{ todo.id }}" style="display: flex; align-items: baseline; margin-left: {{ depth * 20 }}px;">
+        <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+            data-list-id="{{ todo.list_id }}"
+            data-created="{{ todo.created_at_formatted_full }}" data-modified="{{ todo.modified_at_formatted_full }}"
+            onchange="handleTodoSelection(this, {{ todo.id }})" style="margin-right: 5px; flex-shrink: 0;">
+        <div style="flex-grow: 1;">
+            <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+                onchange="toggleItem(this)">
+            {% if todo.pinned %}📌{% endif %}
+            <span
+                style="color: {% if todo.color and todo.color|lower not in ['#000000', '#ffffff'] %}{{ todo.color }}{% else %}inherit{% endif %}; overflow-wrap: break-word;">{{
+                todo.title }}</span>
+            {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit" title="Edit todo (note)">📝</a>{%
+            endif %}
+            {% if todo.alarm_start %}
+            <span title="Alarm set: {{ todo.alarm_start | datetime_format }}" style="cursor:help;">🔔</span>
+            {% endif %}
+            {{ render_links(todo.links) }}
+            {% if enable_dokuwiki_links and list.show_dokuwiki_item_links and todo.dokuwiki_page_enabled %}
+            <a href="{{ dokuwiki_item_link_fn('todo', todo.id) }}" target="_blank" title="Open DokuWiki page"
+                style="text-decoration: none;">{{ dokuwiki_page_icon() }}</a>
+            {% endif %}
+            {% if collation_lists and not list.is_collation %}
+            <span class="collation-dots">
+                {% for cl in collation_lists %}
+                <button type="button" class="collation-dot {% if cl in todo.collation_lists %}on{% endif %}"
+                    style="--collation-color: {{ cl.collation_color or '#888' }};" title="Toggle in {{ cl.name }}"
+                    onclick="toggleTodoInCollation({{ cl.id }}, {{ todo.id }})"></button>
+                {% endfor %}
+            </span>
+            {% endif %}
+            {% if list.is_collation and todo.list_id != list.id %}
+            <span class="collation-dots">
+                <button type="button" class="collation-dot on"
+                    style="--collation-color: {{ list.collation_color or '#888' }};" title="Remove from {{ list.name }}"
+                    onclick="toggleTodoInCollation({{ list.id }}, {{ todo.id }})"></button>
+            </span>
+            {% endif %}
+            {% if list.is_collation and todo.list_id != list.id %}
+            <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}" title="in {{ todo.list.name }}" style="text-decoration: none;">{{
+                list_icon() }}</a>
+            {% endif %}
+            {% for hashtag in todo.hashtags %}
+            <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    {% set todo_children = todo.children|selectattr('completed', 'false')|list if not show_completed else
+    todo.children|list %}
+    {% set todo_notes = todo.notes|list %}
+    {% set mixed_items = todo_children|concat(todo_notes)|sort(attribute='created_at', reverse=(not
+    list.sort_ascending)) %}
+    {% for item in mixed_items %}
+    {% if item.text is defined %}
+    <div style="margin-left: {{ (depth + 1) * 20 }}px; display: flex; align-items: baseline; margin-bottom: 4px;">
+        <input type="checkbox" class="select-item" data-type="note" data-id="{{ item.id }}"
+            data-created="{{ item.created_at_formatted }}" data-modified="{{ item.modified_at_formatted }}"
+            onchange="updateSelectionCount()" style="margin-right: 5px; flex-shrink: 0;">
+        <div style="flex-grow: 1;">
+            <span style="margin-right: 5px;" title="Note">📝</span>
+            {% if item.name %}
+            <strong style="margin-right: 5px;">{{ item.name }}:</strong>
+            {% endif %}
+            <span style="white-space: pre-wrap; word-break: break-word;">{{ item.text | e }}</span>
+            {{ render_links(item.links, "inherit") }}
+        </div>
+    </div>
+    {% else %}
+    {{ render_todo(item, depth + 1) }}
+    {% endif %}
+    {% endfor %}
+    {% endmacro %}
+
+    {% if items %}
+    {% for item in items %}
+    {% if item.type == 'todo' %}
+    {{ render_todo(item.obj, 0) }}
+    {% elif item.type == 'note' %}
+    <div style="display: flex; align-items: baseline; margin-bottom: 8px;">
+        <input type="checkbox" class="select-item" data-type="note" data-id="{{ item.obj.id }}"
+            data-created="{{ item.obj.created_at_formatted }}" data-modified="{{ item.obj.modified_at_formatted }}"
+            onchange="updateSelectionCount()" style="margin-right: 5px; flex-shrink: 0;">
+        <div style="flex-grow: 1;">
+            <span style="margin-right: 5px;" title="Note">📝</span>
+            {% if item.obj.name %}
+            <strong style="margin-right: 5px;">{{ item.obj.name }}:</strong>
+            {% endif %}
+            <span style="white-space: pre-wrap; word-break: break-word;">{{ item.obj.text | e }}</span>
+            {{ render_links(item.obj.links, "inherit") }}
+        </div>
+    </div>
+    {% elif item.type == 'datetime_header' %}
+    <div class="datetime-header-row">
+        <input type="checkbox" class="select-item" data-type="datetime_header" data-id="{{ item.obj.id }}"
+            data-created="{{ item.heading }}" onchange="updateSelectionCount()">
+        <span class="datetime-header">
+            {% if not list.partition_by_datetime_headers %}{{ folder_icon() }}{% endif %}
+            {{ item.heading }}
+            {% if item.dokuwiki_link %}
+            <a href="{{ item.dokuwiki_link }}" class="dokuwiki-link" target="_blank" title="Open in DokuWiki"
+                style="color: inherit; text-decoration: none;"
+                onclick="trackDokuWikiClick('header_group', null, null, [{{ item.todo_ids|join(',') }}])">{{
+                dokuwiki_icon(item.dokuwiki_confirmed) }}</a>
+            {% endif %}
+        </span>
+    </div>
+    {% elif item.type == 'synthetic_datetime_header' %}
+    <div class="datetime-header-row" data-synthetic="1">
+        <input type="checkbox" class="select-item" style="visibility: hidden; pointer-events: none;" disabled>
+        <span class="datetime-header">
+            {% if not list.partition_by_datetime_headers %}{{ folder_icon() }}{% endif %}
+            {{ item.heading }}
+            {% if item.dokuwiki_link %}
+            <a href="{{ item.dokuwiki_link }}" class="dokuwiki-link" target="_blank" title="Open in DokuWiki"
+                style="color: inherit; text-decoration: none;"
+                onclick="trackDokuWikiClick('header_group', null, null, [{{ item.todo_ids|join(',') }}])">{{
+                dokuwiki_icon(item.dokuwiki_confirmed) }}</a>
+            {% endif %}
+        </span>
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% else %}
+    {% if total_todo_count > 0 %}
+    <p>No visible todos (check filters, completed, or delayed items).</p>
+    {% else %}
+    <p>No todos yet.</p>
+    {% endif %}
+    {% endif %}
+
+    {% if list.is_collation and not list.intersperse_collated_todos and not list.manual_sorting %}
+    <hr>
+    <h3 style="margin-bottom:0;margin-top:0">🧺</h3>
+    {% if collected_todos %}
+    {% for todo in collected_todos %}
+    <div id="todo-row-{{ todo.id }}">
+        <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+            data-list-id="{{ todo.list_id }}"
+            data-created="{{ todo.created_at_formatted_full }}" data-modified="{{ todo.modified_at_formatted_full }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        {% if todo.pinned %}📌{% endif %}
+        <span style="color: {{ todo.color or 'inherit' }}">{{ todo.title }}</span>
+        {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit" title="Edit todo (note)">📝</a>{%
+        endif %}
+        {{ render_links(todo.links, "inherit") }}
+        <span class="collation-dots">
+            <button type="button" class="collation-dot on"
+                style="--collation-color: {{ list.collation_color or '#888' }};" title="Remove from {{ list.name }}"
+                onclick="toggleTodoInCollation({{ list.id }}, {{ todo.id }})"></button>
+        </span>
+        {% for hashtag in todo.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+        <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}"
+            title="in {{ todo.list.name }}{% if todo.parent %} > {{ todo.parent.title }}{% endif %}"
+            style="text-decoration: none;">{{ list_icon() }}</a>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>No collected todos yet.</p>
+    {% endif %}
+    {% endif %}
+    <hr id="list-footer-hr">
+
+    <!-- Category Select (hidden by default, toggle with icon) -->
+    <span id="category-toggle"
+        onclick="document.getElementById('category-controls').style.display='inline-flex'; this.style.display='none';"
+        style="cursor: pointer; font-size: 0.8rem; opacity: 0.6;" title="Show category">📁</span>
+    <span id="category-controls" style="display: none; align-items: center; gap: 8px;">
+        <a href="{{ request.scope.root_path }}/categories" style="font-weight: 500; text-decoration: none; color: inherit;">Category:</a>
+        <select id="category-select" onchange="updateCategory(this.value)"
+            style="padding: 4px 8px; font-size: 0.95rem; width: auto;">
+            <option value="">—</option>
+            {% for cat in all_categories %}
+            <option value="{{ cat }}" {% if list.category==cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+        </select>
+        <span
+            onclick="document.getElementById('category-controls').style.display='none'; document.getElementById('category-toggle').style.display='inline';"
+            style="cursor: pointer; font-size: 0.8rem; opacity: 0.6;" title="Hide">✕</span>
+    </span>
+
+
+    {% if items or collected_todos %}
+    <form action="{{ request.scope.root_path }}/list/{{ list.id }}/toggle_sort_order" method="post" style="display:inline;">
+        <button type="submit"
+            style="background:none; border:none; cursor:pointer; color:var(--link-color); padding:0; font-size:1rem; text-decoration:underline;">
+            {% if list.sort_ascending %}
+            {{ t('label_sort_newest') }}
+            {% else %}
+            {{ t('label_sort_oldest') }}
+            {% endif %}
+        </button>
+    </form>
+    |
+    <form action="{{ request.scope.root_path }}/list/{{ list.id }}/toggle_header_partitioning" method="post" style="display:inline;">
+        <button type="submit"
+            style="background:none; border:none; cursor:pointer; color:var(--link-color); padding:0; font-size:1rem; text-decoration:underline; display:inline-flex; align-items:center; gap:4px;">
+            {% if list.partition_by_datetime_headers %}
+            {{ t('label_pure_chrono') }}
+            {% else %}
+            {{ folder_icon() }}
+            {{ t('label_grouped') }}
+            {% endif %}
+        </button>
+    </form>
+    <button id="dokuwiki-delete-toggle" type="button" onclick="toggleDokuWikiDeleteMode()"
+        style="background:none; border:none; cursor:pointer; padding:2px; opacity:0.5; vertical-align:middle;"
+        title="{{ t('tooltip_toggle_dokuwiki') }}">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="red" xmlns="http://www.w3.org/2000/svg">
+            <path
+                d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+            <path fill-rule="evenodd"
+                d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+        </svg>
+    </button>
+    <h3 style="margin-bottom:0;margin-top:0">{{ t('header_operations') }}</h3>
+    <span id="selection-count" data-text-selected="{{ t('text_selected_suffix') }}">0 {{ t('text_selected_suffix')
+        }}</span> |
+    <button type="button" onclick="selectAll()">{{ t('btn_select_all') }}</button>
+    <button type="button" onclick="selectNone()">{{ t('btn_select_none') }}</button><br>
+    <span id="selected-dates" class="dates" style="display:none;"></span>
+    <div style="display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 5px;">
+        <button type="button" onclick="bulkPin('todo')">{{ t('btn_pin') }}</button>
+        <button type="button" onclick="bulkUnpin('todo')">{{ t('btn_unpin') }}</button>
+        <button type="button" onclick="bulkEdit()">{{ t('btn_edit') }}</button>
+        <button type="button" onclick="bulkDelete()">{{ t('btn_delete') }}</button>
+        <button type="button" onclick="showSubtodoForm()">{{ t('btn_add_subtodo') }}</button>
+        <button type="button" onclick="showSubnoteForm()">{{ t('btn_add_note') }}</button>
+        <button type="button" id="tag-selected-btn" onclick="tagSelectedItems()"
+            title="Tag items for moving in Folders view">Tag</button>
+        <select onchange="onMoreActionsChange(this)" style="margin-left: 10px; width: auto;">
+            <option value="">{{ t('opt_more_actions') }}</option>
+            <option value="defer">{{ t('opt_defer') }}</option>
+            <option value="set-alarm">{{ t('opt_set_alarm') }}</option>
+            <option value="edit-hashtags">{{ t('opt_edit_hashtags') }}</option>
+            {% if list.manual_sorting %}
+            <optgroup label="{{ t('group_recipe_mode') }}">
+                {% if list.is_recipe %}
+                <option value="toggle-recipe">🍳 {{ t('opt_disable_recipe') }}</option>
+                <option value="shopping-list">🛒 {{ t('header_shopping_list') }}</option>
+                <option value="reset-ingredients">🔄 {{ t('btn_reset_all') }}</option>
+                <option value="bulk-mark-bought">🛒 {{ t('tip_mark_bought') }}</option>
+                <option value="bulk-mark-ran-out">⚠️ {{ t('tip_mark_ran_out') }}</option>
+                <option value="ingredient-report">📊 {{ t('header_ingredient_report') }}</option>
+                {% else %}
+                <option value="toggle-recipe">🍳 {{ t('opt_enable_recipe') }}</option>
+                {% endif %}
+            </optgroup>
+            {% endif %}
+            {% if enable_dokuwiki_links and list.show_dokuwiki_item_links %}
+            <optgroup label="DokuWiki Pages">
+                <option value="enable-dokuwiki-page">📄 Enable DokuWiki Page</option>
+                <option value="disable-dokuwiki-page">🚫 Disable DokuWiki Page</option>
+            </optgroup>
+            {% endif %}
+        </select>
+    </div>
+
+    <!-- Inline Defer Form -->
+    <div id="inline-defer-form"
+        style="display: none; margin-top: 10px; border: 1px solid #ccc; padding: 10px; border-radius: 4px;">
+        <strong>{{ t('label_defer_until') }}</strong>
+        <input type="date" id="defer-date-input">
+        <button type="button" onclick="applyDefer()">{{ t('btn_apply') }}</button>
+        <button type="button" onclick="cancelDefer()">{{ t('btn_cancel') }}</button>
+    </div>
+
+    <!-- Inline Set Alarm Form -->
+    <div id="inline-alarm-form"
+        style="display: none; margin-top: 10px; border: 1px solid #ccc; padding: 10px; border-radius: 4px;">
+        <strong>{{ t('label_set_alarm') }}</strong>
+        <div style="margin: 5px 0;">
+            <label>
+                <input type="radio" name="alarm_mode_viewlist" value="none" checked
+                    onchange="toggleAlarmModeViewList()"> {{ t('radio_no_alarm') }}
+            </label>
+            <label>
+                <input type="radio" name="alarm_mode_viewlist" value="range" onchange="toggleAlarmModeViewList()"> {{
+                t('radio_time_range') }}
+            </label>
+            <label>
+                <input type="radio" name="alarm_mode_viewlist" value="tolerance" onchange="toggleAlarmModeViewList()">
+                {{ t('radio_single_time') }}
+            </label>
+        </div>
+        <div id="alarm-range-inputs-viewlist" style="display: none; margin: 5px 0;">
+            <label>{{ t('label_start') }}: <input type="datetime-local" name="alarm_start_range_viewlist"></label><br>
+            <label>{{ t('label_end') }}: &nbsp;&nbsp;<input type="datetime-local"
+                    name="alarm_end_range_viewlist"></label>
+        </div>
+        <div id="alarm-tolerance-inputs-viewlist" style="display: none; margin: 5px 0;">
+            <label>Target Time: <input type="datetime-local" name="alarm_target_time_viewlist"></label><br>
+            <label>+/- Minutes: <input type="number" name="alarm_minutes_viewlist" value="120" min="0"></label>
+        </div>
+        <div style="margin-top: 5px;">
+            <button type="button" onclick="applyAlarm()">Apply</button>
+            <button type="button" onclick="cancelAlarm()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Inline Edit Hashtags Form -->
+    <div id="inline-hashtags-form"
+        style="display: none; margin-top: 10px; border: 1px solid #ccc; padding: 10px; border-radius: 4px;">
+        <strong>Edit Hashtags:</strong><br>
+        <input type="text" id="hashtags-edit-viewlist" placeholder="#example #tags" style="width: 300px;">
+        {% if all_hashtags %}
+        <select onchange="addHashtagFromSelect(this, 'hashtags-edit-viewlist')">
+            <option value="">Add existing...</option>
+            {% for h in all_hashtags %}
+            <option value="{{ h.name }}">#{{ h.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <div style="margin-top: 5px;">
+            <button type="button" onclick="applyHashtags()">Apply</button>
+            <button type="button" onclick="cancelHashtags()">Cancel</button>
+        </div>
+    </div>
+    <form id="subtodo-form" action="{{ request.scope.root_path }}/todo/create" method="post" style="display:none;">
+        <input type="hidden" name="list_id" value="{{ list.id }}">
+        <input type="hidden" name="parent_id" id="subtodo-parent-id" value="">
+        <input type="text" name="title" placeholder="Subtodo title" required>
+        <button type="submit">Add</button>
+        <button type="button" onclick="hideSubtodoForm()">Cancel</button>
+    </form>
+    <form id="subnote-form" action="{{ request.scope.root_path }}/note/create" method="post" style="display:none;">
+        <input type="hidden" name="list_id" value="{{ list.id }}">
+        <input type="hidden" name="todo_id" id="subnote-todo-id" value="">
+        <input type="text" name="name" placeholder="Note Name (Optional)">
+        <textarea name="text" placeholder="Note Text" required
+            style="width: 100%; max-width: 500px; display: block; margin-bottom: 5px;"></textarea>
+        <button type="submit">Add Note</button>
+        <button type="button" onclick="hideSubnoteForm()">Cancel</button>
+    </form>
+    <script>
+        function toggleManualSorting(checkbox, listId) {
+            const formData = new FormData();
+            formData.append('manual_sorting', checkbox.checked);
+            SimpleTodo.fetch(`/list/${listId}/toggle_manual_sort`, {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to update manual sorting preference');
+                    checkbox.checked = !checkbox.checked;
+                }
+            });
+        }
+
+        // Selection Order Tracking for Daily Plan
+        let selectedTodos = [];
+
+        function handleTodoSelection(checkbox, todoId) {
+            const idStr = todoId.toString();
+            if (checkbox.checked) {
+                if (!selectedTodos.includes(idStr)) {
+                    selectedTodos.push(idStr);
+                }
+            } else {
+                selectedTodos = selectedTodos.filter(id => id !== idStr);
+            }
+            updateSelectionCount();
+        }
+
+        // Override reorderTodos to respect selection order for TARGET, but Visual Order for SOURCES
+        window.reorderTodos = function () {
+            let selectedIds = [...selectedTodos]; // Copy
+            // Fallback: If logic desync (reload/bulk), default to DOM ids
+            if (selectedIds.length < 2) {
+                const domIds = getSelectedIds('todo');
+                if (domIds.length >= 2) {
+                    console.log("Fallback to DOM order (Selection tracking mismatch)");
+                    selectedIds = domIds;
+                }
+            }
+
+            if (selectedIds.length < 2) {
+                alert('Please select at least two todos to reorder');
+                return;
+            }
+
+            // Logic Part 1: Target is LAST CLICKED (Selection Order)
+            const targetId = selectedIds[selectedIds.length - 1]; // Last item
+
+            // Logic Part 2: Determine Sources (All selected except Last)
+            const rawSourceIds = new Set(selectedIds.slice(0, -1));
+
+            // Logic Part 3: Sort Sources by VISUAL (DOM) ORDER
+            // Get all visible IDs in DOM order
+            const allDomIds = getSelectedIds('todo'); // [VisualA, VisualB, ...]
+
+            // Filter DOM IDs to get our Sources in Visual Order, ignoring Target's visual position
+            // (Target is filtered out because it's not in rawSourceIds)
+            const sourceIds = allDomIds.filter(id => rawSourceIds.has(id));
+
+            // Safety Check
+            if (sourceIds.length !== rawSourceIds.size) {
+                console.warn("Source count mismatch likely due to DOM desync", sourceIds.length, rawSourceIds.size);
+                // If mismatch, we might lose items? Fallback to raw selection order to be safe?
+                // Or stick to what we found. sourceIds is safe (visual).
+            }
+
+            const formData = new FormData();
+            sourceIds.forEach(id => formData.append('source_ids', id));
+            formData.append('target_id', targetId);
+            formData.append('list_id', {{ list.id }});  // Pass collation list context
+
+        SimpleTodo.fetch('/todo/reorder', {
+            method: 'POST',
+            body: formData
+        }).then(response => {
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                response.json().then(data => alert('Error: ' + (data.detail || 'Unknown error')));
+            }
+        });
+        };
+
+        // Extend operations for Reorder
+        // Note: updateSelectionCount is likely defined in app.js or view_list.html (could be missing if not viewed).
+        // Let's check app.js for updateSelectionCount.
+    </script>
+    {% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

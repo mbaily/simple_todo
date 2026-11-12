@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Archived Lists</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    {% from "macros.html" import render_links, nav_bar with context %}
+    {{ nav_bar() }}
+    <h3 style="margin:0;">Archived Lists</h3>
+
+    {% if lists %}
+    {% for list in lists %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="list" data-id="{{ list.id }}"
+            data-created="{{ list.created_at_formatted }}" data-modified="{{ list.modified_at_formatted }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="list" data-id="{{ list.id }}" {% if list.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        <a href="{{ request.scope.root_path }}/list/{{ list.id }}">{{ list.name }}</a>
+        {{ render_links(list.links, "inherit") }}
+        {% for hashtag in list.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+    <h3>Operations</h3>
+    <p><span id="selection-count">0 selected</span> | <button type="button" onclick="selectAll('list')">Select
+            All</button> <button type="button" onclick="selectNone('list')">Select None</button></p>
+    <p id="selected-dates" class="dates" style="display:none;"></p>
+    <p>
+        <button type="button" onclick="bulkEdit('list')">Edit</button>
+        <button type="button" onclick="bulkUnarchive('list')">Unarchive</button>
+        <button type="button" onclick="bulkDelete('list')">Delete</button>
+    </p>
+    {% else %}
+    <p>No archived lists.</p>
+    {% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

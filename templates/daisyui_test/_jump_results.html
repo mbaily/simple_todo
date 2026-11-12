@@ -1,0 +1,6 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+<div class="jump-list" role="listbox" aria-label="Places">
+{% for row in rows %}<a class="btn btn-ghost btn-sm jump-item" role="option" href="{{ row.url }}" data-name="{{ (row.context ~ ' ' ~ row.label)|lower }}">{{ icon(row.icon, 15) }}<span class="jump-label">{{ row.label }}</span>{% if row.context %}<span class="item-context">{{ row.context }}</span>{% endif %}{% if row.starred %}<span class="jump-mark is-favourite" title="Favourite">{{ icon('star', 13) }}</span>{% elif row.recent %}<span class="jump-mark" title="Recent">{{ icon('clock', 13) }}</span>{% endif %}</a>
+{% endfor %}
+<a class="btn btn-ghost btn-sm jump-item" role="option" href="{{ prototype_url }}/search" data-jump-search="{{ prototype_url }}/search" hidden>{{ icon('search', 15) }}<span class="jump-label">Search tasks and notes for “<span data-jump-term></span>”</span></a>
+</div>

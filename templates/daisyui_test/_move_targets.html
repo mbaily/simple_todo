@@ -1,0 +1,9 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set noun = 'folder' if kind == 'folder' else 'list' %}
+<label class="input input-sm search-input move-search">{{ icon('search', 16) }}<input type="search" placeholder="Find a {{ noun }}" aria-label="Find a {{ noun }}" autocomplete="off" data-pick-filter></label>
+<div class="jump-list" role="listbox" aria-label="Destinations">
+{% for row in rows %}<button type="submit" class="btn btn-ghost btn-sm jump-item" role="option" name="target_{{ noun }}_id" value="{{ row.id }}" data-name="{{ (row.context ~ ' ' ~ row.label)|lower }}">{{ icon(row.icon, 15) }}<span class="jump-label">{{ row.label }}</span>{% if row.context %}<span class="item-context">{{ row.context }}</span>{% endif %}{% if row.starred %}<span class="jump-mark is-favourite" title="Favourite">{{ icon('star', 13) }}</span>{% elif row.recent %}<span class="jump-mark" title="Recent">{{ icon('clock', 13) }}</span>{% endif %}</button>
+{% else %}<p class="section-empty">There are no {{ noun }}s to move to.</p>
+{% endfor %}
+<p class="section-empty" data-pick-empty hidden>No {{ noun }}s match.</p>
+</div>

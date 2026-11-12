@@ -1,0 +1,27 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% macro move(item, to, label, symbol, disabled) %}
+<form action="{{ prototype_url }}/lists/reorder/move{{ query }}" method="post" hx-post="{{ prototype_url }}/lists/reorder/move{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><input type="hidden" name="list_id" value="{{ item.id }}"><input type="hidden" name="to" value="{{ to }}"><button class="btn btn-ghost btn-square btn-sm" aria-label="Move {{ item.name }} {{ label }}" title="Move {{ label }}" {% if disabled %}disabled{% endif %} data-reorder-key="{{ item.id }}:{{ to }}">{{ symbol }}</button></form>
+{% endmacro %}
+<div id="daisy-workspace" data-scope="reorder:{{ folder_id }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Reorder lists</h1><span class="eyebrow">{{ folder.path_name if folder else 'Unfiled lists' }} · {{ lists|length }}</span></div>
+        <div class="page-heading-actions">
+            <span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
+            <form class="sort-form" method="get" action="{{ prototype_url }}/lists/reorder" hx-get="{{ prototype_url }}/lists/reorder" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true"><select class="select select-sm" name="folder_id" aria-label="Folder to reorder"><option value="0" {% if not folder_id %}selected{% endif %}>Unfiled lists</option>{% for item in folders %}<option value="{{ item.id }}" {% if folder_id == item.id %}selected{% endif %}>{{ item.path_name }}</option>{% endfor %}</select><noscript><button class="btn btn-sm">Show</button></noscript></form>
+            <a class="btn btn-primary btn-sm" href="{{ return_url }}">{{ icon('check', 14) }} Done</a>
+        </div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    <p class="page-hint">This order is used by “My order” in the overview. Changes save immediately.</p>
+    {% if lists %}
+    <section class="section-panel" aria-label="Lists in order"><ol class="list reorder-list">{% for item in lists %}
+        <li class="list-row item-row reorder-row" id="reorder-{{ item.id }}">
+            <span class="reorder-position">{{ loop.index }}</span>
+            <div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}/list/{{ item.id }}?sort=user&amp;folder_id={{ folder_id }}">{{ item.name }}</a><span class="badge badge-ghost task-count">{{ uncompleted_counts.get(item.id, 0) }}<span class="count-label"> remaining</span></span>{% if item.category %}<span class="item-context">{{ item.category }}</span>{% endif %}</div></div>
+            <div class="row-actions reorder-actions">
+                {{ move(item, 'top', 'to the top', '⤒', loop.first) }}{{ move(item, 'up', 'up', '↑', loop.first) }}{{ move(item, 'down', 'down', '↓', loop.last) }}{{ move(item, 'bottom', 'to the bottom', '⤓', loop.last) }}
+            </div>
+        </li>
+    {% endfor %}</ol></section>
+    {% else %}<div class="empty-state"><h3>No lists in {{ folder.path_name if folder else 'Unfiled lists' }}.</h3></div>{% endif %}
+</div>

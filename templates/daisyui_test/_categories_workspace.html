@@ -1,0 +1,22 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+<div id="daisy-workspace" data-scope="categories" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Categories</h1><span class="eyebrow">{{ categories|length }}</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span></div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    <p class="page-hint">Categories group lists in the overview. Set a list's category from its view options.</p>
+    <form id="category-create-form" data-draft class="inline-fields group-form" action="{{ prototype_url }}/categories/create{{ query }}" method="post" hx-post="{{ prototype_url }}/categories/create{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><input class="input input-sm grow-input" name="name" required maxlength="255" placeholder="New category name" aria-label="Category name" autocomplete="off"><button class="btn btn-primary btn-sm">{{ icon('plus', 14) }} Add category</button></form>
+    {% if categories %}
+    <section class="section-panel" aria-label="Categories"><ul class="list">{% for c in categories %}
+        <li class="list-row bill-row">
+            <div class="bill-main"><div class="item-title-line"><span class="item-title">{{ c.name }}</span><span class="item-context">{{ c.list_count }} {{ 'list' if c.list_count == 1 else 'lists' }}</span>{% if not c.saved %}<span class="badge badge-sm badge-ghost" title="Used by lists but not in the saved category list">Used by lists only</span>{% endif %}</div></div>
+            <div class="row-actions bill-actions">
+                <button type="button" class="btn btn-ghost btn-sm" data-command="bill-panel" data-panel="rename-category-{{ loop.index }}" aria-expanded="false">Rename</button>
+                <form action="{{ prototype_url }}/categories/delete{{ query }}" method="post" hx-post="{{ prototype_url }}/categories/delete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete the category {{ c.name }}? Its {{ c.list_count }} lists are kept without a category."><input type="hidden" name="name" value="{{ c.name }}"><button class="btn btn-ghost btn-square btn-sm delete-button" aria-label="Delete category {{ c.name }}">{{ icon('trash', 15) }}</button></form>
+            </div>
+            <div id="rename-category-{{ loop.index }}" class="bill-panel" hidden><form class="bill-form inline-fields" action="{{ prototype_url }}/categories/rename{{ query }}" method="post" hx-post="{{ prototype_url }}/categories/rename{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><input type="hidden" name="old_name" value="{{ c.name }}"><input class="input input-sm grow-input" name="new_name" value="{{ c.name }}" required maxlength="255" aria-label="New name for {{ c.name }}"><button class="btn btn-sm">Save</button></form></div>
+        </li>
+    {% endfor %}</ul></section>
+    {% else %}<div class="empty-state"><h3>No categories yet.</h3></div>{% endif %}
+</div>

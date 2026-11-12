@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>{% if results_page or folders_page or smart_page or hashtags_page or calendar_page or pages_page or customize_page or bills_page or expenses_page or recipe_page or reorder_page or uncompleted_page or categories_page %}{{ page_title }} · {{ t('app_title') }}{% else %}{% if editor_page %}Edit {{ item_label }} · {% elif list_page %}{{ list.name }} · {% endif %}{{ t('app_title') }}{% endif %}</title>
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/daisyui_test/daisyui-5.7.50.css">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/daisyui_test/style.css?v=50">
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <script src="{{ request.scope.root_path }}/static/daisyui_test/htmx-4.0.0.min.js" defer></script>
+    <script src="{{ request.scope.root_path }}/static/daisyui_test/app.js?v=27" defer></script>
+</head>
+<body hx-boost:inherited="swap:innerMorph" data-app-title="{{ t('app_title') }}">
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set rp = request.scope.root_path %}
+<a href="#main-content" class="skip-link">Skip to content</a>
+<div class="app-shell">
+    <header class="navbar topbar">
+        <a class="brand" href="{{ prototype_url }}"><span class="brand-symbol">{{ icon('check', 18) }}</span><span>simple<span class="brand-light">todo</span></span></a>
+        <nav class="toolbar-navigation" aria-label="Main navigation">
+            {% for path, symbol, label in [('', 'home', 'Overview'), ('/search', 'search', t('title_search', 'Search')), ('/calendar', 'calendar', t('title_calendar', 'Calendar')), ('/folders', 'folder', t('title_folders', 'Folders')), ('/smart-folders', 'smart', t('title_smart_folders', 'Smart folders')), ('/hashtags', 'hash', t('title_hashtags', 'Hashtags'))] %}
+            {% set active = (not path and not list_page and not editor_page and not results_page and not folders_page and not smart_page and not hashtags_page and not calendar_page and not pages_page and not customize_page and not bills_page and not expenses_page and not recipe_page and not reorder_page and not uncompleted_page and not categories_page) or (path == '/search' and results_kind == 'search') or (path == '/folders' and folders_page) or (path == '/smart-folders' and smart_page) or (path == '/hashtags' and hashtags_page) or (path == '/calendar' and calendar_page) %}
+            <a href="{{ prototype_url ~ path if path in ['', '/search', '/folders', '/smart-folders', '/hashtags', '/calendar'] else rp ~ path }}" class="btn btn-ghost btn-sm toolbar-link {{ 'toolbar-secondary' if loop.index > 3 else '' }} {{ 'menu-active' if active else '' }}" {% if active %}aria-current="page"{% endif %} title="{{ label }}">{{ icon(symbol, 17) }}<span>{{ label }}</span></a>
+            {% endfor %}
+            <details id="navigation-menu" class="dropdown dropdown-end navigation-dropdown">
+                <summary class="btn btn-ghost btn-sm" aria-label="More navigation">{{ icon('menu', 18) }}<span>More</span></summary>
+                <ul class="dropdown-content menu row-menu toolbar-menu">
+                    {% for path, symbol, label in [('/folders', 'folder', t('title_folders', 'Folders')), ('/smart-folders', 'smart', t('title_smart_folders', 'Smart folders')), ('/hashtags', 'hash', t('title_hashtags', 'Hashtags'))] %}
+                    <li class="mobile-destination"><a href="{{ prototype_url if path in ['/folders', '/smart-folders', '/hashtags'] else rp }}{{ path }}">{{ icon(symbol, 17) }} {{ label }}</a></li>
+                    {% endfor %}
+                    {% for path, symbol, label in [('/uncompleted', 'check', 'Open tasks'), ('/categories', 'list', 'Categories'), ('/collations', 'layers', t('title_collations', 'Collations')), ('/archived', 'archive', t('title_archived', 'Archived')), ('/bills', 'money', 'Bills'), ('/expenses', 'list', 'Quick expenses'), ('/journal', 'book', t('link_journal', 'Journal')), ('/customization', 'settings', t('title_customize', 'Customize'))] %}
+                    <li><a href="{{ prototype_url if path in ['/archived', '/collations', '/journal', '/customization', '/bills', '/expenses', '/uncompleted', '/categories'] else rp }}{{ path }}" {% if (pages_page and path == '/' ~ pages_page) or (customize_page and path == '/customization') or (bills_page and path == '/bills') or (expenses_page and path == '/expenses') or (uncompleted_page and path == '/uncompleted') or (categories_page and path == '/categories') %}aria-current="page" class="menu-active"{% endif %}>{{ icon(symbol, 17) }} {{ label }}</a></li>
+                    {% endfor %}
+                    <li><a href="{{ rp }}/classic" hx-boost="false">{{ icon('arrow', 17) }} Original frontend</a></li>
+                    {% if basic_auth_enabled %}<li><a href="{{ rp }}/logout" hx-boost="false">{{ icon('logout', 17) }} Log out</a></li>{% endif %}
+                </ul>
+            </details>
+        </nav>
+    </header>
+    {% set strip = shortcuts(request) %}{% include 'daisyui_test/_shortcut_strip.html' %}
+    <main id="main-content" class="main-content" tabindex="-1">
+        {% include workspace_template|default('daisyui_test/_workspace.html') %}
+    </main>
+</div>
+<dialog id="jump-dialog" class="modal" aria-label="Jump to a folder or list">
+    <div class="modal-box move-box jump-box">
+        <label class="input input-sm search-input move-search">{{ icon('search', 16) }}<input id="jump-input" type="search" placeholder="Jump to a folder or list…" aria-label="Jump to" aria-controls="jump-results" autocomplete="off" data-pick-filter></label>
+        <div id="jump-results" data-jump-results><span class="loading loading-spinner loading-sm" aria-label="Loading places"></span></div>
+        <p class="page-hint jump-hint">↑ ↓ to choose · Enter to open · Esc to close</p>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button aria-label="Close">Close</button></form>
+</dialog>
+<dialog id="move-dialog" class="modal" aria-labelledby="move-title">
+    <div class="modal-box move-box">
+        <h2 id="move-title">Move <span data-move-summary>the selection</span> to…</h2>
+        <p class="page-hint" data-move-hint></p>
+        <form id="move-form" method="post" action="{{ prototype_url }}/move" hx-post="{{ prototype_url }}/move" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button">
+            <div data-move-items></div><input type="hidden" name="return_query" value="">
+            <div data-move-targets><span class="loading loading-spinner loading-sm" aria-label="Loading destinations"></span></div>
+        </form>
+        <div class="modal-action"><form method="dialog"><button class="btn">Cancel</button></form></div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button aria-label="Close">Close</button></form>
+</dialog>
+<dialog id="delete-dialog" class="modal" aria-labelledby="delete-title" aria-describedby="delete-description">
+    <div class="modal-box">
+        <span class="dialog-icon">{{ icon('trash', 25) }}</span>
+        <h2 id="delete-title">Delete selected items?</h2>
+        <p id="delete-description">The selected items will be permanently deleted. Deleting a list or parent task also deletes its nested tasks and notes.</p>
+        <p class="delete-selection-summary" id="delete-selection-summary"></p>
+        <div class="modal-action">
+            <form method="dialog"><button class="btn" autofocus>Cancel</button></form>
+            <button type="button" class="btn btn-error" data-command="confirm-delete">Delete items</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button aria-label="Close confirmation">Close</button></form>
+</dialog>
+<div id="toast" class="toast toast-end" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

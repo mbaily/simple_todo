@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>{{ t('title_search') }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    {% set rp = request.scope.root_path %}
+    {% from "macros.html" import render_links %}
+    <div style="margin-bottom: 5px; display: flex; align-items: center; flex-wrap: wrap;">
+        <a href="{{ rp }}/classic" class="nav-icon" title="{{ t('title_home') }}">🏠</a>
+        <a href="{{ rp }}/search" class="nav-icon" title="{{ t('title_search') }}">🔍</a>
+        <a href="{{ rp }}/classic/calendar" class="nav-icon" title="{{ t('title_calendar') }}">📅</a>
+        <a href="{{ rp }}/hashtags" class="nav-icon" title="{{ t('title_hashtags') }}">#️⃣</a>
+        <a href="{{ rp }}/smart-folders" class="nav-icon" title="{{ t('title_smart_folders') }}"
+            style="position: relative;">📁<span
+                style="position: absolute; bottom: -2px; right: -2px; font-size: 0.6em;">⚙️</span></a>
+        <a href="{{ rp }}/folders" class="nav-icon" title="{{ t('title_folders') }}">📂</a>
+        <a href="{{ rp }}/archived" class="nav-icon" title="{{ t('title_archived') }}">📦</a>
+        <a href="{{ rp }}/collations" class="nav-icon" title="{{ t('title_collations') }}">🧺</a>
+        <a href="{{ rp }}/customization" class="nav-icon" title="{{ t('title_customize') }}">⚙️</a>
+    </div>
+
+    <h1 style="margin-top:0; margin-bottom:0;">{{ t('title_search') }}</h1>
+
+    <form action="{{ request.scope.root_path }}/search" method="get">
+        <input type="text" name="q" value="{{ q }}" placeholder="{{ t('placeholder_search') }}" autofocus>
+        <button type="submit">{{ t('btn_search') }}</button>
+        {% if q %}
+        <a href="{{ request.scope.root_path }}/search">{{ t('btn_clear') }}</a>
+        {% endif %}
+    </form>
+
+    {% if q %}
+    <p class="dates">{{ t('text_query_prefix') }} {{ q }}</p>
+
+    <h3 style="margin-top:0; margin-bottom:0;">{{ t('header_lists') }} ({{ lists|length }})</h3>
+    {% if lists %}
+    {% for list in lists %}
+    <div>
+        {% if list.is_collation %}
+        <span class="collation-dots"><span class="collation-dot on"
+                style="--collation-color: {{ list.collation_color or '#888' }}; cursor: default;"></span></span>
+        {% endif %}
+        <a href="{{ request.scope.root_path }}/list/{{ list.id }}">{{ list.name }}</a>
+        {{ render_links(list.links, "inherit") }}
+        {% for hashtag in list.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>{{ t('text_no_matching_lists') }}</p>
+    {% endif %}
+
+    <h3 style="margin-top:0; margin-bottom:0;">{{ t('header_events') }} ({{ events|length }})</h3>
+    {% if events %}
+    {% for ev in events %}
+    <div>
+        <span class="dates">{{ ev.display_start_at | date_format }}</span>
+        {% if ev.rrule %}
+        {{ ev.title }} <span class="dates">({{ t('text_recurring') }})</span>
+        {% else %}
+        <span class="calendar-title-nonrecurring">{{ ev.title }}</span>
+        {% endif %}
+        {% if ev.note %}<span class="dates">- {{ ev.note }}</span>{% endif %}
+        {% for h in ev.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+        {% endfor %}
+        <a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit" class="note-icon" title="{{ t('tip_edit_event') }}">📝</a>
+        <a href="{{ request.scope.root_path }}/classic/calendar" class="note-icon" title="{{ t('tip_go_to_calendar') }}">📅</a>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>{{ t('text_no_matching_events') }}</p>
+    {% endif %}
+
+    <h3 style="margin-top:0; margin-bottom:0;">{{ t('header_todos') }} ({{ todos|length }})</h3>
+    {% from "macros.html" import render_tree_node with context %}
+
+    {% if todo_tree and (todo_tree.lists or todo_tree.folder_nodes) %}
+    {{ render_tree_node(todo_tree) }}
+    {% else %}
+    <p>{{ t('text_no_matching_todos') }}</p>
+    {% endif %}
+    {% else %}
+    <p class="dates">{{ t('text_search_prompt') }}</p>
+    {% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

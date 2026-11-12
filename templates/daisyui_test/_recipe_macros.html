@@ -1,0 +1,28 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% macro op(name) %}{{ prototype_url }}/recipes/do/{{ name }}{% endmacro %}
+{% macro hx(name) %}action="{{ op(name) }}" method="post" hx-post="{{ op(name) }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"{% endmacro %}
+{% macro event_button(todo, kind, label, primary=False, scope='') %}
+<form {{ hx('event') }}><input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="todo_id" value="{{ todo.id }}"><input type="hidden" name="event_type" value="{{ kind }}">{% if scope %}<input type="hidden" name="scope" value="{{ scope }}">{% endif %}<button class="btn btn-sm {{ 'btn-primary' if primary else 'btn-ghost' }}" aria-label="{{ label }}: {{ todo.title }}">{{ label }}</button></form>
+{% endmacro %}
+{% macro status_badge(status) %}{% if status %}<span class="badge badge-sm {{ 'timing-late' if status == 'ran_out' else 'badge-warning' if status == 'likely_low' else 'badge-ghost' if status == 'new' else 'timing-good' }}">{{ statuses[status] }}</span>{% endif %}{% endmacro %}
+{% macro ingredient_row(todo, stats, status=None, show_list=False) %}
+<li class="list-row bill-row ingredient-row" id="ingredient-{{ todo.id }}">
+    <div class="bill-main">
+        <div class="item-title-line"><span class="item-title">{{ todo.title }}</span>{{ status_badge(status) }}{% if todo.ingredient_group %}<a class="badge badge-sm badge-outline tag" href="{{ prototype_url }}/pantry#group-{{ todo.ingredient_group_id }}" title="Shared ingredient: events count for every recipe in the group">{{ icon('layers', 11) }} {{ todo.ingredient_group.canonical_name }}</a>{% endif %}{% if show_list %}<a class="item-context" href="{{ prototype_url }}/list/{{ todo.list_id }}">{{ todo.list.name }}</a>{% endif %}</div>
+        <div class="item-context">{{ stats|ingredient_stats }}</div>
+    </div>
+    <div class="row-actions bill-actions">
+        {{ event_button(todo, 'bought', 'Bought', status in ['ran_out', 'likely_low', 'new'], 'group' if todo.ingredient_group_id else '') }}
+        {% if status != 'ran_out' %}{{ event_button(todo, 'ran_out', 'Ran out', False, 'group' if todo.ingredient_group_id else '') }}{% endif %}
+        <a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/ingredient/{{ todo.id }}/history" title="History" aria-label="History of {{ todo.title }}">{{ icon('clock', 15) }}</a>
+    </div>
+</li>
+{% endmacro %}
+{% macro recipe_nav(list) %}
+<div class="detail-navigation"><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/list/{{ list.id }}">{{ icon('list', 15) }} {{ list.name }}</a>
+<div class="join recipe-tabs" role="navigation" aria-label="Recipe pages">
+    <a class="btn btn-sm join-item {{ 'layout-active' if recipe_page == 'shopping' else '' }}" href="{{ prototype_url }}/list/{{ list.id }}/shopping" {% if recipe_page == 'shopping' %}aria-current="page"{% endif %}>Shopping list</a>
+    <a class="btn btn-sm join-item {{ 'layout-active' if recipe_page == 'ingredients' else '' }}" href="{{ prototype_url }}/list/{{ list.id }}/ingredients" {% if recipe_page == 'ingredients' %}aria-current="page"{% endif %}>Ingredients</a>
+    <a class="btn btn-sm join-item" href="{{ prototype_url }}/pantry">Pantry</a>
+</div></div>
+{% endmacro %}

@@ -1,0 +1,67 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% from 'daisyui_test/_rows.html' import row with context %}
+{% set rp = request.scope.root_path %}
+{% set folder = smart_folder %}
+<div id="daisy-workspace" data-scope="smart:{{ folder.id }}" data-results="smart" data-edit-query="{{ query }}&amp;back=results" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>{{ folder.name }}</h1><span class="eyebrow" id="results-summary">{% if folder.show_lists %}{{ lists|length }} {{ 'list' if lists|length == 1 else 'lists' }}{% endif %}{% if folder.show_lists and folder.show_todos %} · {% endif %}{% if folder.show_todos %}{{ task_count }} {{ 'task' if task_count == 1 else 'tasks' }}{% endif %}{% if events %} · {{ events|length }} {{ 'event' if events|length == 1 else 'events' }}{% endif %}</span></div>
+        <div class="page-heading-actions">
+            <span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
+            <a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/smart-folders">{{ icon('smart', 16) }} All smart folders</a>
+            <a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/smart-folder/{{ folder.id }}/edit">{{ icon('edit', 16) }} Edit rules</a>
+            {% if lists or todos %}<button type="button" class="btn btn-ghost btn-sm select-mode-button" data-command="toggle-selection" aria-pressed="false">{{ icon('select', 16) }} <span>Select</span></button>{% endif %}
+        </div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+
+    <div class="rule-chips" aria-label="Smart folder rules">
+        {% for assoc in folder.include_hashtags_assoc %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ assoc.hashtag.id }}">#{{ assoc.hashtag.name }}{% if assoc.include_subtodos %} + subtasks{% endif %}{% if assoc.include_list_items %} + tagged lists{% endif %}</a>{% endfor %}
+        {% if not folder.include_hashtags_assoc %}<span class="badge badge-ghost">All hashtags</span>{% endif %}
+        {% for assoc in folder.exclude_hashtags_assoc %}<span class="badge badge-outline exclude-chip">not #{{ assoc.hashtag.name }}{% if assoc.include_subtodos %} + subtasks{% endif %}</span>{% endfor %}
+        {% if folder.lists %}<span class="badge badge-ghost">Lists: {{ folder.lists|map(attribute='name')|join(', ') }}</span>{% endif %}
+        {% for item in folder.include_folders %}<span class="badge badge-ghost">In {{ item.path_name }}</span>{% endfor %}
+        {% if folder.include_root_folder and not folder.include_folders %}<span class="badge badge-ghost">Unfiled lists</span>{% endif %}
+        {% for item in folder.exclude_folders %}<span class="badge badge-outline exclude-chip">not in {{ item.path_name }}</span>{% endfor %}
+        {% if folder.exclude_root_folder %}<span class="badge badge-outline exclude-chip">not unfiled</span>{% endif %}
+        {% if folder.uncompleted_only %}<span class="badge badge-ghost">Open only</span>{% endif %}
+        {% if folder.include_archived_lists %}<span class="badge badge-ghost">Includes archived</span>{% endif %}
+        {% if results.modified_after_display %}<span class="badge badge-ghost">Modified from {{ results.modified_after_display }}</span>{% endif %}
+        {% if results.modified_before_display %}<span class="badge badge-ghost">Modified until {{ results.modified_before_display }}</span>{% endif %}
+    </div>
+
+    {% if not sections or (not lists and not task_count and not events) %}
+    <div class="empty-state"><h3>Nothing matches these rules right now.</h3><a class="btn btn-sm" href="{{ prototype_url }}/smart-folder/{{ folder.id }}/edit">{{ icon('edit', 15) }} Edit rules</a></div>
+    {% else %}
+    {% for section in sections %}
+    {% if section == 'L' %}
+    <section class="section-panel" aria-labelledby="smart-lists-heading"><header class="section-heading"><div><h2 id="smart-lists-heading">{{ icon('list', 19) }} Lists <span class="section-count">{{ lists|length }}</span></h2></div></header>
+        {% if lists %}<ul class="list">{% for item in lists %}{{ row(item) }}{% endfor %}</ul>{% else %}<p class="section-empty">No matching lists.</p>{% endif %}
+    </section>
+    {% elif section == 'T' %}
+    <section class="section-panel" aria-labelledby="smart-tasks-heading"><header class="section-heading"><div><h2 id="smart-tasks-heading">{{ icon('check', 19) }} Tasks <span class="section-count">{{ task_count }}</span></h2>{% if folder.group_todos_by_list %}<p>Grouped by list; groups follow the task sort.</p>{% endif %}</div></header>
+        {% if not groups %}<p class="section-empty">No matching tasks.</p>{% endif %}
+        {% for group in groups %}
+        {% if group.list %}<div class="smart-group-heading">{% if group.path %}<span class="smart-group-path">{{ group.path }} ›</span>{% endif %}<a href="{{ prototype_url }}/list/{{ group.list.id }}?sort=user&amp;folder_id={{ group.list.folder_id or 0 }}">{{ group.list.name }}</a><span class="section-count">{{ group.rows|length }}</span></div>{% endif %}
+        <ul class="list">{% for todo, depth in group.rows %}{{ row(todo, 'todo', None, depth) }}{% endfor %}</ul>
+        {% endfor %}
+    </section>
+    {% elif section == 'E' %}
+    <section class="section-panel" aria-labelledby="smart-events-heading"><header class="section-heading"><div><h2 id="smart-events-heading">{{ icon('calendar', 19) }} Calendar events <span class="section-count">{{ events|length }}</span></h2></div><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/calendar">Open calendar {{ icon('arrow', 15) }}</a></header>
+        <ul class="list agenda-list">{% for event in events %}
+        {% set when = event.display_start_at if event.display_start_at is defined and event.display_start_at else event.start_at %}
+        <li class="list-row agenda-row">
+            <div class="agenda-date"><span>{{ when.strftime('%d') }}</span><small>{{ when.strftime('%b') }}</small></div>
+            <div class="agenda-content">
+                <div class="item-title-line"><a class="item-title {{ 'one-off-event' if not event.rrule else '' }}" {% if event.color and event.color|lower not in ['#000000', '#000', 'black'] %}style="color: {{ event.color }}"{% endif %} href="{{ prototype_url }}/calendar?month={{ when.strftime('%Y-%m') }}&amp;day={{ when.strftime('%Y-%m-%d') }}">{{ event.title }}</a></div>
+                <div class="item-context"><span>{{ when.strftime('%A') }}{% if when.year != today_year %} {{ when.year }}{% endif %} · {{ 'All day' if event.all_day else when.strftime('%H:%M') }}</span>{% if event.rrule %}<span>Recurring</span>{% endif %}{% if event.note %}<span class="event-summary">{{ event.note }}</span>{% endif %}</div>
+                {% if event.hashtags %}<div class="item-tags">{% for tag in event.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">#{{ tag.name }}</a>{% endfor %}</div>{% endif %}
+            </div>
+            <a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/calendar/event/{{ event.id }}/edit" title="Edit event" aria-label="Edit event {{ event.title }}">{{ icon('edit', 17) }}</a>
+        </li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    {% include 'daisyui_test/_selection_toolbar.html' %}
+</div>

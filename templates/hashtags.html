@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Hashtags</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    {% if show_named_searches %}
+    <h3 style="margin-bottom:0;margin-top:0">Named Searches</h3>
+    {% if named_searches %}
+    {% for search in named_searches %}
+    <div>
+        <a href="{{ request.scope.root_path }}/search/{{ search.id }}">{{ search.name }}</a>
+        {% if search.uncompleted_only %}(uncompleted only){% endif %}
+        - Hashtags:
+        {% if search.hashtags %}
+        {% for h in search.hashtags %}<a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a> {% endfor %}
+        {% else %}
+        <span class="dates">All items</span>
+        {% endif %}
+        {% if search.excluded_hashtags %}
+        - Excluding:
+        {% for h in search.excluded_hashtags %}<span class="pill">NOT #{{ h.name }}</span> {% endfor %}
+        {% endif %}
+        | <form action="{{ request.scope.root_path }}/search/{{ search.id }}/delete" method="post" style="display:inline;">
+            <button type="submit">Delete</button>
+        </form>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>No named searches yet.</p>
+    {% endif %}
+
+    <form action="{{ request.scope.root_path }}/search/create" method="post">
+        <label>Create Search: <input type="text" name="name" required></label><br>
+        <label><input type="checkbox" name="uncompleted_only" value="true"> Uncompleted items only</label>
+
+        <p>Select hashtags for this search:</p>
+        {% if hashtags %}
+        <label>
+            <input type="checkbox" name="all_items" value="true">
+            <strong>All items</strong>
+        </label>
+        <p class="dates" style="margin-top:4px; margin-bottom:8px;">
+            Tip: choose "All items" and then use NOT to exclude hashtags.
+        </p>
+        {% for hashtag in hashtags %}
+        <div>
+            <label>
+                <input type="checkbox" name="hashtag_ids" value="{{ hashtag.id }}">
+                #{{ hashtag.name }}
+            </label>
+            <span style="display:inline-block; width: 12px;"></span>
+            <label>
+                <input type="checkbox" name="exclude_hashtag_ids" value="{{ hashtag.id }}">
+                NOT
+            </label>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p>No hashtags available.</p>
+        {% endif %}
+        <br>
+        <button type="submit">Create Named Search</button>
+    </form>
+    <hr>
+    {% endif %}
+    {% if hashtags %}
+    <div id="hashtags-container">
+        {% for hashtag in hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill hashtag-link" data-id="{{ hashtag.id }}"
+            data-name="{{ hashtag.name }}" data-inc-list-items="{{ 'true' if hashtag.include_list_items else 'false' }}"
+            data-hide-completed-list-items="{{ 'true' if hashtag.hide_completed_list_items else 'false' }}"
+            onclick="return handleHashtagClick(event, this)">#{{ hashtag.name }}</a>
+        {% endfor %}
+    </div>
+
+    <!-- Hidden Customization Form -->
+    <div id="hashtag-customization-area"
+        style="display:none; margin-top: 20px; padding: 15px; border: 1px solid var(--input-border); background-color: var(--button-bg);">
+        <h3 style="margin-top:0">Customize #<span id="custom-hashtag-name"></span></h3>
+        <form id="hashtag-customization-form" method="post">
+            <label>
+                <input type="checkbox" name="include_list_items" id="custom-include-list-items">
+                inc. list items
+            </label>
+            <div class="dates" style="margin-top:4px;">
+                Automatically include all todos from lists tagged with this hashtag.
+            </div>
+            <label style="display:block; margin-top:8px;">
+                <input type="checkbox" name="hide_completed_list_items" id="custom-hide-completed-list-items">
+                exclude completed lists' todos
+            </label>
+            <div class="dates" style="margin-top:4px;">
+                If checked, todos from completed lists will be hidden.
+            </div>
+            <br>
+            <button type="submit">Save</button>
+            <button type="button" onclick="closeCustomization()">Cancel</button>
+        </form>
+    </div>
+    {% else %}
+    <p>No hashtags yet.</p>
+    {% endif %}
+
+    <div style="margin-top: 10px;">
+        <label style="cursor: pointer; user-select: none; margin-right: 15px;">
+            <input type="checkbox" id="delete-mode-toggle" onchange="toggleMode('delete')">
+            Select to delete
+        </label>
+        <label style="cursor: pointer; user-select: none;">
+            <input type="checkbox" id="customize-mode-toggle" onchange="toggleMode('customize')">
+            Select to customize
+        </label>
+    </div>
+    <hr>
+
+    <script>
+        var currentMode = null; // 'delete', 'customize', or null
+
+        function toggleMode(mode) {
+            var deleteCheckbox = document.getElementById('delete-mode-toggle');
+            var customizeCheckbox = document.getElementById('customize-mode-toggle');
+            var container = document.getElementById('hashtags-container');
+            var customArea = document.getElementById('hashtag-customization-area');
+
+            // Uncheck the other one
+            if (mode === 'delete' && deleteCheckbox.checked) {
+                customizeCheckbox.checked = false;
+                currentMode = 'delete';
+                closeCustomization();
+            } else if (mode === 'customize' && customizeCheckbox.checked) {
+                deleteCheckbox.checked = false;
+                currentMode = 'customize';
+            } else {
+                currentMode = null;
+                closeCustomization();
+            }
+
+            // Update UI classes
+            if (container) {
+                container.classList.remove('delete-mode', 'customize-mode');
+                if (currentMode === 'delete') container.classList.add('delete-mode');
+                if (currentMode === 'customize') container.classList.add('customize-mode');
+            }
+        }
+
+        function closeCustomization() {
+            document.getElementById('hashtag-customization-area').style.display = 'none';
+        }
+
+        function handleHashtagClick(event, element) {
+            var id = element.getAttribute('data-id');
+            var name = element.getAttribute('data-name');
+
+            if (currentMode === 'delete') {
+                event.preventDefault();
+                if (confirm('Delete this hashtag? #' + name)) {
+                    var form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '{{ request.scope.root_path }}/hashtag/' + id + '/delete';
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+                return false;
+            } else if (currentMode === 'customize') {
+                event.preventDefault();
+                // Show inline customization form
+                var area = document.getElementById('hashtag-customization-area');
+                var form = document.getElementById('hashtag-customization-form');
+
+                document.getElementById('custom-hashtag-name').textContent = name;
+                document.getElementById('custom-include-list-items').checked = (element.getAttribute('data-inc-list-items') === 'true');
+                var hideCompletedLists = element.getAttribute('data-hide-completed-list-items') === 'true';
+                document.getElementById('custom-hide-completed-list-items').checked = hideCompletedLists;
+
+                form.action = '{{ request.scope.root_path }}/hashtag/' + id + '/update';
+                area.style.display = 'block';
+                return false;
+            }
+            return true;
+        }
+    </script>
+
+    <style>
+        @media (max-width: 768px) {
+            #hashtags-container .hashtag-link {
+                font-size: 1.3em;
+                margin: 4px;
+            }
+        }
+
+        @media (min-width: 769px) {
+            #hashtags-container {
+                padding-top: 15px;
+            }
+        }
+
+        #hashtags-container.delete-mode .hashtag-link {
+            cursor: crosshair;
+            opacity: 0.8;
+        }
+
+        #hashtags-container.delete-mode .hashtag-link:hover {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        #hashtags-container.customize-mode .hashtag-link {
+            cursor: pointer;
+            opacity: 0.8;
+        }
+
+        #hashtags-container.customize-mode .hashtag-link:hover {
+            background-color: #3498db;
+            color: white;
+        }
+    </style>
+
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

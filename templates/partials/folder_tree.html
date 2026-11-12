@@ -1,0 +1,36 @@
+{% from "partials/folder_tree_nodes.html" import render_tree_nodes with context %}
+
+{# Root Level Render #}
+<div id="tree-root-container">
+    {# 1. Root dropzone at top #}
+    <div id="root-dropzone" class="root-dropzone"
+         @dragover="onDragOverRoot($event)"
+         @dragleave="onDragLeaveRoot($event)"
+         @drop="onDropRoot($event)">
+        <span class="dates">📁 Move to Root Folder</span>
+    </div>
+
+    {# 2. Render Root Folders #}
+    {{ render_tree_nodes(root_folders, []) }}
+
+    {# 3. Render Root Lists in a collapsible group #}
+    {% if root_lists %}
+    <ul class="folder-tree-view" style="margin-top: 5px;">
+        <li class="tree-item unfiled-group">
+            <div class="folder-row">
+                <span class="drag-handle" style="visibility:hidden">☰</span>
+                <input type="checkbox" class="select-item" style="visibility:hidden">
+                <span class="item-icon" style="cursor:pointer;" onclick="toggleLocal('root-lists')">
+                    <span id="arrow-root-lists">▶</span>
+                </span>
+                <span class="item-icon">📚</span>
+                <strong>Unfiled ({{ root_lists|length }})</strong>
+            </div>
+            <div id="root-lists" style="display:none;">
+                {{ render_tree_nodes([], root_lists) }}
+            </div>
+        </li>
+    </ul>
+    {% endif %}
+</div>
+

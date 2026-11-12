@@ -1,0 +1,5 @@
+<form action="{{ request.scope.root_path }}/calendar/set-view" method="post" class="cal-view-picker" aria-label="Calendar view">
+    <button type="submit" name="view" value="list" aria-pressed="{{ 'true' if not traditional_view and not weekly_view else 'false' }}">List</button>
+    <button type="submit" name="view" value="month" aria-pressed="{{ 'true' if traditional_view else 'false' }}">Month</button>
+    <button type="submit" name="view" value="week" aria-pressed="{{ 'true' if weekly_view else 'false' }}">Week</button>
+</form>

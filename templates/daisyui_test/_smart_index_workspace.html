@@ -1,0 +1,39 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% macro summary(folder) %}
+{%- set parts = [] -%}
+{%- if folder.show_lists and folder.show_todos %}{% set _ = parts.append('Lists and tasks') %}{% elif folder.show_lists %}{% set _ = parts.append('Lists') %}{% else %}{% set _ = parts.append('Tasks') %}{% endif -%}
+{%- for assoc in folder.include_hashtags_assoc %}{% set _ = parts.append('#' ~ assoc.hashtag.name) %}{% endfor -%}
+{%- for assoc in folder.exclude_hashtags_assoc %}{% set _ = parts.append('not #' ~ assoc.hashtag.name) %}{% endfor -%}
+{%- if folder.lists %}{% set _ = parts.append(folder.lists|length ~ (' list' if folder.lists|length == 1 else ' lists')) %}{% endif -%}
+{%- if folder.include_folders or folder.exclude_folders or folder.include_root_folder or folder.exclude_root_folder %}{% set _ = parts.append('folder filter') %}{% endif -%}
+{%- if folder.uncompleted_only %}{% set _ = parts.append('open only') %}{% endif -%}
+{%- if folder.modified_after or folder.modified_before %}{% set _ = parts.append('date range') %}{% endif -%}
+{{ parts|join(' · ') }}
+{%- endmacro %}
+<div id="daisy-workspace" data-scope="smart-index" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Smart folders</h1><span class="eyebrow">{{ smart_folders|length }} saved {{ 'view' if smart_folders|length == 1 else 'views' }}</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><a class="btn btn-primary" href="{{ prototype_url }}/smart-folders/new">{{ icon('plus', 17) }} New smart folder</a></div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    {% if smart_folders %}
+    <section class="section-panel" aria-label="Smart folders">
+        <ul class="list">
+        {% for folder in smart_folders %}
+        <li class="list-row item-row smart-row">
+            <span class="folder-symbol">{{ icon('smart', 16) }}</span>
+            <div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}/smart-folder/{{ folder.id }}">{{ folder.name }}</a><span class="item-context">{{ summary(folder) }}</span></div></div>
+            <div class="row-actions">
+                <a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/smart-folder/{{ folder.id }}/edit" title="Edit smart folder" aria-label="Edit {{ folder.name }}">{{ icon('edit', 16) }}</a>
+                {% for direction, symbol in [('up', '↑'), ('down', '↓')] %}
+                <form action="{{ prototype_url }}/smart-folder/{{ folder.id }}/order/{{ direction }}{{ query }}" method="post" hx-post="{{ prototype_url }}/smart-folder/{{ folder.id }}/order/{{ direction }}{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><button class="btn btn-ghost btn-square btn-sm" aria-label="Move {{ folder.name }} {{ direction }}" title="Move {{ direction }}" {% if (direction == 'up' and folder == smart_folders[0]) or (direction == 'down' and folder == smart_folders[-1]) %}disabled{% endif %}>{{ symbol }}</button></form>
+                {% endfor %}
+            </div>
+        </li>
+        {% endfor %}
+        </ul>
+    </section>
+    {% else %}
+    <div class="empty-state"><h3>No smart folders yet. Save a view that collects tasks and lists by hashtag, folder or date.</h3><a class="btn btn-primary" href="{{ prototype_url }}/smart-folders/new">{{ icon('plus', 17) }} New smart folder</a></div>
+    {% endif %}
+</div>

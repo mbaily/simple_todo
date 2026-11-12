@@ -1,0 +1,15 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+<div id="daisy-workspace" data-scope="event-groups" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Event groups</h1><span class="eyebrow">{{ groups|length }} {{ 'group' if groups|length == 1 else 'groups' }}</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/calendar">{{ icon('calendar', 15) }} Back to calendar</a></div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    <form id="group-form" data-draft class="inline-fields group-form" action="{{ prototype_url }}/calendar/groups{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/groups{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><input class="input input-sm grow-input" name="name" required maxlength="255" placeholder="New group name" aria-label="Group name" autocomplete="off"><button class="btn btn-primary btn-sm">{{ icon('plus', 14) }} Add group</button></form>
+    {% if groups %}
+    <section class="section-panel" aria-label="Event groups"><ul class="list">{% for group in groups %}
+        <li class="list-row item-row smart-row"><span class="folder-symbol">{{ icon('layers', 15) }}</span><div class="item-content"><div class="item-title-line"><span class="item-title">{{ group.name }}</span><span class="item-context">{{ counts.get(group.id, 0) }} {{ 'event' if counts.get(group.id, 0) == 1 else 'events' }}</span></div></div>
+            <form action="{{ prototype_url }}/calendar/groups/{{ group.id }}/delete{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/groups/{{ group.id }}/delete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete the group {{ group.name }}? Its {{ counts.get(group.id, 0) }} events are kept without a group."><button class="btn btn-ghost btn-sm delete-button">{{ icon('trash', 14) }} Delete</button></form></li>
+    {% endfor %}</ul></section>
+    {% else %}<div class="empty-state"><h3>No event groups yet. Groups let the calendar show one kind of event at a time.</h3></div>{% endif %}
+</div>

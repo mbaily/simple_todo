@@ -1,0 +1,26 @@
+Cache Optimization Fix Summary
+==============================
+
+The persistent issue of duplicate server requests for static assets (style.css, app.js) despite browser caching headers has been resolved.
+
+Primary Logic
+-------------
+The final fix implemented an "IndexedDB Pre-check" in `static/offline.js`.
+
+Before attempting to `fetch()` a static asset for the offline cache, the script now:
+1. Generates the exact versioned URL (e.g., `/static/style.css?v=20251231`).
+2. Queries the local IndexedDB (`assets` store) for this key.
+3. If the asset exists and the version matches, the network request is SKIPPED entirely.
+
+Combined Fixes
+--------------
+This optimization sits on top of several other consistency fixes ensuring robust caching:
+1. **Universal Template Alignment**: All 22 HTML templates now use `<link ... crossorigin="anonymous">` to ensure the "No-Cookies" mode matches the background script.
+2. **Credential Alignment**: The background script uses `fetch(..., { credentials: 'omit' })` to match the templates.
+3. **Execution Timing**: The background check is deferred until `window.onload` to ensure the browser has fully populated its HTTP cache from the initial page load.
+
+Result
+------
+- **Initial Load**: 1 Request (served from Server or Browser Cache).
+- **Offline Background Check**: 0 Requests (served from IndexedDB logic).
+- **Navigation**: 0 Requests (served from Browser Cache due to aligned keys).

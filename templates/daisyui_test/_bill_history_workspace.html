@@ -1,0 +1,147 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set cur = bill.currency_symbol %}
+{% macro op(name) %}{{ prototype_url }}/bills/{{ bill.id }}/do/{{ name }}{{ query }}{% endmacro %}
+{% macro hx(name) %}action="{{ op(name) }}" method="post" hx-post="{{ op(name) }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button[type=submit]"{% endmacro %}
+{% macro token() %}<input type="hidden" name="request_token" value="{{ new_invoice_token() }}">{% endmacro %}
+{% macro balance(cents) -%}{% if cents is none %}Unknown{% else %}{{ cur }}{{ cents|abs|cents }} {% if cents < 0 %}credit{% elif cents > 0 %}owing{% else %}balanced{% endif %}{% endif %}{%- endmacro %}
+{% macro amount_type() %}
+<label><span>Amount shown is</span><select class="select select-sm" name="amount_type" data-amount-type><option value="gross">The charge before credit</option><option value="net">Owing after credit</option></select></label>
+<label class="invoice-credit" hidden><span>Credit applied on the invoice</span><input class="input input-sm" name="credit_applied" inputmode="decimal" disabled placeholder="Optional"></label>
+{% endmacro %}
+{% macro panel_button(id, label, primary=False) %}<button type="button" class="btn btn-sm {{ 'btn-primary' if primary else 'btn-ghost' }}" data-command="bill-panel" data-panel="{{ id }}" aria-expanded="false" aria-controls="{{ id }}">{{ label }}</button>{% endmacro %}
+<div id="daisy-workspace" data-scope="bill:{{ bill.id }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="detail-navigation"><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/bills">{{ icon('money', 16) }} All bills</a></div>
+    <header class="page-heading">
+        <div class="page-title"><h1 {% if bill.color and bill.color != '#000000' %}style="color: {{ bill.color }}"{% endif %}>{{ bill.name }}</h1>{% if not bill.is_active %}<span class="badge badge-ghost">Inactive</span>{% endif %}</div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><a class="btn btn-sm" href="{{ prototype_url }}/bills/{{ bill.id }}/edit">{{ icon('edit', 15) }} Edit bill</a></div>
+    </header>
+    <div class="detail-context">{% if bill.payee %}<span>{{ bill.payee }}</span>{% endif %}<span>{{ bill.frequency_label }}</span>{% if bill.next_due_date %}<span>Next due {{ bill.next_due_date_formatted }}{% if bill.is_due_date_confirmed %} · invoice confirmed{% else %} · estimated{% endif %}</span>{% else %}<span>No due date</span>{% endif %}{% if bill.is_auto_pay %}<span>Auto-pay</span>{% endif %}{% if bill.category %}<span>{{ bill.category }}</span>{% endif %}</div>
+    {% if bill.note %}<p class="page-hint">{{ bill.note }}</p>{% endif %}
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+
+    <div class="stat-row">
+        <div class="stat-tile"><span>Payments</span><strong>{{ payments|length }}</strong></div>
+        <div class="stat-tile"><span>Total paid</span><strong>{% if avg_amount is not none %}{{ cur }}{{ "%.2f"|format(total_paid) }}{% else %}—{% endif %}</strong></div>
+        {% if refunds_total %}<div class="stat-tile"><span>Refunded · net paid</span><strong>{{ cur }}{{ '%.2f'|format(refunds_total) }} · {{ cur }}{{ '%.2f'|format(total_paid - refunds_total) }}</strong></div>{% endif %}
+        <div class="stat-tile"><span>Average</span><strong>{% if avg_amount is not none %}{{ cur }}{{ "%.2f"|format(avg_amount) }}{% else %}—{% endif %}</strong></div>
+        {% if bill.amount_strategy in ['rolling_avg', 'last_payment'] %}<div class="stat-tile"><span>Next estimate ({{ 'rolling average' if bill.amount_strategy == 'rolling_avg' else 'last payment' }})</span><strong>{% if bill.effective_amount is not none %}~{{ cur }}{{ "%.2f"|format(bill.effective_amount) }}{% else %}—{% endif %}</strong></div>
+        {% else %}<div class="stat-tile"><span>{{ 'Forecast' if bill.ledger_enabled else 'Expected' }} amount</span><strong>{% if bill.expected_amount is not none %}{{ cur }}{{ "%.2f"|format(bill.expected_amount) }}{% else %}—{% endif %}</strong></div>{% endif %}
+        {% if bill.ledger_enabled %}<div class="stat-tile"><span>Credit · owing</span><strong>{{ cur }}{{ bill.credit_cents|cents }} · {{ cur }}{{ bill.outstanding_cents|cents }}</strong></div>{% endif %}
+    </div>
+
+    <section class="section-panel" id="billing" aria-labelledby="invoices-heading">
+        <header class="section-heading"><div><h2 id="invoices-heading">{{ icon('money', 17) }} Invoices and account credit <span class="section-count">{{ bill.invoices|length }}</span></h2><p>Cash payments appear under payments. Existing credit is applied to invoices in date order.</p></div><div class="bill-actions">{{ panel_button('new-invoice', 'Record invoice', True) }}{{ panel_button('extra-payment', 'Extra payment') }}</div></header>
+        <div id="new-invoice" class="bill-panel padded" hidden>
+            <form class="bill-form" {{ hx('invoice') }}>{{ token() }}
+                <div class="bill-fields">
+                    <label><span>Amount</span><input class="input input-sm" name="amount" inputmode="decimal" required aria-label="New invoice amount"></label>
+                    {{ amount_type() }}
+                    <label><span>Due date</span><input class="input input-sm" type="date" name="due_date"></label>
+                    <label><span>Issue date</span><input class="input input-sm" type="date" name="invoice_date" title="Required when the amount is owing after credit"></label>
+                    <label><span>Invoice number</span><input class="input input-sm" name="invoice_number" maxlength="255" placeholder="Optional"></label>
+                    <label><span>Service from</span><input class="input input-sm" type="date" name="period_start"></label>
+                    <label><span>to</span><input class="input input-sm" type="date" name="period_end"></label>
+                    <label><span>Statement balance at issue</span><span class="inline-fields"><input class="input input-sm" name="statement_balance" inputmode="decimal" placeholder="Optional"><select class="select select-sm" name="balance_type"><option value="owing">Owing</option><option value="credit">Credit</option></select></span></label>
+                    <label class="grow"><span>Note</span><input class="input input-sm" name="note"></label>
+                </div>
+                <div class="bill-form-actions"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="allow_duplicate" value="true"> Record as a separate invoice even if it looks like a duplicate</label><button type="submit" class="btn btn-primary btn-sm">Record invoice and apply credit</button></div>
+            </form>
+        </div>
+        <div id="extra-payment" class="bill-panel padded" hidden>
+            <form class="bill-form" {{ hx('extra-payment') }}>{{ token() }}
+                <p class="bill-form-note">Money actually paid to the provider beyond an invoice. Any excess stays as account credit.</p>
+                <div class="bill-fields">
+                    <label><span>Cash paid</span><input class="input input-sm" name="amount_paid" inputmode="decimal" required aria-label="Extra payment amount"></label>
+                    <label><span>Paid on</span><input class="input input-sm" type="date" name="paid_date" value="{{ today_iso }}" max="{{ today_iso }}" required></label>
+                    <label class="grow"><span>Note</span><input class="input input-sm" name="note"></label>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Record extra payment</button>
+            </form>
+        </div>
+        {% if bill.invoices %}<ul class="list">{% for invoice in bill.ordered_invoices|reverse %}
+            <li class="list-row bill-row" id="invoice-{{ invoice.id }}">
+                <div class="bill-main">
+                    <div class="item-title-line"><span class="bill-amount">{{ cur }}{{ invoice.amount_cents|cents }}</span><span class="item-context">due {{ invoice.due_date_iso or 'unknown' }}</span>{% if invoice.invoice_number %}<span class="item-context">#{{ invoice.invoice_number }}</span>{% endif %}<span class="badge badge-sm {{ 'timing-late' if invoice.outstanding_cents else 'timing-good' }}">{{ 'Owing ' ~ cur ~ (invoice.outstanding_cents|cents) if invoice.outstanding_cents else 'Settled' }}</span></div>
+                    <div class="item-tags"><span class="item-context">Issued {{ invoice.invoice_date.strftime('%Y-%m-%d') if invoice.invoice_date else 'date unknown' }}</span>{% if invoice.period_start and invoice.period_end %}<span class="item-context">Service {{ invoice.period_start.strftime('%Y-%m-%d') }} – {{ invoice.period_end.strftime('%Y-%m-%d') }}</span>{% endif %}<span class="item-context">Credit applied {{ cur }}{{ invoice.credit_applied_cents|cents }}</span>{% if invoice.statement_balance_cents is not none %}<span class="item-context">Statement {{ balance(invoice.statement_balance_cents) }}</span>{% endif %}{% if invoice.is_legacy %}<span class="item-context">From old payment history</span>{% endif %}{% if invoice.note %}<span class="item-context">{{ invoice.note }}</span>{% endif %}</div>
+                </div>
+                <div class="row-actions bill-actions">{% if invoice.outstanding_cents %}{{ panel_button('pay-invoice-' ~ invoice.id, 'Record payment', True) }}{% endif %}{{ panel_button('edit-invoice-' ~ invoice.id, 'Edit') }}</div>
+                {% if invoice.outstanding_cents %}<div id="pay-invoice-{{ invoice.id }}" class="bill-panel" hidden><form class="bill-form" {{ hx('pay') }}>{{ token() }}<input type="hidden" name="invoice_id" value="{{ invoice.id }}">
+                    <div class="bill-fields"><label><span>Cash paid</span><input class="input input-sm" name="amount_paid" inputmode="decimal" value="{{ invoice.outstanding_cents|cents }}" required></label><label><span>Paid on</span><input class="input input-sm" type="date" name="paid_date" value="{{ today_iso }}" max="{{ today_iso }}" required></label></div>
+                    <button type="submit" class="btn btn-primary btn-sm">Record payment</button></form></div>{% endif %}
+                <div id="edit-invoice-{{ invoice.id }}" class="bill-panel" hidden><form class="bill-form" {{ hx('invoice') }}>{{ token() }}<input type="hidden" name="invoice_id" value="{{ invoice.id }}">
+                    <div class="bill-fields">
+                        <label><span>Charge before credit</span><input class="input input-sm" name="amount" value="{{ invoice.amount_cents|cents }}" required></label>
+                        <label><span>Due date</span><input class="input input-sm" type="date" name="due_date" value="{{ invoice.due_date_iso }}"></label>
+                        <label><span>Issue date</span><input class="input input-sm" type="date" name="invoice_date" value="{{ invoice.invoice_date.strftime('%Y-%m-%d') if invoice.invoice_date else '' }}"></label>
+                        <label><span>Invoice number</span><input class="input input-sm" name="invoice_number" maxlength="255" value="{{ invoice.invoice_number or '' }}"></label>
+                        <label><span>Service from</span><input class="input input-sm" type="date" name="period_start" value="{{ invoice.period_start.strftime('%Y-%m-%d') if invoice.period_start else '' }}"></label>
+                        <label><span>to</span><input class="input input-sm" type="date" name="period_end" value="{{ invoice.period_end.strftime('%Y-%m-%d') if invoice.period_end else '' }}"></label>
+                        <label><span>Statement balance</span><span class="inline-fields"><input class="input input-sm" name="statement_balance" value="{{ invoice.statement_balance_cents|abs|cents if invoice.statement_balance_cents is not none else '' }}"><select class="select select-sm" name="balance_type"><option value="owing">Owing</option><option value="credit" {% if invoice.statement_balance_cents is not none and invoice.statement_balance_cents < 0 %}selected{% endif %}>Credit</option></select></span></label>
+                        <label class="grow"><span>Note</span><input class="input input-sm" name="note" value="{{ invoice.note or '' }}"></label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Save invoice</button></form></div>
+            </li>
+        {% endfor %}</ul>{% elif not bill.ledger_enabled %}<p class="section-empty">Recording an invoice turns on invoice, payment and credit tracking for this bill.</p>{% endif %}
+    </section>
+
+    <section class="section-panel" aria-labelledby="payments-heading">
+        <header class="section-heading"><div><h2 id="payments-heading">{{ icon('check', 17) }} Payments <span class="section-count">{{ payments|length }}</span></h2></div></header>
+        {% if payments %}<ul class="list">{% for p in payments %}
+            {% set timed = p.due_date and p.paid_date and (p.amount_cents is none or (p.invoice and p.invoice.due_date)) %}
+            <li class="list-row bill-row">
+                <div class="bill-main">
+                    <div class="item-title-line"><span class="bill-amount">{% if p.amount_paid is not none %}{{ p.currency_symbol }}{{ "%.2f"|format(p.amount_paid) }}{% else %}—{% endif %}</span><span class="item-context">paid {{ p.paid_date_formatted }}</span><span class="item-context">{% if p.amount_cents is not none and not p.invoice_id %}to account credit{% elif p.invoice_id and p.invoice and not p.invoice.due_date %}due date unknown{% else %}for {{ p.due_date_formatted }}{% endif %}</span>
+                        {% if timed %}{% if p.days_difference > 0 %}<span class="badge badge-sm timing-good">{{ p.timing_label }}</span>{% elif p.days_difference == 0 %}<span class="badge badge-sm timing-good">On time</span>{% elif p.is_late_overridden %}<span class="badge badge-sm timing-good">{{ p.timing_label }}, marked on time</span>{% else %}<span class="badge badge-sm timing-late">{{ p.timing_label }}</span>{% endif %}{% endif %}
+                        {% if p.payment_method %}<span class="item-context">{{ p.payment_method }}</span>{% endif %}</div>
+                    {% if p.notes_list %}<div class="payment-notes">{% for n in p.notes_list %}<span>{{ n.text }}{% if n.created_at %} <small>{{ n.created_at }}</small>{% endif %}</span>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="row-actions bill-actions">
+                    {% if timed and p.days_difference < 0 %}<form action="{{ prototype_url }}/bills/{{ bill.id }}/late-override{{ query }}" method="post" hx-post="{{ prototype_url }}/bills/{{ bill.id }}/late-override{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><input type="hidden" name="payment_id" value="{{ p.id }}">{% if not p.is_late_overridden %}<input type="hidden" name="overridden" value="true">{% endif %}<button class="btn btn-ghost btn-sm">{{ 'Undo on-time mark' if p.is_late_overridden else 'Mark on time' }}</button></form>{% endif %}
+                    {{ panel_button('note-' ~ p.id, 'Add note') }}{{ panel_button('edit-payment-' ~ p.id, 'Edit') }}
+                    <form {{ hx('payment-delete') }} hx-confirm="{{ 'Delete this payment? The due date moves back and balances are recalculated.' if loop.first and not bill.ledger_enabled else 'Delete this payment record? Invoice balances and account credit are recalculated.' }}"><input type="hidden" name="payment_id" value="{{ p.id }}">{% if loop.first and not bill.ledger_enabled %}<input type="hidden" name="restore_due_date" value="true">{% endif %}<button type="submit" class="btn btn-ghost btn-square btn-sm delete-button" aria-label="Delete payment of {{ p.paid_date_formatted }}">{{ icon('trash', 15) }}</button></form>
+                </div>
+                <div id="note-{{ p.id }}" class="bill-panel" hidden><form class="bill-form inline-fields" {{ hx('payment-note') }}><input type="hidden" name="payment_id" value="{{ p.id }}"><input class="input input-sm grow-input" name="note_text" required placeholder="Add a note" aria-label="Payment note"><button type="submit" class="btn btn-sm">Save note</button></form></div>
+                <div id="edit-payment-{{ p.id }}" class="bill-panel" hidden><form class="bill-form" {{ hx('payment-edit') }}>{{ token() }}<input type="hidden" name="payment_id" value="{{ p.id }}">
+                    <div class="bill-fields">
+                        {% if p.invoice %}<p class="bill-form-note">Due date {{ p.due_date_formatted or 'unknown' }} comes from the invoice; edit it there.</p>{% elif p.amount_cents is not none %}<input type="hidden" name="due_date" value="">{% else %}<label><span>Due date</span><input class="input input-sm" type="date" name="due_date" value="{{ p.due_date_iso }}" required></label>{% endif %}
+                        <label><span>Paid on</span><input class="input input-sm" type="date" name="paid_date" value="{{ p.paid_date_iso }}" max="{{ today_iso }}" required></label>
+                        <label><span>Amount</span><input class="input input-sm" name="amount_paid" value="{{ '%.2f'|format(p.amount_paid) if p.amount_paid is not none else '' }}"></label>
+                        <label class="grow"><span>Note</span><input class="input input-sm" name="note" value="{{ p.display_note }}"></label>
+                        {% if p.note %}<label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="clear_note" value="true"> Clear notes</label>{% endif %}
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Save payment</button></form></div>
+            </li>
+        {% endfor %}</ul>{% else %}<p class="section-empty">No payments recorded yet.</p>{% endif %}
+    </section>
+
+    <section class="section-panel" id="adjustments" aria-labelledby="adjustments-heading">
+        <header class="section-heading"><div><h2 id="adjustments-heading">{{ icon('layers', 17) }} Opening balance, adjustments and refunds <span class="section-count">{{ bill.adjustments|length }}</span></h2><p>Opening balances cover history before the first recorded event. Supplier credits and debits change the balance but not cash spending; a refund is money returned to you and reduces net spending. Use today or an earlier date.</p></div><div class="bill-actions">{{ panel_button('new-adjustment', 'Record adjustment') }}</div></header>
+        <div id="new-adjustment" class="bill-panel padded" hidden><form class="bill-form" {{ hx('adjustment') }}>{{ token() }}
+            <div class="bill-fields"><label><span>Type</span><select class="select select-sm" name="kind">{% for kind, label in adjustment_types.items() %}<option value="{{ kind }}">{{ label }}</option>{% endfor %}</select></label><label><span>Amount</span><input class="input input-sm" name="amount" inputmode="decimal" required aria-label="Adjustment amount"></label><label><span>Effective date</span><input class="input input-sm" type="date" name="effective_date" value="{{ today_iso }}" max="{{ today_iso }}" required></label><label class="grow"><span>Note</span><input class="input input-sm" name="note"></label></div>
+            <button type="submit" class="btn btn-primary btn-sm">Record adjustment</button></form></div>
+        {% if bill.adjustments %}<ul class="list">{% for adjustment in bill.adjustments|sort(attribute='effective_date', reverse=true) %}
+            <li class="list-row bill-row"><div class="bill-main"><div class="item-title-line"><span class="item-title">{{ adjustment.kind_label }}</span><span class="bill-amount">{{ cur }}{{ adjustment.amount_cents|cents }}</span><span class="item-context">{{ adjustment.effective_date.strftime('%Y-%m-%d') }}</span><span class="item-context">{% if adjustment.is_credit %}{{ cur }}{{ adjustment.available_cents|cents }} credit left{% else %}{{ cur }}{{ adjustment.outstanding_cents|cents }} owing{% endif %}</span>{% if adjustment.note %}<span class="item-context">{{ adjustment.note }}</span>{% endif %}</div></div>
+                <div class="row-actions bill-actions">{{ panel_button('edit-adjustment-' ~ adjustment.id, 'Edit') }}<form {{ hx('adjustment-delete') }} hx-confirm="Delete this adjustment? Account balances are recalculated."><input type="hidden" name="adjustment_id" value="{{ adjustment.id }}"><button type="submit" class="btn btn-ghost btn-square btn-sm delete-button" aria-label="Delete adjustment">{{ icon('trash', 15) }}</button></form></div>
+                <div id="edit-adjustment-{{ adjustment.id }}" class="bill-panel" hidden><form class="bill-form" {{ hx('adjustment') }}>{{ token() }}<input type="hidden" name="adjustment_id" value="{{ adjustment.id }}">
+                    <div class="bill-fields"><label><span>Type</span><select class="select select-sm" name="kind">{% for kind, label in adjustment_types.items() %}<option value="{{ kind }}" {% if kind == adjustment.kind %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label><label><span>Amount</span><input class="input input-sm" name="amount" value="{{ adjustment.amount_cents|cents }}" required></label><label><span>Effective date</span><input class="input input-sm" type="date" name="effective_date" value="{{ adjustment.effective_date.strftime('%Y-%m-%d') }}" max="{{ today_iso }}" required></label><label class="grow"><span>Note</span><input class="input input-sm" name="note" value="{{ adjustment.note or '' }}"></label></div>
+                    <button type="submit" class="btn btn-primary btn-sm">Save adjustment</button></form></div>
+            </li>
+        {% endfor %}</ul>{% endif %}
+    </section>
+
+    <section class="section-panel" id="reconciliation" aria-labelledby="reconciliation-heading">
+        <header class="section-heading"><div><h2 id="reconciliation-heading">{{ icon('book', 17) }} Check against the supplier's balance <span class="section-count">{{ statement_comparisons|length }}</span></h2><p>Compares the supplier's balance with what is recorded here up to that date. Recording a balance does not change money owed or paid.</p></div><div class="bill-actions">{{ panel_button('new-statement', 'Record supplier balance') }}</div></header>
+        <div id="new-statement" class="bill-panel padded" hidden><form class="bill-form" {{ hx('statement') }}>{{ token() }}
+            <div class="bill-fields"><label><span>Supplier balance</span><span class="inline-fields"><input class="input input-sm" name="amount" inputmode="decimal" required aria-label="Supplier balance amount"><select class="select select-sm" name="balance_type" aria-label="Supplier balance type"><option value="owing">Owing</option><option value="credit">Credit</option></select></span></label><label><span>As of</span><input class="input input-sm" type="date" name="as_of_date" value="{{ today_iso }}" required></label><label class="grow"><span>Note</span><input class="input input-sm" name="note" placeholder="Statement or website balance"></label></div>
+            <button type="submit" class="btn btn-primary btn-sm">Check supplier balance</button></form></div>
+        {% if statement_comparisons %}<ul class="list">{% for row in statement_comparisons %}
+            <li class="list-row bill-row"><div class="bill-main"><div class="item-title-line"><span class="badge badge-sm {{ 'timing-good' if row.status == 'Match' else 'badge-warning' }}">{{ row.status }}</span><span class="item-context">{{ row.as_of_date.strftime('%Y-%m-%d') if row.as_of_date else 'Unknown date' }} · {{ row.source }}</span></div>
+                <div class="item-tags"><span class="item-context">Supplier {{ balance(row.supplier_cents) }}</span><span class="item-context">Recorded here {{ balance(row.app_cents) }}</span><span class="item-context">Difference {% if row.difference_cents is none %}—{% else %}{{ '+' if row.difference_cents > 0 else '-' if row.difference_cents < 0 else '' }}{{ cur }}{{ row.difference_cents|abs|cents }}{% endif %}</span>{% if row.status == 'Missing invoice issue dates' %}<span class="item-context">Provisional: enter the missing invoice issue dates for an exact comparison.</span>{% endif %}{% if row.note %}<span class="item-context">{{ row.note }}</span>{% endif %}</div></div>
+                <div class="row-actions bill-actions">{% if row.invoice %}<a class="btn btn-ghost btn-sm" href="#invoice-{{ row.invoice.id }}">Edit on invoice</a>{% else %}{{ panel_button('edit-statement-' ~ row.statement.id, 'Edit') }}<form {{ hx('statement-delete') }} hx-confirm="Delete this supplier balance?"><input type="hidden" name="statement_id" value="{{ row.statement.id }}"><button type="submit" class="btn btn-ghost btn-square btn-sm delete-button" aria-label="Delete supplier balance">{{ icon('trash', 15) }}</button></form>{% endif %}</div>
+                {% if not row.invoice %}<div id="edit-statement-{{ row.statement.id }}" class="bill-panel" hidden><form class="bill-form" {{ hx('statement') }}>{{ token() }}<input type="hidden" name="statement_id" value="{{ row.statement.id }}">
+                    <div class="bill-fields"><label><span>Balance</span><span class="inline-fields"><input class="input input-sm" name="amount" value="{{ row.supplier_cents|abs|cents }}" required><select class="select select-sm" name="balance_type"><option value="owing">Owing</option><option value="credit" {% if row.supplier_cents < 0 %}selected{% endif %}>Credit</option></select></span></label><label><span>As of</span><input class="input input-sm" type="date" name="as_of_date" value="{{ row.as_of_date.strftime('%Y-%m-%d') }}" required></label><label class="grow"><span>Note</span><input class="input input-sm" name="note" value="{{ row.note or '' }}"></label></div>
+                    <button type="submit" class="btn btn-primary btn-sm">Save supplier balance</button></form></div>{% endif %}
+            </li>
+        {% endfor %}</ul>{% endif %}
+    </section>
+</div>

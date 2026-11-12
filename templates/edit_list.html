@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Edit List</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h1>Edit List</h1>
+
+    <form action="{{ request.scope.root_path }}/list/{{ list.id }}/update" method="post">
+        <label>Name:<br>
+            <input type="text" name="name" value="{{ list.name }}" required>
+        </label><br><br>
+
+        <label>Hashtags:<br>
+            <input type="text" id="hashtags-edit" name="hashtags"
+                value="{% for h in list.hashtags %}#{{ h.name }} {% endfor %}" placeholder="#example #tags">
+        </label>
+        {% if all_hashtags %}
+        <select onchange="addHashtagFromSelect(this, 'hashtags-edit')">
+            <option value="">Add existing...</option>
+            {% for h in all_hashtags %}
+            <option value="{{ h.name }}">#{{ h.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <br><br>
+
+        <label>
+            <input type="checkbox" id="delay-checkbox" name="is_delayed" {% if list.delayed_until %}checked{% endif %}
+                onchange="toggleDelayDate(this)">
+            Defer until
+        </label>
+        <input type="date" id="delay-date" name="delayed_until"
+            value="{% if list.delayed_until %}{{ list.delayed_until.strftime('%Y-%m-%d') }}{% endif %}" {% if not
+            list.delayed_until %}disabled{% endif %}>
+        <br><br>
+
+        <button type="submit">Save Changes</button>
+    </form>
+
+    <script>
+        function toggleDelayDate(checkbox) {
+            const dateInput = document.getElementById('delay-date');
+            dateInput.disabled = !checkbox.checked;
+            if (checkbox.checked && !dateInput.value) {
+                // Default to tomorrow if checked and empty
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                dateInput.value = tomorrow.toISOString().split('T')[0];
+            }
+        }
+    </script>
+
+    <details>
+        <summary style="cursor: pointer;">
+            <h3 style="display: inline; margin: 0;">Links</h3>
+        </summary>
+        {% if list.links %}
+        <ul>
+            {% for link in list.links %}
+            <li>
+                <a href="{{ link.url }}" target="_blank">{{ link.title or link.url }}</a>
+                <form action="{{ request.scope.root_path }}/api/link/{{ link.id }}/delete" method="post" style="display:inline;">
+                    <button type="submit" style="background:none; border:none; cursor:pointer; color:red;">[x]</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <form action="{{ request.scope.root_path }}/api/link/create" method="post" style="margin-top: 10px; border: 1px solid #ccc; padding: 10px;">
+            <input type="hidden" name="list_id" value="{{ list.id }}">
+            <label>URL: <input type="url" name="url" required style="width: 100%;"></label><br>
+            <label>Title (optional): <input type="text" name="title" style="width: 100%;"></label><br>
+            <button type="submit">Add Link</button>
+        </form>
+    </details>
+
+    <p class="dates">Created: {{ list.created_at_formatted }} | Modified: {{ list.modified_at_formatted }}</p>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

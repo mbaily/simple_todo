@@ -1,0 +1,14 @@
+{% set ev = row.event %}
+<div class="cal-week-event{% if row.completed %} cal-week-event-completed{% endif %}{% if timed %} cal-week-event-timed{% endif %}{% if row.is_important %} cal-week-event-important{% endif %}"
+     data-event-id="{{ ev.id }}" data-occurrence="{{ row.occurrence_at.isoformat() }}"
+     {% if timed %}style="top:{{ row.top }}%; height:{{ row.height }}%; left:{{ row.left }}%; width:{{ row.width }}%;"{% endif %}>
+    <input type="checkbox" {% if row.completed %}checked{% endif %} aria-label="Complete {{ ev.title }} on {{ row.occurrence_at.isoformat() }}"
+           onchange="toggleWeekOccurrence(this)">
+    <a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit?view_week={{ current_week_str }}{% if row.occurrence_at %}&occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{% endif %}"
+       {% if ev.color %}style="color:{{ ev.color }}"{% endif %}
+       title="{{ ev.title }}{% if timed %} · {{ row.occurrence_at.strftime('%H:%M') }}{% if ev.duration_minutes %} · {{ ev.duration_minutes }} min{% endif %}{% endif %}{% if ev.note %} — {{ ev.note }}{% endif %}">
+        {% if timed %}<span class="cal-week-event-time">{% if row.continues_before %}← {% endif %}{{ row.occurrence_at.strftime('%H:%M') }}{% if ev.duration_minutes %} · {{ ev.duration_minutes }} min{% endif %}{% if row.continues_after %} →{% endif %}</span>{% endif %}
+        {{ ev.title }}{% if ev.rrule %}<span class="dates"> ↻</span>{% endif %}
+        {% if row.is_important %}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{% endif %}
+    </a>
+</div>

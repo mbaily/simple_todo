@@ -1,0 +1,19 @@
+{% if events %}
+<h3 style="margin-bottom:0;margin-top:10px;">Calendar Events</h3>
+{% for ev in events %}
+<div>
+    <span class="dates">{{ ev.display_start_at | date_format }}</span>
+    {% if ev.rrule %}
+    {{ ev.title }} <span class="dates">(recurring)</span>
+    {% else %}
+    <span class="calendar-title-nonrecurring">{{ ev.title }}</span>
+    {% endif %}
+    {% if ev.note %}<span class="dates">- {{ ev.note }}</span>{% endif %}
+    {% for h in ev.hashtags %}
+    <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+    {% endfor %}
+    <a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit" class="note-icon" title="Edit event">📝</a>
+    <a href="{{ request.scope.root_path }}/calendar" class="note-icon" title="Go to Calendar">📅</a>
+</div>
+{% endfor %}
+{% endif %}

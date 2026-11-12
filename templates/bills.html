@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Bills</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20260930" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <style>
+        h2 { margin: 0; }
+        p { margin: 0; }
+
+        .bill-row {
+            padding: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .bill-name {
+            font-weight: 500;
+        }
+
+        .bill-amount {
+            font-family: monospace;
+            font-size: 0.95em;
+        }
+
+        .bill-due {
+            font-size: 0.85em;
+            color: #6b7280;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-due { color: #9ca3af; }
+        }
+
+        .bill-overdue .bill-due {
+            color: #dc2626;
+            font-weight: bold;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-overdue .bill-due { color: #f87171; }
+        }
+
+        .bill-due-today {
+            background: rgba(245, 158, 11, 0.08);
+            border-left: 3px solid #f59e0b;
+            padding-left: 6px;
+            border-radius: 2px;
+        }
+
+        .bill-due-today .bill-due {
+            color: #d97706;
+            font-weight: bold;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-due-today .bill-due { color: #fbbf24; }
+        }
+
+        .bill-auto-badge {
+            font-size: 0.75em;
+            background: #dbeafe;
+            color: #1d4ed8;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-auto-badge {
+                background: #1e3a5f;
+                color: #93c5fd;
+            }
+        }
+
+        .bill-confirmed-badge {
+            font-size: 0.72em;
+            background: #dcfce7;
+            color: #15803d;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-confirmed-badge {
+                background: #14532d;
+                color: #86efac;
+            }
+        }
+
+        .bill-est-badge {
+            font-size: 0.72em;
+            background: #f3f4f6;
+            color: #6b7280;
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-est-badge {
+                background: #374151;
+                color: #9ca3af;
+            }
+        }
+
+        .bill-timing-badge {
+            font-size: 0.75em;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+
+        .timing-early {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .timing-early { background: #14532d; color: #86efac; }
+        }
+
+        .timing-late {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .timing-late { background: #7f1d1d; color: #fca5a5; }
+        }
+
+        .bill-inactive {
+            opacity: 0.5;
+            text-decoration: line-through;
+        }
+
+        .bill-category {
+            font-size: 0.8em;
+            color: #8b5cf6;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .bill-category { color: #a78bfa; }
+        }
+
+        .bill-section {
+            margin-bottom: 18px;
+        }
+
+        .bill-section h3 {
+            margin: 10px 0 4px 0;
+            font-size: 1.05em;
+        }
+
+        .monthly-total {
+            font-size: 0.95em;
+            color: #374151;
+            margin-bottom: 10px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .monthly-total { color: #d1d5db; }
+        }
+
+        .pay-form, .confirm-form {
+            display: none;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 6px 0 10px 20px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .pay-form, .confirm-form {
+                border-color: #555;
+                background: rgba(255, 255, 255, 0.02);
+            }
+        }
+
+        .pay-form label, .confirm-form label {
+            display: inline-block;
+            margin-right: 12px;
+            margin-bottom: 4px;
+        }
+
+        .confirm-form .invoice-credit[hidden] {
+            display: none;
+        }
+
+        .payment-row {
+            padding: 4px 0;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {% from "billing.html" import account_balance %}
+    {{ nav_bar() }}
+
+    <h2>Bills</h2>
+    <div class="monthly-total">
+        Estimated monthly: {% for s in currency_summaries %}{{ ' / ' if not loop.first else '' }}{{ s.currency }} <strong>{{ s.currency_symbol }}{{ "%.2f"|format(s.bills_monthly) }}</strong>{% endfor %}
+        {% if show_inactive %}
+        | <a href="{{ request.scope.root_path }}/classic/bills">Hide inactive</a>
+        {% else %}
+        | <a href="{{ request.scope.root_path }}/classic/bills?show_inactive=1">Show inactive{% if inactive_count %} ({{ inactive_count }}){% endif %}</a>
+        {% endif %}
+    </div>
+
+    <div style="font-size: 1.2rem; padding-bottom: 5px; margin-bottom: 10px;">
+        <span onclick="toggleCreateBillForm()" title="Add Bill" style="cursor: pointer; user-select: none;">➕</span>
+    </div>
+
+    <form id="create-bill-form" action="{{ request.scope.root_path }}/bills/create" method="post" style="display:none; border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; border-radius: 4px;">
+        <label>Name: <input type="text" name="name" required style="width: 200px;"></label><br>
+        <label>Payee: <input type="text" name="payee" placeholder="optional" style="width: 200px;"></label><br>
+        <label>Amount: <input type="text" name="expected_amount" inputmode="decimal" placeholder="e.g. 180.00" title="Enter a non-negative amount with at most two decimal places. Leave blank if unknown." style="width: 80px;"></label>
+        <label>Type:
+            <select name="amount_strategy" style="width: 130px;">
+                <option value="fixed" selected>Fixed</option>
+                <option value="rolling_avg">Rolling Average</option>
+                <option value="last_payment">Last Payment</option>
+            </select>
+        </label>
+        <label>Currency:
+            <select name="currency" style="width: 70px;">
+                <option value="AUD" selected>AUD ($)</option>
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="NZD">NZD ($)</option>
+                <option value="CAD">CAD ($)</option>
+            </select>
+        </label><br>
+        <label>Next due: <input type="date" name="next_due_date"></label>
+        <label>Anchor day: <input type="number" name="anchor_day" min="1" max="31" placeholder="auto" style="width: 60px;" title="Anchor day of month (e.g. 31) to prevent calendar drift"></label><br>
+        <label>Frequency:
+            <select name="frequency" onchange="toggleCustomDays(this)">
+                <option value="weekly">Weekly</option>
+                <option value="fortnightly">Fortnightly</option>
+                <option value="monthly" selected>Monthly</option>
+                <option value="bimonthly">Every 2 months</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+                <option value="custom">Custom (days)</option>
+            </select>
+        </label>
+        <span id="custom-days-input" style="display:none;">
+            <label>Every <input type="number" name="frequency_days" min="1" style="width:60px;"> days</label>
+        </span>
+        <br>
+        <label>Category: <input type="text" name="category" placeholder="e.g. Utilities" style="width: 150px;"></label>
+        <label><input type="checkbox" name="is_auto_pay" value="true"> Auto-pay</label>
+        <label><input type="checkbox" name="is_due_date_confirmed" value="true"> Bill already arrived (confirmed due date)</label><br>
+        <label><input type="checkbox" name="ledger_enabled" value="true"> Track invoices, payments and account credit</label>
+        <p class="dates">Use for accounts with partial payments, credits or refunds. Recording a confirmed invoice also enables tracking.</p>
+        <label>Note: <input type="text" name="note" placeholder="optional" style="width: 300px;"></label><br>
+        <label>
+            <input type="checkbox" id="use-color-create" onchange="onCreateColorToggle(this)"> Custom colour:
+            <input type="color" id="color-picker-create" value="#3b82f6" style="display:none;"
+                oninput="document.getElementById('color-val-create').value = this.value">
+        </label>
+        <input type="hidden" name="color" id="color-val-create" value="">
+        <button type="submit">Create Bill</button>
+    </form>
+
+    <!-- 1. OVERDUE BILLS -->
+    {% if overdue %}
+    <div class="bill-section">
+        <h3>⚠️ Overdue</h3>
+        {% for bill in overdue %}
+        <div class="bill-row bill-overdue" id="bill-{{ bill.id }}">
+            <span class="bill-name">
+                {% if bill.color and bill.color != '#000000' %}<span style="color: {{ bill.color }}">{{ bill.name }}</span>{% else %}{{ bill.name }}{% endif %}
+                {% if bill.note %}<span class="bill-due" title="{{ bill.note }}" style="cursor:help;">📝</span>{% endif %}
+            </span>
+            {{ account_balance(bill, request.scope.root_path) }}
+            {% if bill.payee %}<span class="bill-due">({{ bill.payee }})</span>{% endif %}
+            {% if bill.effective_amount is not none %}<span class="bill-amount">{% if bill.is_estimated %}~{% endif %}{{ bill.currency_symbol }}{{ bill|bill_amount }}{% if bill.is_estimated %} <span class="bill-est-badge" style="background:#e0e7ff; color:#3730a3;" title="Estimated from payment history">Est.</span>{% endif %}</span>{% endif %}
+            <span class="bill-due">due {{ bill.next_due_date_formatted }}</span>
+            {% if bill.is_auto_pay %}<span class="bill-auto-badge">auto</span>{% endif %}
+            {% if bill.is_due_date_confirmed %}<span class="bill-confirmed-badge">Invoice confirmed</span>{% else %}<span class="bill-est-badge">Est.</span>{% endif %}
+            {% if bill.category %}<span class="bill-category">{{ bill.category }}</span>{% endif %}
+            {% if not bill.ledger_enabled or bill.open_invoice %}<button type="button" onclick="togglePayForm({{ bill.id }})" style="font-size:0.8em; font-weight:bold;">Record payment</button>{% else %}<a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history#billing" style="font-size:0.8em;">Record invoice / extra payment</a>{% endif %}
+            <button type="button" onclick="toggleConfirmForm({{ bill.id }})" style="font-size:0.8em;">Confirm Bill</button>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/edit" style="font-size:0.8em;">Edit</a>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history" style="font-size:0.8em;">History</a>
+        </div>
+        <!-- Pay Form -->
+        <form class="pay-form" id="pay-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/pay" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% if bill.open_invoice %}<input type="hidden" name="invoice_id" value="{{ bill.open_invoice.id }}">{% endif %}
+            {% set days_away = bill.days_until_due(now) %}
+            {% set days_late = -days_away if days_away is not none else 0 %}
+            <div style="font-size:0.85em; margin-bottom:6px; color:#4b5563;">
+                Paying bill: <strong>{{ bill.name }}</strong>
+                {% if days_late > 0 %}<span style="color:#dc2626; margin-left:6px;">(paying {{ days_late }} days late)</span>{% endif %}
+            </div>
+            <label>Actual due date: <input type="date" name="actual_due_date" value="{{ bill.next_due_date_iso }}" title="Actual date this bill was due according to invoice"></label>
+            <label>Amount paid: <input type="text" name="amount_paid" value="{{ bill|bill_amount }}" style="width:80px;"></label>
+            <label>Paid date: <input type="date" name="paid_date" value="{{ now.strftime('%Y-%m-%d') }}" max="{{ now.strftime('%Y-%m-%d') }}"></label>
+            <label>Note: <input type="text" name="note" placeholder="optional" style="width:140px;"></label>
+            <details style="display:inline-block; margin-left:6px; font-size:0.85em;">
+                <summary style="cursor:pointer; color:#6b7280;">Override next due</summary>
+                <label style="margin-top:4px;">Next due: <input type="date" name="next_due_override" placeholder="auto"></label>
+            </details>
+            <button type="submit" style="margin-left:8px;">Confirm Payment</button>
+        </form>
+        <!-- Confirm Invoice Form -->
+        <form class="confirm-form" id="confirm-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/confirm-invoice" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% include 'partials/confirm_invoice_target.html' %}
+            <label>Supplier invoice number: <input name="invoice_number" type="text" maxlength="255" value="" placeholder="Optional"></label>
+            <label>Issue date: <input type="date" name="invoice_date" value="" title="Required for an amount owing after credit"></label>
+            <div style="font-size:0.85em; margin-bottom:6px;">Set exact date and amount from provider's bill:</div>
+            <label>Actual due date: <input type="date" name="actual_due_date" value="{{ bill.next_due_date_iso if not bill.open_invoice else '' }}"></label>
+            <label>Amount: <input type="text" name="actual_amount" value="{{ '%.2f'|format(bill.effective_amount) if not bill.open_invoice and bill.effective_amount is not none else '' }}" style="width:80px;"></label>
+            {% include 'partials/invoice_amount_type.html' %}
+            <button type="submit">Save Confirmed Bill</button>
+        </form>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 2. DUE TODAY -->
+    {% if due_today %}
+    <div class="bill-section">
+        <h3>🔔 Due Today</h3>
+        {% for bill in due_today %}
+        <div class="bill-row bill-due-today" id="bill-{{ bill.id }}">
+            <span class="bill-name">
+                {% if bill.color and bill.color != '#000000' %}<span style="color: {{ bill.color }}">{{ bill.name }}</span>{% else %}{{ bill.name }}{% endif %}
+                {% if bill.note %}<span class="bill-due" title="{{ bill.note }}" style="cursor:help;">📝</span>{% endif %}
+            </span>
+            {{ account_balance(bill, request.scope.root_path) }}
+            {% if bill.payee %}<span class="bill-due">({{ bill.payee }})</span>{% endif %}
+            {% if bill.effective_amount is not none %}<span class="bill-amount">{% if bill.is_estimated %}~{% endif %}{{ bill.currency_symbol }}{{ bill|bill_amount }}{% if bill.is_estimated %} <span class="bill-est-badge" style="background:#e0e7ff; color:#3730a3;" title="Estimated from payment history">Est.</span>{% endif %}</span>{% endif %}
+            <span class="bill-due">due today ({{ bill.next_due_date_formatted }})</span>
+            {% if bill.is_auto_pay %}<span class="bill-auto-badge">auto</span>{% endif %}
+            {% if bill.is_due_date_confirmed %}<span class="bill-confirmed-badge">Invoice confirmed</span>{% else %}<span class="bill-est-badge">Est.</span>{% endif %}
+            {% if bill.category %}<span class="bill-category">{{ bill.category }}</span>{% endif %}
+            {% if not bill.ledger_enabled or bill.open_invoice %}<button type="button" onclick="togglePayForm({{ bill.id }})" style="font-size:0.8em; font-weight:bold;">Record payment</button>{% else %}<a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history#billing" style="font-size:0.8em;">Record invoice / extra payment</a>{% endif %}
+            <button type="button" onclick="toggleConfirmForm({{ bill.id }})" style="font-size:0.8em;">Confirm Bill</button>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/edit" style="font-size:0.8em;">Edit</a>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history" style="font-size:0.8em;">History</a>
+        </div>
+        <!-- Pay Form -->
+        <form class="pay-form" id="pay-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/pay" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% if bill.open_invoice %}<input type="hidden" name="invoice_id" value="{{ bill.open_invoice.id }}">{% endif %}
+            <div style="font-size:0.85em; margin-bottom:6px; color:#4b5563;">
+                Paying bill: <strong>{{ bill.name }}</strong>
+                <span style="color:#2563eb; margin-left:6px;">(due today)</span>
+            </div>
+            <label>Actual due date: <input type="date" name="actual_due_date" value="{{ bill.next_due_date_iso }}" title="Actual date this bill was due according to invoice"></label>
+            <label>Amount paid: <input type="text" name="amount_paid" value="{{ bill|bill_amount }}" style="width:80px;"></label>
+            <label>Paid date: <input type="date" name="paid_date" value="{{ now.strftime('%Y-%m-%d') }}" max="{{ now.strftime('%Y-%m-%d') }}"></label>
+            <label>Note: <input type="text" name="note" placeholder="optional" style="width:140px;"></label>
+            <details style="display:inline-block; margin-left:6px; font-size:0.85em;">
+                <summary style="cursor:pointer; color:#6b7280;">Override next due</summary>
+                <label style="margin-top:4px;">Next due: <input type="date" name="next_due_override" placeholder="auto"></label>
+            </details>
+            <button type="submit" style="margin-left:8px;">Confirm Payment</button>
+        </form>
+        <!-- Confirm Invoice Form -->
+        <form class="confirm-form" id="confirm-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/confirm-invoice" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% include 'partials/confirm_invoice_target.html' %}
+            <label>Supplier invoice number: <input name="invoice_number" type="text" maxlength="255" value="" placeholder="Optional"></label>
+            <label>Issue date: <input type="date" name="invoice_date" value="" title="Required for an amount owing after credit"></label>
+            <div style="font-size:0.85em; margin-bottom:6px;">Set exact date and amount from provider's bill:</div>
+            <label>Actual due date: <input type="date" name="actual_due_date" value="{{ bill.next_due_date_iso if not bill.open_invoice else '' }}"></label>
+            <label>Amount: <input type="text" name="actual_amount" value="{{ '%.2f'|format(bill.effective_amount) if not bill.open_invoice and bill.effective_amount is not none else '' }}" style="width:80px;"></label>
+            {% include 'partials/invoice_amount_type.html' %}
+            <button type="submit">Save Confirmed Bill</button>
+        </form>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 3. UPCOMING ACTIONABLE (Due within 14 days or confirmed) -->
+    {% if upcoming %}
+    <div class="bill-section">
+        <h3>📋 Upcoming</h3>
+        {% for bill in upcoming %}
+        <div class="bill-row{% if not bill.is_active %} bill-inactive{% endif %}" id="bill-{{ bill.id }}">
+            <span class="bill-name">
+                {% if bill.color and bill.color != '#000000' %}<span style="color: {{ bill.color }}">{{ bill.name }}</span>{% else %}{{ bill.name }}{% endif %}
+                {% if bill.note %}<span class="bill-due" title="{{ bill.note }}" style="cursor:help;">📝</span>{% endif %}
+            </span>
+            {{ account_balance(bill, request.scope.root_path) }}
+            {% if bill.payee %}<span class="bill-due">({{ bill.payee }})</span>{% endif %}
+            {% if bill.effective_amount is not none %}<span class="bill-amount">{% if bill.is_estimated %}~{% endif %}{{ bill.currency_symbol }}{{ bill|bill_amount }}{% if bill.is_estimated %} <span class="bill-est-badge" style="background:#e0e7ff; color:#3730a3;" title="Estimated from payment history">Est.</span>{% endif %}</span>{% endif %}
+            <span class="bill-due">due {{ bill.next_due_date_formatted }}</span>
+            {% if bill.is_auto_pay %}<span class="bill-auto-badge">auto</span>{% endif %}
+            {% if bill.is_due_date_confirmed %}
+                <span class="bill-confirmed-badge" title="Invoice confirmed">Invoice confirmed</span>
+            {% else %}
+                <span class="bill-est-badge" title="Projected estimate">Est.</span>
+            {% endif %}
+            {% if bill.category %}<span class="bill-category">{{ bill.category }}</span>{% endif %}
+            {% if bill.is_active %}
+            {% if not bill.ledger_enabled or bill.open_invoice %}<button type="button" onclick="togglePayForm({{ bill.id }})" style="font-size:0.8em;">Record payment</button>{% else %}<a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history#billing" style="font-size:0.8em;">Record invoice / extra payment</a>{% endif %}
+            <button type="button" onclick="toggleConfirmForm({{ bill.id }})" style="font-size:0.8em;" title="Set actual bill invoice due date & amount">Confirm Bill</button>
+            {% endif %}
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/edit" style="font-size:0.8em;">Edit</a>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history" style="font-size:0.8em;">History</a>
+        </div>
+        <!-- Pay Form -->
+        <form class="pay-form" id="pay-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/pay" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% if bill.open_invoice %}<input type="hidden" name="invoice_id" value="{{ bill.open_invoice.id }}">{% endif %}
+            {% set days_ahead = bill.days_until_due(now) or 0 %}
+            <div style="font-size:0.85em; margin-bottom:6px; color:#4b5563;">
+                Paying bill: <strong>{{ bill.name }}</strong>
+                {% if days_ahead > 0 %}<span style="color:#15803d; margin-left:6px;">(paying {{ days_ahead }} days early)</span>{% endif %}
+            </div>
+            <label>Actual due date: <input type="date" name="actual_due_date" value="{{ bill.next_due_date_iso }}" title="Actual date this bill was due according to invoice"></label>
+            <label>Amount paid: <input type="text" name="amount_paid" value="{{ bill|bill_amount }}" style="width:80px;"></label>
+            <label>Paid date: <input type="date" name="paid_date" value="{{ now.strftime('%Y-%m-%d') }}" max="{{ now.strftime('%Y-%m-%d') }}"></label>
+            <label>Note: <input type="text" name="note" placeholder="optional" style="width:140px;"></label>
+            <details style="display:inline-block; margin-left:6px; font-size:0.85em;">
+                <summary style="cursor:pointer; color:#6b7280;">Override next due</summary>
+                <label style="margin-top:4px;">Next due: <input type="date" name="next_due_override" placeholder="auto"></label>
+            </details>
+            <button type="submit" style="margin-left:8px;">Confirm Payment</button>
+        </form>
+        <!-- Confirm Invoice Form -->
+        <form class="confirm-form" id="confirm-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/confirm-invoice" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% include 'partials/confirm_invoice_target.html' %}
+            <label>Supplier invoice number: <input name="invoice_number" type="text" maxlength="255" value="" placeholder="Optional"></label>
+            <label>Issue date: <input type="date" name="invoice_date" value="" title="Required for an amount owing after credit"></label>
+            <div style="font-size:0.85em; margin-bottom:6px;">Set exact date and amount from provider's bill:</div>
+            <label>Actual due date: <input type="date" name="actual_due_date" value="{{ bill.next_due_date_iso if not bill.open_invoice else '' }}"></label>
+            <label>Amount: <input type="text" name="actual_amount" value="{{ '%.2f'|format(bill.effective_amount) if not bill.open_invoice and bill.effective_amount is not none else '' }}" style="width:80px;"></label>
+            {% include 'partials/invoice_amount_type.html' %}
+            <button type="submit">Save Confirmed Bill</button>
+        </form>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 4. PAID FOR CURRENT CYCLE / COVERED EARLY -->
+    {% if covered_early %}
+    <div class="bill-section">
+        <h3>✅ Paid for Current Cycle</h3>
+        {% for bill in covered_early %}
+        {% set lp = bill.last_payment %}
+        <div class="bill-row" id="bill-{{ bill.id }}">
+            <span class="bill-name">
+                {% if bill.color and bill.color != '#000000' %}<span style="color: {{ bill.color }}">{{ bill.name }}</span>{% else %}{{ bill.name }}{% endif %}
+                {% if bill.note %}<span class="bill-due" title="{{ bill.note }}" style="cursor:help;">📝</span>{% endif %}
+            </span>
+            {{ account_balance(bill, request.scope.root_path) }}
+            {% if bill.payee %}<span class="bill-due">({{ bill.payee }})</span>{% endif %}
+            {% if lp %}
+                <span class="bill-due">
+                    ✓ Paid {% if lp.amount_paid is not none %}{{ lp.currency_symbol }}{{ "%.2f"|format(lp.amount_paid) }} {% endif %}on {{ lp.paid_date_formatted }}{% if lp.effective_due_date %} for due date {{ lp.due_date_formatted }}{% endif %}
+                </span>
+                {% if lp.effective_due_date and lp.paid_date %}
+                    {% if lp.days_difference > 0 %}
+                        <span class="bill-timing-badge timing-early">{{ lp.timing_label }}</span>
+                    {% elif lp.days_difference == 0 %}
+                        <span class="bill-timing-badge timing-early">On time</span>
+                    {% elif lp.is_late_overridden %}
+                        <span class="bill-timing-badge timing-early" title="Marked on time">✓ (Override)</span>
+                    {% else %}
+                        <span class="bill-timing-badge timing-late">{{ lp.timing_label }}</span>
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+            <span class="bill-due" style="margin-left: 4px;">• Next due: <strong>{{ bill.next_due_date_formatted }}</strong>{% if bill.effective_amount is not none %} ({% if bill.is_estimated %}~{% endif %}{{ bill.currency_symbol }}{{ bill|bill_amount }}){% endif %}</span>
+            {% if bill.is_due_date_confirmed %}
+                <span class="bill-confirmed-badge" title="Invoice confirmed">Invoice confirmed</span>
+            {% else %}
+                <span class="bill-est-badge" title="Projected estimate">Est.</span>
+            {% endif %}
+            {% if bill.is_auto_pay %}<span class="bill-auto-badge">auto</span>{% endif %}
+            {% if bill.category %}<span class="bill-category">{{ bill.category }}</span>{% endif %}
+            <button type="button" onclick="togglePayForm({{ bill.id }})" style="font-size:0.75em; opacity: 0.8;" title="Pay next cycle in advance">Pay Next Cycle</button>
+            <button type="button" onclick="toggleConfirmForm({{ bill.id }})" style="font-size:0.75em; opacity: 0.8;" title="Set actual bill invoice due date & amount for next cycle">Confirm Bill</button>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/edit" style="font-size:0.8em;">Edit</a>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history" style="font-size:0.8em;">History</a>
+        </div>
+        <!-- Pay Form (for paying next cycle early) -->
+        <form class="pay-form" id="pay-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/pay" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% if bill.open_invoice %}<input type="hidden" name="invoice_id" value="{{ bill.open_invoice.id }}">{% endif %}
+            {% set days_ahead = bill.days_until_due(now) or 0 %}
+            <div style="font-size:0.85em; margin-bottom:6px; color:#4b5563;">
+                Paying ahead for next cycle: <strong>{{ bill.name }}</strong>
+                {% if days_ahead > 0 %}<span style="color:#15803d; margin-left:6px;">(paying {{ days_ahead }} days early)</span>{% endif %}
+            </div>
+            <label>Cycle due date: <input type="date" name="actual_due_date" value="{{ bill.next_due_date_iso }}" title="Cycle due date"></label>
+            <label>Amount paid: <input type="text" name="amount_paid" value="{{ bill|bill_amount }}" style="width:80px;"></label>
+            <label>Paid date: <input type="date" name="paid_date" value="{{ now.strftime('%Y-%m-%d') }}" max="{{ now.strftime('%Y-%m-%d') }}"></label>
+            <label>Note: <input type="text" name="note" placeholder="optional" style="width:140px;"></label>
+            <details style="display:inline-block; margin-left:6px; font-size:0.85em;">
+                <summary style="cursor:pointer; color:#6b7280;">Override next due</summary>
+                <label style="margin-top:4px;">Next due: <input type="date" name="next_due_override" placeholder="auto"></label>
+            </details>
+            <button type="submit" style="margin-left:8px;">Confirm Payment</button>
+        </form>
+        <!-- Confirm Invoice Form -->
+        <form class="confirm-form" id="confirm-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/confirm-invoice" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% include 'partials/confirm_invoice_target.html' %}
+            <label>Supplier invoice number: <input name="invoice_number" type="text" maxlength="255" value="" placeholder="Optional"></label>
+            <label>Issue date: <input type="date" name="invoice_date" value="" title="Required for an amount owing after credit"></label>
+            <div style="font-size:0.85em; margin-bottom:6px;">Set exact date and amount from provider's bill for next cycle:</div>
+            <label>Actual due date: <input type="date" name="actual_due_date" value="{{ bill.next_due_date_iso if not bill.open_invoice else '' }}"></label>
+            <label>Amount: <input type="text" name="actual_amount" value="{{ '%.2f'|format(bill.effective_amount) if not bill.open_invoice and bill.effective_amount is not none else '' }}" style="width:80px;"></label>
+            {% include 'partials/invoice_amount_type.html' %}
+            <button type="submit">Save Confirmed Bill</button>
+        </form>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 5. FUTURE PROJECTIONS (> 14 days away, unconfirmed) -->
+    {% if future_estimates %}
+    <div class="bill-section">
+        <h3>📅 Future Estimates</h3>
+        {% for bill in future_estimates %}
+        <div class="bill-row{% if not bill.is_active %} bill-inactive{% endif %}" id="bill-{{ bill.id }}">
+            <span class="bill-name">
+                {% if bill.color and bill.color != '#000000' %}<span style="color: {{ bill.color }}">{{ bill.name }}</span>{% else %}{{ bill.name }}{% endif %}
+                {% if bill.note %}<span class="bill-due" title="{{ bill.note }}" style="cursor:help;">📝</span>{% endif %}
+            </span>
+            {{ account_balance(bill, request.scope.root_path) }}
+            {% if bill.payee %}<span class="bill-due">({{ bill.payee }})</span>{% endif %}
+            {% if bill.effective_amount is not none %}<span class="bill-amount">{% if bill.is_estimated %}~{% endif %}{{ bill.currency_symbol }}{{ bill|bill_amount }}{% if bill.is_estimated %} <span class="bill-est-badge" style="background:#e0e7ff; color:#3730a3;" title="Estimated from payment history">Est.</span>{% endif %}</span>{% endif %}
+            <span class="bill-due">estimated due {{ bill.next_due_date_formatted }}</span>
+            <span class="bill-est-badge">Est.</span>
+            {% if bill.is_auto_pay %}<span class="bill-auto-badge">auto</span>{% endif %}
+            {% if bill.category %}<span class="bill-category">{{ bill.category }}</span>{% endif %}
+            {% if bill.is_active %}
+            {% if not bill.ledger_enabled or bill.open_invoice %}<button type="button" onclick="togglePayForm({{ bill.id }})" style="font-size:0.8em;">Record payment</button>{% else %}<a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history#billing" style="font-size:0.8em;">Record invoice / extra payment</a>{% endif %}
+            <button type="button" onclick="toggleConfirmForm({{ bill.id }})" style="font-size:0.8em;" title="Set actual bill invoice due date & amount">Confirm Bill</button>
+            {% endif %}
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/edit" style="font-size:0.8em;">Edit</a>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history" style="font-size:0.8em;">History</a>
+        </div>
+        <!-- Pay Form -->
+        <form class="pay-form" id="pay-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/pay" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% if bill.open_invoice %}<input type="hidden" name="invoice_id" value="{{ bill.open_invoice.id }}">{% endif %}
+            {% set days_ahead = bill.days_until_due(now) or 0 %}
+            <div style="font-size:0.85em; margin-bottom:6px; color:#4b5563;">
+                Paying bill: <strong>{{ bill.name }}</strong>
+                {% if days_ahead > 0 %}<span style="color:#15803d; margin-left:6px;">(paying {{ days_ahead }} days early)</span>{% endif %}
+            </div>
+            <label>Actual due date: <input type="date" name="actual_due_date" value="{{ bill.next_due_date_iso }}" title="Actual date this bill was due according to invoice"></label>
+            <label>Amount paid: <input type="text" name="amount_paid" value="{{ bill|bill_amount }}" style="width:80px;"></label>
+            <label>Paid date: <input type="date" name="paid_date" value="{{ now.strftime('%Y-%m-%d') }}" max="{{ now.strftime('%Y-%m-%d') }}"></label>
+            <label>Note: <input type="text" name="note" placeholder="optional" style="width:140px;"></label>
+            <details style="display:inline-block; margin-left:6px; font-size:0.85em;">
+                <summary style="cursor:pointer; color:#6b7280;">Override next due</summary>
+                <label style="margin-top:4px;">Next due: <input type="date" name="next_due_override" placeholder="auto"></label>
+            </details>
+            <button type="submit" style="margin-left:8px;">Confirm Payment</button>
+        </form>
+        <!-- Confirm Invoice Form -->
+        <form class="confirm-form" id="confirm-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/confirm-invoice" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% include 'partials/confirm_invoice_target.html' %}
+            <label>Supplier invoice number: <input name="invoice_number" type="text" maxlength="255" value="" placeholder="Optional"></label>
+            <label>Issue date: <input type="date" name="invoice_date" value="" title="Required for an amount owing after credit"></label>
+            <div style="font-size:0.85em; margin-bottom:6px;">Set exact date and amount from provider's bill:</div>
+            <label>Actual due date: <input type="date" name="actual_due_date" value="{{ bill.next_due_date_iso if not bill.open_invoice else '' }}"></label>
+            <label>Amount: <input type="text" name="actual_amount" value="{{ '%.2f'|format(bill.effective_amount) if not bill.open_invoice and bill.effective_amount is not none else '' }}" style="width:80px;"></label>
+            {% include 'partials/invoice_amount_type.html' %}
+            <button type="submit">Save Confirmed Bill</button>
+        </form>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- UNSCHEDULED ACTIVE BILLS -->
+    {% if unscheduled %}
+    <div class="bill-section">
+        <h3>❓ Unscheduled Active Bills</h3>
+        {% for bill in unscheduled %}
+        <div class="bill-row" id="bill-{{ bill.id }}">
+            <span class="bill-name">
+                {% if bill.color and bill.color != '#000000' %}<span style="color: {{ bill.color }}">{{ bill.name }}</span>{% else %}{{ bill.name }}{% endif %}
+                {% if bill.note %}<span class="bill-due" title="{{ bill.note }}" style="cursor:help;">📝</span>{% endif %}
+            </span>
+            {{ account_balance(bill, request.scope.root_path) }}
+            {% if bill.payee %}<span class="bill-due">({{ bill.payee }})</span>{% endif %}
+            {% if bill.effective_amount is not none %}<span class="bill-amount">{% if bill.is_estimated %}~{% endif %}{{ bill.currency_symbol }}{{ bill|bill_amount }}{% if bill.is_estimated %} <span class="bill-est-badge" style="background:#e0e7ff; color:#3730a3;" title="Estimated from payment history">Est.</span>{% endif %}</span>{% endif %}
+            <span class="bill-due" style="color:#d97706;">No due date set</span>
+            {% if bill.is_auto_pay %}<span class="bill-auto-badge">auto</span>{% endif %}
+            {% if bill.category %}<span class="bill-category">{{ bill.category }}</span>{% endif %}
+            <button type="button" onclick="toggleConfirmForm({{ bill.id }})" style="font-size:0.8em;" title="Set due date">Set Due Date</button>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/edit" style="font-size:0.8em;">Edit</a>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history" style="font-size:0.8em;">History</a>
+        </div>
+        <!-- Set Due Date Form (uses confirm-invoice endpoint) -->
+        <form class="confirm-form" id="confirm-form-{{ bill.id }}" action="{{ request.scope.root_path }}/bills/{{ bill.id }}/confirm-invoice" method="post" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+            <input type="hidden" name="request_token" value="{{ new_invoice_token() }}">
+            {% include 'partials/confirm_invoice_target.html' %}
+            <label>Supplier invoice number: <input name="invoice_number" type="text" maxlength="255" value="" placeholder="Optional"></label>
+            <label>Issue date: <input type="date" name="invoice_date" value="" title="Required for an amount owing after credit"></label>
+            <div style="font-size:0.85em; margin-bottom:6px;">Set first due date and expected amount:</div>
+            <label>Due date: <input type="date" name="actual_due_date" value="{{ now.strftime('%Y-%m-%d') }}" required></label>
+            <label>Amount: <input type="text" name="actual_amount" value="{{ '%.2f'|format(bill.effective_amount) if not bill.open_invoice and bill.effective_amount is not none else '' }}" style="width:80px;"></label>
+            {% include 'partials/invoice_amount_type.html' %}
+            <button type="submit">Save Due Date</button>
+        </form>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not overdue and not due_today and not upcoming and not covered_early and not future_estimates and not unscheduled %}
+        {% if inactive_count %}
+        <p class="dates">No active bills ({{ inactive_count }} inactive). Click ➕ to add one{% if not show_inactive %}, or <a href="{{ request.scope.root_path }}/classic/bills?show_inactive=1">show inactive bills</a>{% endif %}.</p>
+        {% else %}
+        <p class="dates">No bills configured. Click ➕ to add one.</p>
+        {% endif %}
+    {% endif %}
+
+    <!-- 6. RECENT PAYMENTS (Last 30 Days) -->
+    {% if recent_payments %}
+    <div class="bill-section">
+        <h3>💳 Recent Payments (Last 30 Days)</h3>
+        {% for payment in recent_payments %}
+        <div class="payment-row">
+            <a href="{{ request.scope.root_path }}/bills/{{ payment.bill_id }}/history" style="font-weight: 500; text-decoration: none; color: inherit;{% if payment.bill and payment.bill.color and payment.bill.color != '#000000' %} color: {{ payment.bill.color }};{% endif %}" title="View payment history">{{ payment.bill.name if payment.bill else 'Unknown Bill' }}</a>
+            {% if payment.amount_paid is not none %}<span class="bill-amount">{{ payment.currency_symbol }}{{ "%.2f"|format(payment.amount_paid) }}</span>{% endif %}
+            <span class="bill-due">paid {{ payment.paid_date_formatted }}</span>
+            {% if payment.effective_due_date %}<span class="bill-due">(for due date {{ payment.due_date_formatted }})</span>{% endif %}
+            {% if payment.effective_due_date and payment.paid_date %}
+                {% if payment.days_difference > 0 %}
+                    <span class="bill-timing-badge timing-early">{{ payment.timing_label }}</span>
+                {% elif payment.days_difference == 0 %}
+                    <span class="bill-timing-badge timing-early">On time</span>
+                {% elif payment.is_late_overridden %}
+                    <span class="bill-timing-badge timing-early" title="Marked on time">✓ (Override)</span>
+                {% else %}
+                    <span class="bill-timing-badge timing-late">{{ payment.timing_label }}</span>
+                {% endif %}
+            {% endif %}
+            {% if payment.display_note %}<span class="bill-due">— {{ payment.display_note }}</span>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 7. INACTIVE BILLS -->
+    {% if show_inactive and inactive_bills %}
+    <div class="bill-section" style="opacity: 0.8; margin-top: 25px; border-top: 1px dashed #ccc; padding-top: 15px;">
+        <h3>📦 Inactive Bills</h3>
+        {% for bill in inactive_bills %}
+        <div class="bill-row bill-inactive" id="bill-{{ bill.id }}">
+            <span class="bill-name">
+                {% if bill.color and bill.color != '#000000' %}<span style="color: {{ bill.color }}">{{ bill.name }}</span>{% else %}{{ bill.name }}{% endif %}
+                {% if bill.note %}<span class="bill-due" title="{{ bill.note }}" style="cursor:help;">📝</span>{% endif %}
+            </span>
+            {{ account_balance(bill, request.scope.root_path) }}
+            {% if bill.payee %}<span class="bill-due">({{ bill.payee }})</span>{% endif %}
+            {% if bill.effective_amount is not none %}<span class="bill-amount">{% if bill.is_estimated %}~{% endif %}{{ bill.currency_symbol }}{{ bill|bill_amount }}{% if bill.is_estimated %} <span class="bill-est-badge" style="background:#e0e7ff; color:#3730a3;" title="Estimated from payment history">Est.</span>{% endif %}</span>{% endif %}
+            {% if bill.next_due_date_formatted %}<span class="bill-due">last due {{ bill.next_due_date_formatted }}</span>{% else %}<span class="bill-due"><em>No due date</em></span>{% endif %}
+            <span class="bill-est-badge">Inactive</span>
+            {% if bill.is_auto_pay %}<span class="bill-auto-badge">auto</span>{% endif %}
+            {% if bill.category %}<span class="bill-category">{{ bill.category }}</span>{% endif %}
+            <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/toggle-active{% if show_inactive %}?show_inactive=1{% endif %}" method="post" style="display:inline;">
+                <button type="submit" style="font-size:0.8em; color:#16a34a; cursor:pointer;">Reactivate</button>
+            </form>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/edit" style="font-size:0.8em;">Edit</a>
+            <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history" style="font-size:0.8em;">History</a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <script>
+        function selectConfirmedInvoice(select) {
+            const form = select.form;
+            const option = select.selectedOptions[0];
+            form.elements.invoice_number.value = option.dataset.number;
+            form.elements.invoice_date.value = option.dataset.issued;
+            form.elements.actual_due_date.value = option.dataset.due;
+            form.elements.actual_amount.value = option.dataset.amount;
+            form.elements.credit_applied.value = '';
+            form.elements.amount_type.value = 'gross';
+            form.elements.amount_type.dispatchEvent(new Event('change'));
+        }
+
+        function toggleCreateBillForm() {
+            var form = document.getElementById('create-bill-form');
+            if (form) {
+                form.style.display = form.style.display !== 'block' ? 'block' : 'none';
+            }
+        }
+
+        function togglePayForm(billId) {
+            var form = document.getElementById('pay-form-' + billId);
+            if (form) {
+                form.style.display = form.style.display !== 'block' ? 'block' : 'none';
+            }
+            var cForm = document.getElementById('confirm-form-' + billId);
+            if (cForm) cForm.style.display = 'none';
+        }
+
+        function toggleConfirmForm(billId) {
+            var form = document.getElementById('confirm-form-' + billId);
+            if (form) {
+                form.style.display = form.style.display !== 'block' ? 'block' : 'none';
+            }
+            var pForm = document.getElementById('pay-form-' + billId);
+            if (pForm) pForm.style.display = 'none';
+        }
+
+        function onCreateColorToggle(cb) {
+            var picker = document.getElementById('color-picker-create');
+            var val = document.getElementById('color-val-create');
+            if (picker) picker.style.display = cb.checked ? 'inline' : 'none';
+            if (val) val.value = cb.checked ? picker.value : '';
+        }
+
+        function toggleCustomDays(select) {
+            var el = document.getElementById('custom-days-input');
+            if (el) {
+                el.style.display = select.value === 'custom' ? 'inline' : 'none';
+            }
+        }
+    </script>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

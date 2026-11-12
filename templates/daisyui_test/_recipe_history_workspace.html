@@ -1,0 +1,19 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% from 'daisyui_test/_recipe_macros.html' import hx with context %}
+<div id="daisy-workspace" data-scope="recipe:{{ back }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="detail-navigation"><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/list/{{ todo.list_id }}/shopping">{{ icon('list', 15) }} {{ todo.list.name }} shopping list</a><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/pantry">Pantry</a></div>
+    <div class="page-heading">
+        <div class="page-title"><h1>{{ todo.title }}</h1><span class="eyebrow">{{ events|length }} {{ 'event' if events|length == 1 else 'events' }}{% if group %} · shared as {{ group.canonical_name }}{% endif %}</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span></div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    {% if group %}<p class="page-hint">Shared with {% for member in group.todos %}{{ member.title }} ({{ member.list.name }}){{ ', ' if not loop.last }}{% endfor %}; their events are listed together.</p>{% endif %}
+    <form class="section-panel bill-form recipe-event-form" {{ hx('event') }}><input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="todo_id" value="{{ todo.id }}">
+        <div class="bill-fields"><label><span>Event</span><select class="select select-sm" name="event_type" aria-label="Event type"><option value="bought">Bought</option><option value="ran_out">Ran out</option><option value="reset">Restocked (start a new cycle)</option></select></label><label><span>Date</span><input class="input input-sm" type="date" name="event_date" value="{{ today_iso }}" max="{{ today_iso }}" aria-label="Event date"></label><label class="grow"><span>Note</span><input class="input input-sm" name="note" placeholder="Optional" aria-label="Event note"></label></div>
+        <button class="btn btn-primary btn-sm">{{ icon('plus', 14) }} Record event</button>
+    </form>
+    {% if events %}<section class="section-panel" aria-label="Events"><ul class="list">{% for event in events %}
+        <li class="list-row bill-row"><div class="bill-main"><div class="item-title-line"><span class="badge badge-sm {{ 'timing-late' if event.event_type == 'ran_out' else 'timing-good' }}">{{ {'bought': 'Bought', 'ran_out': 'Ran out', 'reset': 'Restocked'}.get(event.event_type, event.event_type) }}</span><span class="item-context">{{ event.event_date.strftime('%a %-d %b %Y') }}</span>{% if event.quantity and event.quantity != 1 %}<span class="item-context">× {{ event.quantity }}</span>{% endif %}{% if group and event.todo_id != todo.id %}<span class="item-context">via {{ event.todo.list.name }}</span>{% endif %}{% if event.note %}<span class="item-context">{{ event.note }}</span>{% endif %}</div></div>
+            <form {{ hx('event-delete') }} hx-confirm="Delete this event? Ingredient statistics are recalculated."><input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="todo_id" value="{{ todo.id }}"><input type="hidden" name="event_id" value="{{ event.id }}"><button class="btn btn-ghost btn-square btn-sm delete-button" aria-label="Delete event of {{ event.event_date.strftime('%-d %b %Y') }}">{{ icon('trash', 15) }}</button></form></li>
+    {% endfor %}</ul></section>{% else %}<div class="empty-state"><h3>No purchases or run-outs recorded yet.</h3></div>{% endif %}
+</div>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <title>Reorder Lists - {{ t('app_title', 'Todo Lists') }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231">
+    <script src="{{ request.scope.root_path }}/static/htmx.min.js"></script>
+    <script src="{{ request.scope.root_path }}/static/alpine.min.js" defer></script>
+    <style>
+        .reorder-list-row {
+            line-height: inherit;
+        }
+
+        .reorder-list-row.is-dragging {
+            opacity: 0.3;
+        }
+
+        .reorder-list-row.drag-over-top {
+            border-top: 2px solid var(--link-color, #0066cc);
+        }
+
+        .reorder-list-row.drag-over-bottom {
+            border-bottom: 2px solid var(--link-color, #0066cc);
+        }
+
+        .drag-handle {
+            cursor: grab;
+            user-select: none;
+            margin-right: 5px;
+            color: var(--dates-color, #888);
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+        <a href="{{ request.scope.root_path }}/{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}"
+            style="text-decoration: none; font-size: 1.2rem;" title="Back to Home">←</a>
+        <h2 style="margin: 0;">Reorder Lists</h2>
+    </div>
+
+    {% if all_folders %}
+    <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+        <label for="folder-select" class="dates"><b>Folder:</b></label>
+        <select id="folder-select" onchange="window.location.href = this.value" style="font-size: 0.9rem; padding: 2px 4px;">
+            <option value="{{ request.scope.root_path }}/lists/reorder" {% if not current_folder_id %}selected{% endif %}>Root (No folder)</option>
+            {% for f in all_folders %}
+            <option value="{{ request.scope.root_path }}/lists/reorder?folder_id={{ f.id }}" {% if current_folder_id == f.id %}selected{% endif %}>{{ f.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% elif active_folder_name %}
+    <div class="dates" style="margin-bottom: 8px;">
+        Folder: <b>{{ active_folder_name }}</b>
+    </div>
+    {% endif %}
+
+    <script>
+        function reorderListHandler() {
+            return {
+                draggedRow: null,
+
+                onDragStart(event) {
+                    const row = event.target.closest('.reorder-list-row');
+                    if (!row) return;
+                    this.draggedRow = row;
+                    row.classList.add('is-dragging');
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', row.dataset.id);
+                },
+
+                onDragOver(event) {
+                    event.preventDefault();
+                    const row = event.target.closest('.reorder-list-row');
+                    if (!row || !this.draggedRow || row === this.draggedRow) return;
+                    event.dataTransfer.dropEffect = 'move';
+
+                    const rect = row.getBoundingClientRect();
+                    const mid = rect.top + rect.height / 2;
+                    if (event.clientY < mid) {
+                        row.classList.add('drag-over-top');
+                        row.classList.remove('drag-over-bottom');
+                    } else {
+                        row.classList.add('drag-over-bottom');
+                        row.classList.remove('drag-over-top');
+                    }
+                },
+
+                onDragLeave(event) {
+                    const row = event.target.closest('.reorder-list-row');
+                    if (row) {
+                        row.classList.remove('drag-over-top', 'drag-over-bottom');
+                    }
+                },
+
+                onDrop(event) {
+                    event.preventDefault();
+                    const targetRow = event.target.closest('.reorder-list-row');
+                    if (!targetRow || !this.draggedRow || targetRow === this.draggedRow) {
+                        this.cleanup();
+                        return;
+                    }
+
+                    const list = document.getElementById('reorder-list-container');
+                    const rect = targetRow.getBoundingClientRect();
+                    const mid = rect.top + rect.height / 2;
+
+                    if (event.clientY < mid) {
+                        list.insertBefore(this.draggedRow, targetRow);
+                    } else {
+                        list.insertBefore(this.draggedRow, targetRow.nextSibling);
+                    }
+
+                    this.cleanup();
+                    this.syncAndSave();
+                },
+
+                onDragEnd(event) {
+                    this.cleanup();
+                },
+
+                cleanup() {
+                    if (this.draggedRow) {
+                        this.draggedRow.classList.remove('is-dragging');
+                        this.draggedRow = null;
+                    }
+                    document.querySelectorAll('.reorder-list-row').forEach(function(r) {
+                        r.classList.remove('drag-over-top', 'drag-over-bottom', 'is-dragging');
+                    });
+                },
+
+                syncAndSave() {
+                    const container = document.getElementById('hidden-inputs');
+                    if (!container) return;
+                    container.innerHTML = '';
+                    const rows = document.querySelectorAll('#reorder-list-container .reorder-list-row');
+                    rows.forEach(function(r) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'list_ids';
+                        input.value = r.dataset.id;
+                        container.appendChild(input);
+                    });
+
+                    const statusEl = document.getElementById('save-status');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span style="color: var(--dates-color, #888); font-size: 0.9rem;">Saving...</span>';
+                    }
+
+                    const form = document.getElementById('reorder-form');
+                    if (window.htmx && form) {
+                        htmx.trigger(form, 'submit');
+                    }
+                }
+            };
+        }
+
+        document.addEventListener('alpine:init', function() {
+            Alpine.data('reorderList', reorderListHandler);
+        });
+    </script>
+
+    <div x-data="reorderListHandler()">
+        {% if lists %}
+        <div id="reorder-list-container">
+            {% for lst in lists %}
+            <div class="reorder-list-row"
+                 data-id="{{ lst.id }}"
+                 draggable="true"
+                 @dragstart="onDragStart($event)"
+                 @dragover="onDragOver($event)"
+                 @dragleave="onDragLeave($event)"
+                 @drop="onDrop($event)"
+                 @dragend="onDragEnd($event)">
+                <span class="drag-handle" title="Drag to reorder">☰</span>
+                {% if lst.pinned %}📌{% endif %}
+                {% if lst.is_collation %}
+                <span class="collation-dots"><span class="collation-dot on"
+                        style="--collation-color: {{ lst.collation_color or '#888' }}; cursor: default;"></span></span>
+                {% endif %}
+                <span>{{ lst.name }}</span>
+                <span class="dates" style="margin-left: 3px;">{{ uncompleted_counts.get(lst.id, 0) }}</span>
+                {% if lst.category %}<span class="dates" style="margin-left: 4px;">[{{ lst.category }}]</span>{% endif %}
+                {% for hashtag in lst.hashtags %}
+                <span class="pill">#{{ hashtag.name }}</span>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <form id="reorder-form"
+            hx-post="{{ request.scope.root_path }}/lists/reorder{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}"
+            hx-target="#save-status"
+            hx-swap="innerHTML"
+            style="margin-top: 10px;">
+            <div id="hidden-inputs">
+                {% for lst in lists %}
+                <input type="hidden" name="list_ids" value="{{ lst.id }}">
+                {% endfor %}
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+                <button type="submit">{{ t('btn_save', 'Save Order') }}</button>
+                <span id="save-status"></span>
+                <a href="{{ request.scope.root_path }}/{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}">View in Home</a>
+            </div>
+        </form>
+        {% else %}
+        <p>{{ t('text_no_lists', 'No lists yet.') }}</p>
+        {% endif %}
+    </div>
+
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

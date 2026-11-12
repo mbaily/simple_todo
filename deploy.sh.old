@@ -1,0 +1,225 @@
+#!/bin/bash
+set -euo pipefail
+
+# Deployment Script for Simple Todo App
+
+# Default target directory
+DEFAULT_TARGET_DIR=/opt/simple_todo
+
+# Help message
+usage() {
+    echo "Usage: $0 [TARGET_DIRECTORY] [DATA_DIRECTORY]"
+    echo "Deploys the simple_todo app to TARGET_DIRECTORY."
+    echo ""
+    echo "Example:"
+    echo "  $0"
+    echo "  $0 /opt/simple_todo"
+    echo "  $0 /opt/simple_todo /var/lib/simple_todo"
+    echo "DATA_DIRECTORY can also be set with SIMPLE_TODO_DATA_DIR."
+    echo ""
+    exit 1
+}
+
+# Parse arguments
+TARGET_DIR="${1:-$DEFAULT_TARGET_DIR}"
+
+if [[ "$TARGET_DIR" == "-h" || "$TARGET_DIR" == "--help" ]]; then
+    usage
+fi
+
+# Capture source directory (where script is running from)
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+echo SOURCE_DIR is ${SOURCE_DIR}
+
+# Check for root
+if [ "$EUID" -ne 0 ]; then 
+  echo "Please run as root (sudo)"
+  exit 1
+fi
+
+SERVICE_USER="www-data"
+SERVICE_GROUP="www-data"
+TARGET_DIR=$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).expanduser().resolve())' "$TARGET_DIR")
+STATE_DIR="${2:-${SIMPLE_TODO_DATA_DIR:-$TARGET_DIR}}"
+STATE_DIR=$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).expanduser().resolve())' "$STATE_DIR")
+EXTERNAL_DATA=0
+if [[ -n "${2:-${SIMPLE_TODO_DATA_DIR:-}}" ]]; then
+    EXTERNAL_DATA=1
+    python3 - "$STATE_DIR" "$TARGET_DIR" "$SOURCE_DIR" <<'PY'
+from pathlib import Path
+import sys
+state, target, source = map(Path, sys.argv[1:])
+if state.is_relative_to(target) or state.is_relative_to(source):
+    raise SystemExit("DATA_DIRECTORY must be outside both source and deployment directories")
+PY
+    install -d -m 700 -o "$SERVICE_USER" -g "$SERVICE_GROUP" "$STATE_DIR"
+fi
+
+echo "Deploying Simple Todo to: $TARGET_DIR"
+
+# Ensure target directory exists
+if [ ! -d "$TARGET_DIR" ]; then
+    echo "Creating target directory..."
+    mkdir -p "$TARGET_DIR"
+fi
+
+# 1. Sync Files
+echo "Syncing application files..."
+# Using rsync to copy specific files/dirs and exclude others
+# Excludes based on user request (no git checkout, no dev files)
+# Certificates are managed directly on the deployment host.  Excluding them
+# also protects them from rsync --delete and prevents source copies replacing them.
+# Keep deployment backups and their code snapshots, logs and validation artifacts.
+# Authentication credentials are managed on the deployment host.
+rsync -av --delete \
+    --exclude='.git' \
+    --exclude='.gitignore' \
+    --exclude='.venv' \
+    --exclude='__pycache__' \
+    --exclude='.pytest_cache' \
+    --exclude='tests' \
+    --exclude='test_*.py' \
+    --exclude='test_output.log' \
+    --exclude='*.db' \
+    --exclude='*.db-*' \
+    --exclude='*.db.*' \
+    --exclude='*.sqlite*' \
+    --exclude='session-secret' \
+    --exclude='settings.json' \
+    --exclude='.swp' \
+    --exclude='*.log' \
+    --exclude='.vscode' \
+    --exclude='deploy.sh' \
+    --exclude='run_dev.sh' \
+    --exclude='.env' \
+    --exclude='.htpasswd' \
+    --exclude='certs/***' \
+    --exclude='backups/***' \
+    --include='*.py' \
+    --include='requirements.txt' \
+    --include='default_smart_folders.json' \
+    --include='simple_todo.service' \
+    --include='templates/***' \
+    --include='static/***' \
+    --include='scripts/***' \
+    --include='locales/***' \
+    --include='docs/***' \
+    --exclude='*' \
+    "$SOURCE_DIR/" "$TARGET_DIR/"
+
+echo "Files synced successfully."
+
+# 2. Setup Virtual Environment
+echo "Setting up virtual environment in $TARGET_DIR/.venv..."
+cd "$TARGET_DIR"
+
+if [ ! -d ".venv" ]; then
+    python3 -m venv .venv
+    echo "Virtual environment created."
+fi
+
+# 3. Install Dependencies
+echo "Installing dependencies..."
+./.venv/bin/pip install --upgrade pip
+./.venv/bin/pip install -r requirements.txt
+
+# 4. Generate/Update Systemd Service File
+SERVICE_FILE="simple_todo.service"
+echo "Configuring systemd service file: $SERVICE_FILE..."
+
+# If the service file exists (copied from source), we modify it to match the deployment location
+if [ -f "$SERVICE_FILE" ]; then
+    # Read host, port and public prefix from the deployment .env at service startup.
+    # Caddy terminates TLS; the backend always uses plain HTTP.
+    CMD="$TARGET_DIR/.venv/bin/python main.py"
+
+    # Seed/merge the selected state's .env, preserving server-only keys.
+    # This preserves server-only keys like SIMPLE_TODO_SESSION_SECRET.
+    if [[ -f "$SOURCE_DIR/.env" ]]; then
+        if [[ -f "$STATE_DIR/.env" ]]; then
+            echo "Merging .env (preserving existing server keys)..."
+            # Add any keys from source that don't already exist in target
+            while IFS= read -r line; do
+                # Skip comments and blank lines
+                [[ -z "$line" || "$line" == \#* ]] && continue
+                key="${line%%=*}"
+                # External-mode paths belong to this deployment, not the
+                # developer's legacy single-file environment.
+                if [[ "$EXTERNAL_DATA" == 1 && ( "$key" == SIMPLE_TODO_DB_PATH || "$key" == SIMPLE_TODO_DATA_DIR ) ]]; then
+                    continue
+                fi
+                if ! grep -q "^${key}=" "$STATE_DIR/.env" 2>/dev/null; then
+                    echo "$line" >> "$STATE_DIR/.env"
+                    echo "  Added new key: $key"
+                fi
+            done < "$SOURCE_DIR/.env"
+        else
+            cp "$SOURCE_DIR/.env" "$STATE_DIR/.env"
+            echo "Copied .env to $STATE_DIR."
+        fi
+        chown "$SERVICE_USER:$SERVICE_GROUP" "$STATE_DIR/.env"
+        chmod 600 "$STATE_DIR/.env"
+
+        # Auto-generate session secret if missing
+        if ! grep -q "^SIMPLE_TODO_SESSION_SECRET=" "$STATE_DIR/.env" 2>/dev/null; then
+            SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+            echo "SIMPLE_TODO_SESSION_SECRET=$SECRET" >> "$STATE_DIR/.env"
+            echo "  Generated new SIMPLE_TODO_SESSION_SECRET"
+        fi
+    fi
+
+    DATA_ENV=""
+    if [[ "$EXTERNAL_DATA" == 1 ]]; then
+        DATA_ENV="Environment=\"SIMPLE_TODO_DATA_DIR=$STATE_DIR\""
+    fi
+
+    # Generate the service file content directly
+    echo "Generating $SERVICE_FILE with correct configuration..."
+    cat <<EOF > "$SERVICE_FILE"
+[Unit]
+Description=Simple Todo FastAPI Service
+After=network.target
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+Group=$SERVICE_GROUP
+WorkingDirectory=$TARGET_DIR
+Environment="PATH=$TARGET_DIR/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+$DATA_ENV
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=-$STATE_DIR/.env
+UMask=0077
+
+# Command to run the service
+ExecStart=$CMD
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    echo "Service file generated successfully."
+fi
+
+# 5. Set Permissions
+echo "Setting permissions (chown $SERVICE_USER:$SERVICE_GROUP)..."
+chown -R "$SERVICE_USER:$SERVICE_GROUP" "$TARGET_DIR"
+
+echo ""
+echo "Deployment Complete!"
+echo "--------------------"
+echo "App location: $TARGET_DIR"
+echo "State location: $STATE_DIR"
+echo "Virtual Env : $TARGET_DIR/.venv"
+echo "User/Group  : $SERVICE_USER:$SERVICE_GROUP"
+echo ""
+echo "To install the systemd service:"
+echo "  cp $TARGET_DIR/$SERVICE_FILE /etc/systemd/system/"
+echo "  systemctl daemon-reload"
+echo "  systemctl enable --now $SERVICE_FILE"
+echo ""
+echo "After changing $STATE_DIR/.env or settings.json, restart the service:"
+echo "  sudo systemctl restart simple_todo"

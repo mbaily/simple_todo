@@ -1,0 +1,27 @@
+I want to create a simple todo app using python + fastapi with some JSON endpoints for AJAX, most commonly checking and unchecking checkboxes for todos or lists.
+
+It will use sqlite + sqlalchemy for app data and metadata storage.
+
+The app should use nothing but a few AJAX calls for javascript. The rest is Server-side rendered HTML.
+
+The HTML the server renders should be very plain with no formatting whatever. All the text should all be the same font size. Some can be HTML anchors, and some HTML checkboxes, but that's all the interactivity. No interactivity provided by javascript except the checkboxes. The rest is standard HTML app stuff using form submission, and if needed HTML redirect.
+
+A todo belongs to a list. A list can have many todos.
+
+Todos and lists both have creation and modification dates, shown as dd/mm/yyyy format.
+
+Todos and lists can have 1 or more hashtags associated with them.
+
+
+Obviously you can view the main list of lists (main page) and for each list the todos for that list (view list page). These pages also show the hashtags for each list.
+
+A todo can also have a multi-line text note associated with it. This is edited in another page for editing a todo's title and it's note. Whether a todo has a note, that is shown in the entry for that todo in the view list page.
+
+Hashtags, once submitted to the app, as in '#shopping', will get recorded as a hashtag.
+sting (lists or todos).
+
+On another page you can view hashtags, and select multiple hashtags to create a named search (given a name) When you create the named search you also supply a boolean (checkbox) option whether the named search is for only uncompleted items (lists and todos) or all items.
+
+Then when you click on the named search (named searches are shown at the top of the hashtags viewing page), you are shown all the items that have any of the hashtags that that named search was created with.
+
+On the hashtags viewing page you can also delete hashtags, this removes them from any items they are attached to and removes from the app.

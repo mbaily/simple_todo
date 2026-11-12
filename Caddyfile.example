@@ -1,0 +1,8 @@
+example.com {
+    redir /simple_todo /simple_todo/ 308
+    handle_path /simple_todo/* {
+        reverse_proxy 127.0.0.1:3102
+    }
+
+    # Add the other apps' handlers in this same site block.
+}

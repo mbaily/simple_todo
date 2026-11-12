@@ -1,0 +1,15 @@
+<details class="calendar-sort">
+    <summary aria-label="Sort events within each day" title="Sort events within each day ({{ calendar_sort_options[calendar_sort_order] }})">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M4 6h11M4 12h7M4 18h3M18 6v12m-3-3 3 3 3-3" />
+        </svg>
+    </summary>
+    <form class="calendar-sort-menu" action="{{ request.scope.root_path }}/calendar/set-sort" method="post">
+        <input type="hidden" name="offset" value="{{ offset }}">
+        {% if weekly_view %}<input type="hidden" name="week" value="{{ current_week_str }}">{% endif %}
+        {% if traditional_view %}<input type="hidden" name="month" value="{{ current_month_str }}">{% endif %}
+        {% for value, label in calendar_sort_options.items() %}
+        <button type="submit" name="calendar_sort_order" value="{{ value }}" aria-pressed="{{ 'true' if calendar_sort_order == value else 'false' }}">{{ label }}</button>
+        {% endfor %}
+    </form>
+</details>

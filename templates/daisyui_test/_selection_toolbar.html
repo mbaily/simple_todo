@@ -1,0 +1,28 @@
+<form id="daisy-bulk-form" class="bulk-toolbar" action="{{ prototype_url }}/bulk{{ query }}" method="post" hx-post="{{ prototype_url }}/bulk{{ query }}" hx-target:inherited="#daisy-workspace" hx-swap:inherited="outerMorph" hx-disable="find button" aria-label="Selection actions" hidden>
+    <div class="selection-summary"><strong id="selection-count" aria-live="polite">0 selected</strong><div class="selection-links"><button type="button" data-command="select-all">Select all</button><span>·</span><button type="button" data-command="clear-selection">Clear</button></div><small id="selected-dates" hidden></small></div>
+    <div class="bulk-buttons">
+        <button class="btn btn-sm" name="action" value="pin" data-pin-items>{{ icon('pin', 15) }} Pin</button>
+        <button class="btn btn-sm" name="action" value="unpin" data-pin-items>Unpin</button>
+        {% if not list_page %}<button class="btn btn-sm" name="action" value="archive" data-lists-only>Archive</button><button class="btn btn-sm" name="action" value="unarchive" data-lists-only>Unarchive</button><button type="button" class="btn btn-sm" data-command="move-to-folder" data-lists-only>Move to folder…</button>{% endif %}
+        <button type="button" class="btn btn-sm" data-command="edit-selected" data-single-item>{{ icon('edit', 15) }} Edit</button>
+        {% if list_page %}
+        <button type="button" class="btn btn-sm" data-command="show-panel" data-panel="subtask" data-single-todo>Subtask</button>
+        <button type="button" class="btn btn-sm" data-command="show-panel" data-panel="task-note" data-single-todo>Task note</button>
+        <button type="button" class="btn btn-sm" data-command="show-panel" data-panel="defer" data-single-todo>Defer</button>
+        <button type="button" class="btn btn-sm" data-command="show-panel" data-panel="alarm" data-single-todo>Alarm</button>
+        <button type="button" class="btn btn-sm" data-command="show-panel" data-panel="hashtags" data-single-todo>Tags</button>
+        {% if list.manual_sorting %}<button type="button" class="btn btn-sm" data-command="show-panel" data-panel="reorder" data-todos-only>Reorder</button>{% endif %}
+        {% if enable_dokuwiki_links and list.show_dokuwiki_item_links %}
+        {% for action, label in [('wiki-enable', 'Enable wiki pages'), ('wiki-disable', 'Disable wiki pages')] %}
+        <button type="button" class="btn btn-sm" hx-post="{{ detail_url }}/selected/{{ action }}{{ query }}" hx-include="[name='items']:checked" hx-disable="this" data-todos-only>{{ label }}</button>
+        {% endfor %}
+        {% endif %}
+        {% if list.is_recipe %}
+        {% for action, label in [('bought', 'Bought'), ('ran_out', 'Ran out')] %}<button type="button" class="btn btn-sm" hx-post="{{ detail_url }}/selected/{{ action }}{{ query }}" hx-include="[name='items']:checked" hx-disable="this" data-native-todos>{{ label }}</button>{% endfor %}
+        {% endif %}
+        {% endif %}
+        <button type="button" class="btn btn-sm" data-command="move-to-list" data-movable>Move to list…</button>
+        <button type="button" class="btn btn-sm delete-button" data-command="delete-selected" data-requires-selection>{{ icon('trash', 15) }} Delete</button>
+        <button type="button" class="btn btn-ghost btn-square btn-sm" data-command="toggle-selection" aria-label="Exit selection mode">{{ icon('close', 16) }}</button>
+    </div>
+</form>

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>🍳 Ingredient Report - {{ list.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <style>
+        /* Minimalist Ingredient Report */
+        .report-header {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--input-border);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .summary-bar {
+            display: flex;
+            gap: 16px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--input-border);
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            font-size: 0.95rem;
+        }
+
+        .summary-item {
+            display: flex;
+            gap: 6px;
+        }
+
+        .summary-number {
+            font-weight: 600;
+        }
+
+        .ingredient-item {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--input-border);
+        }
+
+        .ingredient-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .ingredient-title {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text-color);
+            word-wrap: break-word;
+            /* Ensure wrapping */
+            max-width: 100%;
+        }
+
+        /* Status colors (text only) */
+        .status-ran-out {
+            color: #ef4444;
+            font-weight: 500;
+        }
+
+        .status-likely-low {
+            color: #f59e0b;
+        }
+
+        .status-new {
+            color: #6366f1;
+        }
+
+        .status-in-stock {
+            color: #10b981;
+        }
+
+        .ingredient-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            color: var(--dates-color);
+            line-height: 1.4;
+        }
+
+        .stat-label {
+            color: var(--dates-color);
+            margin-right: 4px;
+        }
+
+        .stat-value {
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .ingredient-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .quantity-input {
+            width: 50px;
+            padding: 6px;
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            text-align: center;
+            background: var(--input-bg);
+            color: var(--text-color);
+        }
+
+        button {
+            background: transparent;
+            border: 1px solid var(--input-border);
+            color: var(--text-color);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: var(--button-bg);
+        }
+
+        .buy-btn {
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .buy-btn:hover {
+            background: #ecfdf5;
+        }
+
+        .ran-out-btn {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .ran-out-btn:hover {
+            background: #fef2f2;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .buy-btn:hover {
+                background: rgba(16, 185, 129, 0.1);
+            }
+
+            .ran-out-btn:hover {
+                background: rgba(239, 68, 68, 0.1);
+            }
+        }
+
+        .ingredient-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .ingredient-card.warning {
+            border-left: 4px solid #f59e0b;
+            background: linear-gradient(90deg, #fef3c7 0%, var(--card-bg, #fff) 10%);
+        }
+
+        .ingredient-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .ingredient-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--text-color, #333);
+        }
+
+        .ingredient-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-ok {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-new {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .ingredient-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            padding: 8px;
+            background: var(--stat-bg, #f9fafb);
+            border-radius: 6px;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #6b7280;
+            margin-bottom: 2px;
+        }
+
+        .stat-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-color, #333);
+        }
+
+        .stat-value.highlight {
+            color: #059669;
+        }
+
+        .stat-value.warning {
+            color: #d97706;
+        }
+
+        .ingredient-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .ingredient-actions button {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            background: var(--button-bg, #fff);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+
+        .ingredient-actions button:hover {
+            background: var(--button-hover-bg, #f3f4f6);
+        }
+
+        .ingredient-actions button.primary {
+            background: #10b981;
+            color: white;
+            border-color: #059669;
+        }
+
+        .ingredient-actions button.primary:hover {
+            background: #059669;
+        }
+
+        .ingredient-actions button.danger {
+            background: #ef4444;
+            color: white;
+            border-color: #dc2626;
+        }
+
+        .ingredient-actions button.danger:hover {
+            background: #dc2626;
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .report-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .summary-card.total {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .summary-card.warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .summary-card.ok {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .summary-card .number {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .summary-card .label {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        .quantity-input {
+            width: 60px;
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .ingredient-card {
+                border-color: #374151;
+            }
+
+            .ingredient-card.warning {
+                background: linear-gradient(90deg, #78350f 0%, var(--card-bg, #1f2937) 10%);
+            }
+
+            .stat-item {
+                background: #374151;
+            }
+
+            .ingredient-actions button {
+                border-color: #4b5563;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div style="margin-bottom: 10px;">
+        <a href="{{ request.scope.root_path }}/list/{{ list.id }}" class="nav-icon" title="{{ t('tooltip_back_to_list') }}">⬅️</a>
+        <a href="{{ request.scope.root_path }}/list/{{ list.id }}/shopping_list" class="nav-icon" title="{{ t('header_shopping_list') }}">🛒</a>
+        <a href="{{ request.scope.root_path }}/pantry" class="nav-icon" title="{{ t('tooltip_pantry_manage_all') }}">🥫</a>
+        <a href="{{ request.scope.root_path }}/classic" class="nav-icon" title="{{ t('title_home') }}">🏠</a>
+    </div>
+
+    <div class="report-header">
+        <div>
+            <h1 style="margin: 0;">🍳 {{ t('header_ingredient_report') }}</h1>
+            <h2 style="margin: 5px 0 0 0; font-weight: normal; color: #6b7280;">{{ list.name }}</h2>
+        </div>
+        <div class="report-actions">
+            <a href="{{ request.scope.root_path }}/list/{{ list.id }}/shopping_list"
+                style="padding: 8px 16px; background: #3b82f6; color: white; border-radius: 6px; text-decoration: none; font-weight: 500;"
+                title="{{ t('tip_view_shopping_list') }}">
+                🛒 {{ t('header_shopping_list') }}
+            </a>
+            <button onclick="resetAllIngredients()" class="primary" title="{{ t('tip_reset_all') }}">
+                🔄 {{ t('btn_reset_all') }}
+            </button>
+        </div>
+    </div>
+
+    {% set warning_count = ingredients|selectattr('stats.likely_to_run_out')|list|length %}
+    {% set ran_out_count = ingredients|selectattr('stats.last_event_type', 'equalto', 'ran_out')|list|length %}
+    {% set ok_count = ingredients|length - warning_count - ran_out_count %}
+
+    <div class="summary-bar">
+        <div class="summary-item">
+            <span class="summary-number">{{ ingredients|length }}</span> {{ t('label_total_ingredients') }}
+        </div>
+        {% if ran_out_count > 0 %}
+        <div class="summary-item status-ran-out">
+            <span class="summary-number">{{ ran_out_count }}</span> {{ t('status_ran_out') }}
+        </div>
+        {% endif %}
+        {% if warning_count > 0 %}
+        <div class="summary-item status-likely-low">
+            <span class="summary-number">{{ warning_count }}</span> {{ t('status_likely_low') }}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if ingredients %}
+    {% for item in ingredients %}
+    <div class="ingredient-item" id="ingredient-{{ item.todo.id }}">
+
+        <div class="ingredient-header">
+            <div class="ingredient-title">
+                {% if item.todo.completed %}✅{% endif %}
+                {{ item.todo.title }}
+            </div>
+
+            <!-- Status Indicators -->
+            {% if item.stats.last_event_type == 'ran_out' %}
+            <div class="status-ran-out">🚨 {{ t('status_ran_out') }}</div>
+            {% elif not item.stats.days_since_bought and not item.stats.total_bought %}
+            <div class="status-new">🆕 {{ t('status_new') }}</div>
+            {% elif item.stats.likely_to_run_out %}
+            <div class="status-likely-low">⚠️ {{ t('status_likely_low') }}</div>
+            {% else %}
+            <div class="status-in-stock">✅ {{ t('status_stocked') }}</div>
+            {% endif %}
+        </div>
+
+        <div class="ingredient-stats">
+            <div>
+                <span class="stat-label">{{ t('label_last_bought') }}:</span>
+                <div class="meta-item">
+                    {% if item.stats.days_since_bought is not none %}
+                    {{ item.stats.days_since_bought }} {{ t('text_days_ago') }}
+                    {% else %}
+                    {{ t('text_never') }}
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if item.stats.last_bought_quantity %}
+            <div>
+                <span class="stat-label">{{ t('label_qty') }}:</span>
+                <span class="stat-value">{{ item.stats.last_bought_quantity }}</span>
+            </div>
+            {% endif %}
+
+            {% if item.stats.average_cycle %}
+            <div>
+                <span class="stat-label">{{ t('label_avg_cycle') }}:</span>
+                <span class="stat-value">{{ item.stats.average_cycle }}d</span>
+            </div>
+            {% endif %}
+
+            {% if item.stats.total_ran_out > 0 %}
+            <div>
+                <span class="stat-label">{{ t('status_ran_out') }}:</span>
+                <span class="stat-value">{{ item.stats.total_ran_out }}x</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="ingredient-actions">
+            <input type="number" class="quantity-input" id="qty-{{ item.todo.id }}" value="1" min="1"
+                title="{{ t('tip_quantity') }}">
+            <button onclick="markBought({{ item.todo.id }})" class="buy-btn" title="{{ t('tip_mark_bought') }}">
+                {{ t('btn_bought') }}
+            </button>
+            <button onclick="markRanOut({{ item.todo.id }})" class="ran-out-btn" title="{{ t('tip_mark_ran_out') }}">
+                {{ t('btn_ran_out') }}
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p style="text-align: center; color: #6b7280; padding: 40px;">
+        No ingredients in this recipe list yet. Add todos to the list to track them as ingredients.
+    </p>
+    {% endif %}
+
+    <script>
+        const LIST_ID = {{ list.id }};
+
+        async function markBought(todoId) {
+            const quantity = parseInt(document.getElementById('qty-' + todoId).value) || 1;
+
+            try {
+                const response = await SimpleTodo.fetch(`/api/todo/${todoId}/ingredient_event`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event_type: 'bought',
+                        quantity: quantity
+                    })
+                });
+
+                if (response.ok) {
+                    // Refresh the page to show updated stats
+                    window.location.reload();
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to record event');
+            }
+        }
+
+        async function markRanOut(todoId) {
+            const quantity = parseInt(document.getElementById('qty-' + todoId).value) || 1;
+
+            try {
+                const response = await SimpleTodo.fetch(`/api/todo/${todoId}/ingredient_event`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event_type: 'ran_out',
+                        quantity: quantity
+                    })
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to record event');
+            }
+        }
+
+        async function resetAllIngredients() {
+            if (!confirm('This will mark all ingredients as freshly stocked. Continue?')) {
+                return;
+            }
+
+            try {
+                const response = await SimpleTodo.fetch(`/api/list/${LIST_ID}/reset_ingredients`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ quantity: 1 })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(`Reset ${data.reset_count} ingredients!`);
+                    window.location.reload();
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to reset ingredients');
+            }
+        }
+    </script>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

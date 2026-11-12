@@ -1,0 +1,93 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% from 'daisyui_test/_rows.html' import row, calendar_rows with context %}
+{% from 'daisyui_test/_folder_menu.html' import folder_menu with context %}
+{% set rp = request.scope.root_path %}
+{% set show_global = not current_folder_id or current_folder_id == active_folder_id %}
+{% set recent_count = pinned_lists_recent|length + pinned_todos_recent|length %}
+{% set older_count = pinned_lists_old|length + pinned_todos_old|length %}
+{% macro agenda() %}
+{% if show_global and home_calendar_occurrences %}
+<section class="section-panel calendar-panel" aria-labelledby="calendar-heading">
+    <header class="section-heading"><div><h2 id="calendar-heading">{{ icon('calendar', 19) }} Around today</h2><p>{{ home_calendar_start | date_format }} – {{ home_calendar_end | date_format }} · ± {{ home_calendar_days }} days</p></div><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/calendar">Open calendar {{ icon('arrow', 15) }}</a></header>
+    {{ calendar_rows(home_calendar_occurrences) }}
+</section>
+{% endif %}
+{% endmacro %}
+<div id="daisy-workspace" data-page-title="{{ t('app_title') }}" data-edit-query="{{ query }}&amp;back=home" data-scope="home:{{ folder_param if folder_param is not none else 'default' }}" data-page-url="{{ prototype_url }}{{ query }}" data-sort="{{ sort }}" data-folder="{{ folder_param if folder_param is not none else '' }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>{{ active_folder_name or 'Overview' }}<span class="heading-dot">.</span></h1><time class="eyebrow" datetime="{{ today.isoformat() }}">{{ today | date_format }}</time></div>
+        <div class="page-heading-actions">
+            <form class="daily-plan-form" aria-label="Create daily plan" action="{{ prototype_url }}/daily-plan{{ query }}" method="post" hx-post="{{ prototype_url }}/daily-plan{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button">
+                <div class="join daily-plan-controls"><select name="offset" class="select join-item" aria-label="Daily plan date">{% for day in daily_dates %}<option value="{{ loop.index0 }}">{{ 'Today' if loop.index0 == 0 else 'Tomorrow' if loop.index0 == 1 else day.strftime('%a') }} · {{ day | date_format }}</option>{% endfor %}</select><button type="submit" class="btn join-item">Create plan {{ icon('plus', 17) }}</button></div>
+            </form>
+            <span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><button type="button" class="btn btn-primary" data-command="new-list">{{ icon('plus', 18) }} New list</button></div>
+    </div>
+
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+
+    <section class="capture-panel" aria-label="Create a list">
+        <details id="create-list-details" class="collapse capture-collapse" {% if show_quick_add_forms %}open{% endif %}>
+            <summary class="collapse-title capture-summary">{{ icon('plus', 18) }} New list{{ icon('down', 16) }}</summary>
+            <div class="collapse-content">
+                <form data-draft id="create-list-form" action="{{ prototype_url }}/lists{{ query }}" method="post" hx-post="{{ prototype_url }}/lists{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button[type='submit']">
+                    <div class="quick-add-row"><label class="input list-name-input">{{ icon('list', 18) }}<input id="new-list-name" name="name" type="text" placeholder="What’s this list for?" aria-label="List name" required maxlength="500" autocomplete="off"></label><button type="submit" class="btn btn-primary">Add list {{ icon('plus', 17) }}</button></div>
+                    <details class="tag-options" data-persist="create-tags"><summary>Tags and options</summary><fieldset class="fieldset tag-fieldset"><legend class="fieldset-legend">Hashtags</legend><label for="new-list-tags">Add new or existing tags</label><input id="new-list-tags" class="input" name="hashtags" type="text" placeholder="#work #personal"><p class="fieldset-label">Separate tags with spaces.</p>{% if all_hashtags %}<div class="tag-picker" aria-label="Existing hashtags">{% for tag in all_hashtags %}<label class="existing-tag"><input class="checkbox checkbox-xs" type="checkbox" name="hashtag_ids" value="{{ tag.id }}"> #{{ tag.name }}</label>{% endfor %}</div>{% endif %}</fieldset></details>
+                </form>
+            </div>
+        </details>
+    </section>
+
+    {% if show_global and active_alarms %}
+    <section class="section-panel attention-panel" aria-labelledby="alarm-heading"><header class="section-heading"><div><h2 id="alarm-heading">{{ icon('bell', 19) }} Active alarms <span class="badge badge-warning badge-sm">{{ active_alarms|length }}</span></h2></div></header><ul class="list">{% for item in active_alarms %}{{ row(item, 'todo', 'Alarm') }}{% endfor %}</ul></section>
+    {% endif %}
+
+    {% if show_global and (resuming_lists or resuming_todos) %}
+    <section class="section-panel" aria-labelledby="resuming-heading"><header class="section-heading"><div><h2 id="resuming-heading">{{ icon('clock', 19) }} Ready to resume <span class="section-count">{{ resuming_lists|length + resuming_todos|length }}</span></h2></div></header><ul class="list">{% for item in resuming_lists %}{{ row(item, 'list', 'Resuming') }}{% endfor %}{% for item in resuming_todos %}{{ row(item, 'todo', 'Resuming') }}{% endfor %}</ul></section>
+    {% endif %}
+
+    {% if show_global and show_today_calendar_above_pinned and today_calendar_occurrences %}
+    <section class="section-panel" aria-labelledby="today-heading"><header class="section-heading"><div><h2 id="today-heading">{{ icon('calendar', 19) }} Today &amp; outstanding</h2></div></header>{{ calendar_rows(today_calendar_occurrences, False) }}</section>
+    {% endif %}
+
+    {% if show_global and recent_count %}
+    <section class="section-panel pinned-panel" aria-labelledby="pinned-heading"><header class="section-heading"><div><h2 id="pinned-heading">{{ icon('pin', 19) }} Pinned <span class="section-count">{{ recent_count }}</span></h2></div>{% if older_count %}<a class="subtle-link" href="#older-pins">{{ older_count }} older {{ icon('down', 14) }}</a>{% endif %}</header><ul class="list">{% for item in pinned_lists_recent %}{{ row(item) }}{% endfor %}{% for item in pinned_todos_recent %}{{ row(item, 'todo') }}{% endfor %}</ul></section>
+    {% endif %}
+
+    {% if show_calendar_above_lists %}{{ agenda() }}{% endif %}
+
+    <section class="lists-section" aria-labelledby="lists-heading">
+        <div class="scope-line"><div class="breadcrumbs" role="navigation" aria-label="Breadcrumb"><span class="trail-icon" title="Where you are: each step is a link">{{ icon('trail', 15) }}</span><ul><li><a href="{{ prototype_url }}?sort={{ sort }}" hx-get="{{ prototype_url }}?sort={{ sort }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">Home</a></li>{% if current_folder %}{% for ancestor in folder_trail(current_folder.parent) %}<li><a href="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ ancestor.id }}" hx-get="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ ancestor.id }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ ancestor.name }}</a></li>{% endfor %}{% endif %}<li aria-current="page">{{ active_folder_name or 'Top level' }}</li></ul></div>
+            <div class="scope-actions">
+                {% if current_folder %}{{ folder_menu(current_folder, None, active_folder_id == current_folder.id, False) }}
+                {% else %}<details class="dropdown dropdown-end row-dropdown"><summary class="btn btn-ghost btn-sm">{{ icon('plus', 15) }} New folder</summary><div class="dropdown-content row-menu folder-menu"><form class="folder-menu-form" action="{{ prototype_url }}/folders{{ query }}" method="post" hx-post="{{ prototype_url }}/folders{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><input type="hidden" name="parent_id" value="0"><label for="new-top-folder">New folder at the top level</label><div class="inline-fields"><input id="new-top-folder" class="input input-sm grow-input" name="name" placeholder="Folder name" required maxlength="255" autocomplete="off"><button class="btn btn-sm">{{ icon('plus', 14) }} Add</button></div></form></div></details>{% endif %}
+            </div>
+        </div>
+        {% if subfolders %}<header class="lists-toolbar folders-toolbar"><div class="lists-title"><h2 id="folders-heading">Folders</h2><span class="badge badge-ghost">{{ subfolders|length }}</span></div></header>
+        <div class="section-panel list-group subfolder-group" aria-labelledby="folders-heading"><ul class="list">{% for child in subfolders %}{% set list_count = child.lists|rejectattr('archived')|list|length %}
+            <li class="list-row item-row folder-row {{ 'is-default-folder' if active_folder_id == child.id else '' }}" data-item-key="folder:{{ child.id }}">
+                <span class="folder-symbol">{{ icon('folder', 17) }}</span>
+                <div class="item-content"><div class="item-title-line"><a class="item-title" href="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ child.id }}" hx-get="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ child.id }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ child.name }}</a>{% if active_folder_id == child.id %}<span class="badge badge-outline badge-sm default-badge">Default view</span>{% endif %}<span class="item-context">{{ list_count }} {{ 'list' if list_count == 1 else 'lists' }}{% if child.children %} · {{ child.children|length }} {{ 'subfolder' if child.children|length == 1 else 'subfolders' }}{% endif %}</span></div></div>
+                <div class="row-actions">{{ folder_menu(child, subfolders, active_folder_id == child.id) }}</div>
+            </li>{% endfor %}</ul></div>{% endif %}
+        <header class="lists-toolbar">
+            <div class="lists-title"><h2 id="lists-heading">Your lists</h2><span class="badge badge-ghost">{{ lists|length }}</span></div>
+            <div class="list-view-controls">
+                <details class="dropdown dropdown-end folder-dropdown"><summary class="btn btn-ghost btn-sm">{{ icon('folder', 16) }} {{ active_folder_name or 'Unfiled' }} {{ icon('down', 14) }}</summary><ul class="dropdown-content menu row-menu"><li><a href="{{ prototype_url }}?sort={{ sort }}" hx-get="{{ prototype_url }}?sort={{ sort }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">Default view</a></li><li><a href="{{ prototype_url }}?sort={{ sort }}&amp;folder_id=0" hx-get="{{ prototype_url }}?sort={{ sort }}&amp;folder_id=0" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">Unfiled lists</a></li>{% for folder in folders %}<li><a href="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ folder.id }}" hx-get="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ folder.id }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ folder.path_name }}</a></li>{% endfor %}<li class="menu-separator"><a href="{{ prototype_url }}/folders">{{ icon('settings', 15) }} Manage folders</a></li></ul></details>
+                <form class="sort-form" method="get" action="{{ prototype_url }}" hx-get="{{ prototype_url }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{% if folder_param is not none %}<input type="hidden" name="folder_id" value="{{ folder_param }}">{% endif %}<label for="list-sort" class="sr-only">Sort lists</label><select id="list-sort" name="sort" class="select select-sm"><option value="user" {% if sort == 'user' %}selected{% endif %}>My order</option><option value="modified" {% if sort == 'modified' %}selected{% endif %}>Recently modified</option><option value="created" {% if sort == 'created' %}selected{% endif %}>Recently created</option></select><noscript><button type="submit">Sort</button></noscript></form>
+                <a class="subtle-link" href="{{ prototype_url }}/lists/reorder?folder_id={{ current_folder_id or 0 }}">{{ icon('list', 14) }} Reorder lists</a>
+                <button type="button" class="btn btn-ghost btn-sm select-mode-button" data-command="toggle-selection" aria-pressed="false">{{ icon('select', 16) }} <span>Select</span></button>
+            </div>
+        </header>
+        {% if not lists %}<div class="empty-state"><h3>No lists in this view.</h3><button type="button" class="btn btn-primary" data-command="new-list">{{ icon('plus', 17) }} Create a list</button></div>{% endif %}
+        {% if uncategorized_lists %}<div class="section-panel list-group"><ul class="list">{% for item in uncategorized_lists %}{{ row(item) }}{% endfor %}</ul></div>{% endif %}
+        {% for category in sorted_categories %}<details class="collapse collapse-arrow category-panel" data-persist="category:{{ category }}" open><summary class="collapse-title category-heading"><span>{{ category }}</span><span class="section-count">{{ categorized_lists[category]|length }}</span></summary><div class="collapse-content category-content"><ul class="list">{% for item in categorized_lists[category] %}{{ row(item) }}{% endfor %}</ul></div></details>{% endfor %}
+    </section>
+
+    {% if not show_calendar_above_lists %}{{ agenda() }}{% endif %}
+
+    {% if show_global and older_count %}
+    <details id="older-pins" class="collapse collapse-arrow older-pins section-panel" data-persist="older-pins"><summary class="collapse-title category-heading"><span>{{ icon('pin', 17) }} Older pins</span><span class="badge badge-ghost badge-sm">{{ older_count }}</span><small>Older than {{ pinned_old_days }} days</small></summary><div class="collapse-content category-content"><ul class="list">{% for item in pinned_lists_old %}{{ row(item) }}{% endfor %}{% for item in pinned_todos_old %}{{ row(item, 'todo') }}{% endfor %}</ul></div></details>
+    {% endif %}
+
+    {% include 'daisyui_test/_selection_toolbar.html' %}
+</div>

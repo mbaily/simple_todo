@@ -1,0 +1,4 @@
+{# Keep the previous page on screen until the new document is fully parsed.
+   Native render blocking lets reloads restore scrolling before the first paint,
+   without painting either the toolbar at the top or an empty background. #}
+<link rel="expect" href="#page-ready" blocking="render">

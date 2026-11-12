@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Journal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h1 style="margin-top:0;">Journal</h1>
+
+    {% if entries %}
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="text-align: left; border-bottom: 2px solid #ccc;">
+                <th style="padding: 8px;">Time</th>
+                <th style="padding: 8px;">Action</th>
+                <th style="padding: 8px;">Details</th>
+                <th style="padding: 8px;">Link</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 8px; white-space: nowrap;" class="dates">{{ entry.created_at_formatted }}</td>
+                <td style="padding: 8px;">{{ entry.action }}</td>
+                <td style="padding: 8px;">{{ entry.details }}</td>
+                <td style="padding: 8px;">
+                    {% if "Deleted" not in entry.action %}
+                    {% if entry.entity_type == 'list' %}
+                    <a href="{{ request.scope.root_path }}/list/{{ entry.entity_id }}">View List</a>
+                    {% elif entry.entity_type == 'todo' %}
+                    <a href="{{ request.scope.root_path }}/todo/{{ entry.entity_id }}/edit">Edit Todo</a>
+                    {% elif entry.entity_type == 'calendar_event' %}
+                    <a href="{{ request.scope.root_path }}/classic/calendar">View Calendar</a>
+                    {% elif entry.entity_type == 'smart_folder' %}
+                    <a href="{{ request.scope.root_path }}/smart-folder/{{ entry.entity_id }}">View Folder</a>
+                    {% elif entry.entity_type == 'named_search' %}
+                    <a href="{{ request.scope.root_path }}/search/{{ entry.entity_id }}">View Search</a>
+                    {% elif entry.entity_type == 'hashtag' %}
+                    <a href="{{ request.scope.root_path }}/hashtag/{{ entry.entity_id }}">View Hashtag</a>
+                    {% elif entry.entity_type == 'bill' and entry.entity_id %}
+                    <a href="{{ request.scope.root_path }}/bills/{{ entry.entity_id }}/history">View Bill</a>
+                    {% endif %}
+                    {% else %}
+                    <span class="dates">Deleted</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No journal entries yet.</p>
+    {% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

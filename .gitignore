@@ -1,0 +1,55 @@
+# Virtual environments
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local DB
+*.db
+*.db-*
+*.db.*
+*.sqlite*
+
+# TLS certs / keys (never commit private keys)
+certs/*.key
+certs/*.crt
+certs/*.pem
+certs/*.csr
+
+# Environment files
+.env
+.env.*
+!.env.example
+session-secret
+/settings.json
+backups/
+
+# Basic auth credentials (don't commit)
+.htpasswd*
+
+# Logs and temp files
+*.log
+*.bak
+*.swp
+*.swo
+*~
+/ai_progress_*.txt
+/ai_task*.txt
+/latest_commit.txt
+/private/
+
+# Scratch & temporary test files
+*_todo_app.txt
+test.txt
+test_import.json
+static/extra_offline_fns.js
+
+# Abandoned/duplicate subpackage
+todo_core/
+
+# IDE and workspace
+.vscode/
+.agent/
+*.code-workspace

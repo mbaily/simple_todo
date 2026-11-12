@@ -1,0 +1,16 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% from 'daisyui_test/_rows.html' import row with context %}
+<div id="daisy-workspace" data-scope="archived" data-edit-query="{{ query }}&amp;back=home" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Archived</h1><span class="eyebrow">{{ lists|length }} {{ 'list' if lists|length == 1 else 'lists' }}</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>{% if lists %}<button type="button" class="btn btn-ghost btn-sm select-mode-button" data-command="toggle-selection" aria-pressed="false">{{ icon('select', 16) }} <span>Select</span></button>{% endif %}</div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    {% if lists %}
+    <section class="section-panel" aria-label="Archived lists"><ul class="list">{% for item in lists %}{{ row(item) }}{% endfor %}</ul></section>
+    <p class="page-hint">Select lists to unarchive or delete them. Archived lists stay out of the overview, search and smart folders unless a smart folder includes archived lists.</p>
+    {% else %}
+    <div class="empty-state"><h3>No archived lists. Archive lists from the overview's selection toolbar to tidy them away.</h3></div>
+    {% endif %}
+    {% include 'daisyui_test/_selection_toolbar.html' %}
+</div>

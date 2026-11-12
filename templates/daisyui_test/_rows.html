@@ -1,0 +1,72 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% macro row(item, kind='list', marker=None, depth=0) %}
+{% set key = kind ~ ':' ~ item.id %}
+{% set rp = request.scope.root_path %}
+{% set title = item.name if kind == 'list' else item.title %}
+<li class="list-row item-row {{ 'is-completed' if item.completed else '' }}{{ ' task-row' if depth else '' }}" data-item-key="{{ key }}"{% if depth %} style="--depth: {{ depth }}"{% endif %}>
+    <label class="selection-control" title="Select {{ title }}">
+        <input class="checkbox checkbox-sm selection-checkbox" type="checkbox" name="items" value="{{ key }}" form="daisy-bulk-form" data-created="{{ item.created_at_formatted }}" data-modified="{{ item.modified_at_formatted }}" aria-label="Select {{ title }}">
+    </label>
+    <form class="completion-form" action="{{ prototype_url }}/complete/{{ kind }}/{{ item.id }}{{ query }}" method="post" hx-post="{{ prototype_url }}/complete/{{ kind }}/{{ item.id }}{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find input">
+        <input class="checkbox checkbox-sm completion-checkbox" type="checkbox" name="completed" value="true" {% if item.completed %}checked{% endif %} aria-label="Mark {{ title }} {{ 'incomplete' if item.completed else 'complete' }}">
+        <noscript><button type="submit">Save</button></noscript>
+    </form>
+    <div class="item-content">
+        <div class="item-title-line">
+            {% if marker or item.pinned %}<span class="row-marker" title="{{ marker or 'Pinned' }}">{{ icon('bell' if marker == 'Alarm' else 'clock' if marker == 'Resuming' else 'pin', 15) }}</span>{% endif %}
+            {% if kind == 'list' %}
+            {% if item.is_collation %}<span class="collation-marker" style="--collation-color: {{ item.collation_color or '#888' }}" title="Collation list" aria-label="Collation list"></span>{% endif %}
+            <a class="item-title" href="{{ prototype_url }}/list/{{ item.id }}?sort={{ sort }}&amp;folder_id={{ current_folder_id or 0 }}">{{ title }}</a>
+            <span class="badge badge-ghost task-count" aria-label="{{ uncompleted_counts.get(item.id, 0) }} remaining tasks">{{ uncompleted_counts.get(item.id, 0) }}<span class="count-label"> remaining</span></span>
+            {% else %}
+            <span class="item-title" {% if item.color and item.color|lower not in ['#000000', '#ffffff'] %}style="color: {{ item.color }}"{% endif %}>{{ title }}</span>
+            {% endif %}
+        </div>
+        {% if (kind == 'todo' and not hide_list_context) or marker == 'Resuming' %}
+        <div class="item-context">
+            {% if kind == 'todo' %}<a href="{{ prototype_url }}/list/{{ item.list_id }}?sort={{ sort }}&amp;folder_id={{ current_folder_id or 0 }}&amp;highlight={{ item.id }}">{{ item.list.name }}</a>{% if item.parent %}<span> / {{ item.parent.title }}</span>{% endif %}{% endif %}
+            {% if marker == 'Alarm' %}<span>Alarm {{ item.alarm_start | datetime_format }}{% if item.alarm_end != item.alarm_start %} – {{ item.alarm_end.strftime('%H:%M') }}{% endif %}</span>{% endif %}
+            {% if marker == 'Resuming' %}<span>Deferred until {{ item.delayed_until | date_format }}</span>{% endif %}
+        </div>
+        {% endif %}
+        {% if item.hashtags %}<div class="item-tags">{% for tag in item.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">#{{ tag.name }}</a>{% endfor %}</div>{% endif %}
+    </div>
+    <div class="row-actions">
+        {% if kind == 'todo' and item.has_note %}<a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/todo/{{ item.id }}/edit{{ query }}&amp;back={{ edit_back|default('home') }}" aria-label="Edit note for {{ title }}" title="Edit note">{{ icon('note', 17) }}</a>{% endif %}
+        {% if kind == 'list' and enable_dokuwiki_links and item.dokuwiki_page_enabled and dokuwiki_item_link_fn %}<a class="btn btn-ghost btn-square btn-sm" href="{{ dokuwiki_item_link_fn('list', item.id) }}" target="_blank" rel="noopener noreferrer" title="Open DokuWiki page" aria-label="Open DokuWiki page for {{ title }}">{{ icon('book', 17) }}</a>{% endif %}
+        {% if item.dokuwiki_link is defined and item.dokuwiki_link %}<a class="btn btn-ghost btn-square btn-sm {{ 'wiki-confirmed' if item.dokuwiki_confirmed else '' }}" href="{{ item.dokuwiki_link }}" target="_blank" rel="noopener noreferrer" title="Open dated DokuWiki page" aria-label="Open dated DokuWiki page for {{ title }}">{{ icon('book', 17) }}</a>{% endif %}
+        {% if item.links|length == 1 %}<a class="btn btn-ghost btn-square btn-sm" href="{{ item.links[0].url }}" target="_blank" rel="noopener noreferrer" title="{{ item.links[0].title or item.links[0].url }}" aria-label="Open link for {{ title }}">{{ icon('link', 17) }}</a>{% endif %}
+        <details class="dropdown dropdown-end row-dropdown">
+            <summary class="btn btn-ghost btn-square btn-sm" aria-label="Actions for {{ title }}">{{ icon('more', 19) }}</summary>
+            <ul class="dropdown-content menu row-menu">
+                <li><a href="{{ prototype_url }}/{{ kind }}/{{ item.id }}/edit{{ query }}&amp;back={{ edit_back|default('home') }}">{{ icon('edit', 16) }} Edit {{ 'list' if kind == 'list' else 'task' }}</a></li>
+                <li><button type="button" data-command="select-item" data-key="{{ key }}">{{ icon('select', 16) }} Select item</button></li>
+                <li><button type="button" data-command="move-item" data-key="{{ key }}">{{ icon('arrow', 16) }} Move to {{ 'folder' if kind == 'list' else 'list' }}…</button></li>
+                {% if item.links|length > 1 %}<li class="menu-title">Links</li>{% for link in item.links %}<li><a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ icon('link', 16) }} {{ link.title or link.url }}</a></li>{% endfor %}{% endif %}
+            </ul>
+        </details>
+    </div>
+</li>
+{% endmacro %}
+
+{% macro calendar_rows(occurrences, show_notes=True) %}
+{% set rp = request.scope.root_path %}
+<ul class="list agenda-list">
+{% for occurrence in occurrences %}
+{% set event = occurrence.event %}
+<li class="list-row agenda-row {{ 'important-event' if occurrence.is_important else '' }}">
+    <div class="agenda-date"><span>{{ occurrence.occurrence_at.strftime('%d') }}</span><small>{{ occurrence.occurrence_at.strftime('%b') }}</small></div>
+    <div class="agenda-content">
+        <div class="item-title-line"><input type="checkbox" class="checkbox checkbox-xs" {% if occurrence.completed %}checked{% endif %} disabled aria-label="{{ event.title }} completion (view only)">
+            <a class="item-title {{ 'one-off-event' if not event.rrule else '' }}" {% if event.color and event.color|lower not in ['#000000', '#000', 'black'] %}style="color: {{ event.color }}"{% endif %} href="{{ prototype_url }}/calendar?month={{ occurrence.occurrence_at.strftime('%Y-%m') }}&amp;day={{ occurrence.occurrence_at.strftime('%Y-%m-%d') }}">{{ event.title }}</a>
+            {% if occurrence.is_important %}<span class="badge badge-warning badge-sm">Important</span>{% endif %}
+        </div>
+        <div class="item-context"><span>{{ occurrence.occurrence_at.strftime('%A') }} · {{ 'All day' if event.all_day else occurrence.occurrence_at.strftime('%H:%M') }}</span>{% if event.rrule %}<span>Recurring</span>{% endif %}</div>
+        {% if event.hashtags %}<div class="item-tags">{% for tag in event.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">#{{ tag.name }}</a>{% endfor %}</div>{% endif %}
+        {% if show_notes %}{% for note in event.notes %}{% if not note.occurrence_at or note.occurrence_at.strftime('%Y-%m-%d') == occurrence.occurrence_at.strftime('%Y-%m-%d') %}<div class="event-note">{% if note.name %}<strong>{{ note.name }}: </strong>{% endif %}{{ note.text | daisy_note }}{% if note.occurrence_at %}<small> ({{ note.occurrence_at | date_format }})</small>{% endif %}</div>{% endif %}{% endfor %}{% endif %}
+    </div>
+    {% if event.note or event.notes %}<a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/calendar/event/{{ event.id }}/edit?occurrence_at={{ occurrence.occurrence_at.strftime('%Y-%m-%d') }}" title="Edit occurrence notes" aria-label="Edit notes for {{ event.title }}">{{ icon('note', 17) }}</a>{% endif %}
+</li>
+{% endfor %}
+</ul>
+{% endmacro %}

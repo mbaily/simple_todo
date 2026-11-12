@@ -1,0 +1,46 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% macro option(tag, name, label, disabled=False) %}
+<form action="{{ prototype_url }}/hashtag/{{ tag.id }}/options/{{ name }}{{ query }}" method="post" hx-post="{{ prototype_url }}/hashtag/{{ tag.id }}/options/{{ name }}{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find input"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="enabled" value="true" {% if tag[name] %}checked{% endif %} {% if disabled %}disabled{% endif %}> {{ label }}</label><noscript><button>Save</button></noscript></form>
+{% endmacro %}
+<div id="daisy-workspace" data-scope="hashtags" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Hashtags</h1><span class="eyebrow">{{ hashtags|length }} {{ 'tag' if hashtags|length == 1 else 'tags' }}</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>{% if hashtags|length > 8 %}<label class="input input-sm tag-filter">{{ icon('search', 15) }}<input id="hashtag-filter" type="search" data-row-filter=".hashtag-row" placeholder="Filter tags" aria-label="Filter hashtags" autocomplete="off"></label>{% endif %}</div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    {% if hashtags %}
+    <section class="section-panel" aria-label="Hashtags">
+        <ul class="list">
+        {% for tag in hashtags %}
+        {% set lists_n = list_counts.get(tag.id, 0) %}{% set todos_n = todo_counts.get(tag.id, 0) %}{% set events_n = event_counts.get(tag.id, 0) %}
+        <li class="list-row item-row hashtag-row" data-name="{{ tag.name|lower }}">
+            <span class="folder-symbol">{{ icon('hash', 15) }}</span>
+            <div class="item-content"><div class="item-title-line">
+                <a class="item-title" href="{{ prototype_url }}/hashtag/{{ tag.id }}">#{{ tag.name }}</a>
+                <span class="item-context">{% if lists_n %}<span>{{ lists_n }} {{ 'list' if lists_n == 1 else 'lists' }}</span>{% endif %}{% if todos_n %}<span>{{ todos_n }} {{ 'task' if todos_n == 1 else 'tasks' }}</span>{% endif %}{% if events_n %}<span>{{ events_n }} {{ 'event' if events_n == 1 else 'events' }}</span>{% endif %}{% if not (lists_n or todos_n or events_n) %}<span>Unused</span>{% endif %}</span>
+                {% if tag.include_list_items %}<span class="badge badge-ghost badge-sm">+ tagged lists' tasks</span>{% endif %}
+            </div></div>
+            <div class="row-actions">
+                <details class="dropdown dropdown-end row-dropdown">
+                    <summary class="btn btn-ghost btn-square btn-sm" aria-label="Actions for #{{ tag.name }}">{{ icon('more', 19) }}</summary>
+                    <div class="dropdown-content row-menu folder-menu">
+                        <a class="btn btn-ghost btn-sm folder-menu-item" href="{{ prototype_url }}/hashtag/{{ tag.id }}">{{ icon('arrow', 15) }} Open tagged items</a>
+                        <div class="folder-menu-form"><span class="menu-label">Tag page shows</span>
+                            {{ option(tag, 'show_completed', 'Completed items') }}
+                            {{ option(tag, 'include_list_items', "Tasks in tagged lists") }}
+                            {{ option(tag, 'hide_completed_list_items', 'Skip completed tagged lists', not tag.include_list_items) }}
+                        </div>
+                        <form class="folder-menu-form" action="{{ prototype_url }}/hashtag/{{ tag.id }}/rename{{ query }}" method="post" hx-post="{{ prototype_url }}/hashtag/{{ tag.id }}/rename{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><label for="rename-tag-{{ tag.id }}">Rename</label><div class="inline-fields"><input id="rename-tag-{{ tag.id }}" class="input input-sm grow-input" name="name" value="{{ tag.name }}" required maxlength="101" pattern="#?\w+" autocomplete="off"><button class="btn btn-sm">Save</button></div></form>
+                        <form action="{{ prototype_url }}/hashtag/{{ tag.id }}/delete{{ query }}" method="post" hx-post="{{ prototype_url }}/hashtag/{{ tag.id }}/delete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete #{{ tag.name }}? It is removed from {{ lists_n }} lists, {{ todos_n }} tasks and {{ events_n }} events; the items themselves are kept."><button class="btn btn-ghost btn-sm folder-menu-item delete-button">{{ icon('trash', 15) }} Delete hashtag</button></form>
+                    </div>
+                </details>
+            </div>
+        </li>
+        {% endfor %}
+        </ul>
+        <p class="section-empty" id="hashtag-filter-empty" hidden>No hashtags match the filter.</p>
+    </section>
+    {% else %}
+    <div class="empty-state"><h3>No hashtags yet. Add tags such as #work when creating or editing lists and tasks.</h3></div>
+    {% endif %}
+</div>

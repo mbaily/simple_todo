@@ -1,0 +1,592 @@
+Simple Todo — Screen-by-Screen Feature Reference
+==================================================
+Built with FastAPI + Jinja2 + SQLite. Server-side rendered.
+All pages share a global emoji navigation bar and support light/dark mode
+via CSS prefers-color-scheme. Localization is available for en, es, fr,
+de, ja, pl.
+
+
+1. HOME (Root URL — /)
+-----------------------
+Displays all non-archived lists in the user's current folder context.
+
+Sections shown (top to bottom):
+- Active alarms: todos with an alarm window that includes the current time.
+- Today's calendar events (and optionally yesterday's uncompleted events).
+- Resuming items: todos and lists whose delay period has just expired.
+- Pinned todos and pinned lists, split into "recent" and "old" groups
+  (threshold configurable via PINNED_OLD_DAYS).
+- Calendar occurrences within ±N days of today (configurable).
+- Lists grouped by category (uncategorized first, then alphabetical
+  category headings). Each list shows its name, hashtag pills, creation/
+  modification dates, uncompleted todo count, and collation dot indicators.
+- Sort toggle: created date vs. modified date.
+
+Actions available:
+- Create a new list (inline form or quick-add if configured).
+- Toggle list completion via checkbox (AJAX).
+- Pin/unpin lists and todos (AJAX).
+- Bulk select items via circular checkboxes to delete, pin, archive,
+  tag with hashtags, or move to a different list/folder.
+- Navigate into a folder (respects active folder from settings or
+  query parameter). A breadcrumb shows the current folder name.
+- Hashtag include/exclude filters from the Customize screen apply here.
+
+
+2. LIST VIEW (/list/{id})
+-------------------------
+Displays a single list's todos, notes, and collected (collation) items.
+
+Header area:
+- List name, hashtag pills, creation/modification dates.
+- Navigation: previous/next/first list buttons with "X / Total" counter.
+  Navigation respects folder context and sort order.
+- Per-list toggles: show/hide completed, show/hide delayed, sort
+  ascending/descending, toggle datetime header partitioning, toggle
+  manual sorting, toggle recipe (ingredient) mode.
+
+Main content:
+- Todos displayed with title, optional color, note icon, checkbox,
+  hashtag pills, subtodo expand/collapse, creation/modification dates.
+- Subtodos: nested under parent todos, indented. Created by specifying
+  a parent when adding.
+- Datetime headers: visual date/time dividers inserted between todos.
+  When partitioning is enabled, todos are grouped under these headers.
+- Notes: named text blocks attached to the list, displayed inline
+  with creation/modification timestamps.
+- Collected todos (collation mode): if the list is a collation list,
+  shows todos collected from other lists. Can be interspersed with
+  native todos or shown in a separate section.
+- Links: URL attachments on the list, individual todos, or notes.
+  Shown as link icons; multiple links use a dropdown.
+
+Actions available:
+- Create todo (inline form with title, optional hashtags, color, parent).
+- Create note (inline form with name, text).
+- Create datetime header (inserts a timestamp divider).
+- Toggle todo completion (AJAX checkbox).
+- Pin/unpin individual todos (AJAX).
+- Defer a todo (set delayed_until date — hides it until that date).
+- Set alarm window on a todo (start/end datetime).
+- Edit todo (separate page: title, note, color, hashtags, parent,
+  delayed_until, alarm start/end, DokuWiki page link toggle).
+- Delete todo.
+- Edit list settings (separate page: name, hashtags, category, folder
+  assignment, collation mode, collation color, show DokuWiki item
+  links, DokuWiki page link toggle).
+- Drag-and-drop reorder (when manual sorting is on).
+- Manage collation membership: toggle collecting todos from this list
+  into a collation list (AJAX).
+- Ingredient/recipe mode: when enabled, todos represent ingredients.
+  Actions include "bought", "ran out", bulk buy/reset, ingredient
+  grouping across lists, shopping list generation, and an ingredient
+  usage report with history.
+- Archive/unarchive the list.
+- Delete the list.
+- Add/remove URL links on the list, todos, and notes.
+- Update hashtags on individual todos (AJAX).
+- Category assignment for the list (AJAX combobox with existing
+  categories).
+
+
+3. SEARCH (/search)
+-------------------
+Full-text search across the entire database.
+
+- Single text input; results appear on the same page.
+- Searches list names, todo titles, todo notes, hashtag names, and
+  calendar event titles/notes.
+- List results: shows matching lists sorted by modification date.
+- Todo results: organized into a grouped tree (todos grouped under
+  their parent list, with folder hierarchy). Shows title, note
+  excerpt, completion state, list name.
+- Calendar event results: shows matching events with their next
+  uncompleted occurrence date.
+
+
+4. CALENDAR (/calendar)
+-----------------------
+Two interchangeable view modes (toggled via a button):
+
+List view (default):
+- Chronological list of calendar event occurrences within a sliding
+  window (7 days past to CALENDAR_LOOKAHEAD_DAYS into the future).
+- Navigate forward/back in 30-day increments.
+- Past dates shown in grey; today highlighted.
+- Recurring events can be collapsed (show only next N uncompleted
+  future occurrences; configurable).
+
+Traditional monthly grid view:
+- Standard calendar grid (Monday start). Navigate by month.
+- Each day cell shows event occurrences with title, color, and
+  completion state. Today's cell is highlighted.
+
+Both views show:
+- Event title (with optional color), recurrence rule description,
+  hashtag pills, event group name, and notes.
+- Completion checkbox per occurrence (AJAX toggle).
+
+Actions available:
+- Create event (inline form: title, start date/time, optional
+  recurrence rule as iCalendar RRULE string, color, hashtags, event
+  group, note).
+- Edit event (separate page: all fields plus delete).
+- Toggle completion on individual occurrences.
+- Filter by: all events, non-recurring only, recurring only, or a
+  specific event group.
+- Manage event groups (separate page: create, delete groups).
+
+
+5. HASHTAGS (/hashtags)
+-----------------------
+Lists all hashtags and (optionally) named searches.
+
+Hashtags section:
+- Alphabetical list of all hashtags. Each shows the hashtag name and
+  the count of associated lists, todos, and calendar events.
+- Click a hashtag to view its detail page.
+
+Hashtag detail page (/hashtag/{id}):
+- Shows all lists, todos, and calendar events tagged with this hashtag.
+- Todos grouped by parent list in a tree view.
+- Toggle: show/hide completed items for this hashtag (persisted).
+- Toggle: include list items (show lists tagged with this hashtag).
+- Delete hashtag (removes it from all associations).
+
+Named searches section (if enabled via config):
+- Saved multi-hashtag queries. Each named search has include and
+  exclude hashtag sets, and an "uncompleted only" toggle.
+- Create, view results, and delete named searches.
+
+
+6. SMART FOLDERS (/smart-folders)
+---------------------------------
+Saved, configurable views/filters for cross-cutting queries.
+
+Smart folders listing page:
+- Shows all smart folders sorted by user-defined sort order.
+- Create form with full filter configuration.
+- Drag-and-drop reorder support.
+
+Each smart folder is defined by:
+- Name.
+- Content toggles: show lists, show todos, show calendar events.
+- Grouping: group todos by list (with folder hierarchy) or flat list.
+- Subtodo handling: root todos only, nest subtodos.
+- Filters: uncompleted only, include archived lists.
+- Hashtag filters: include hashtags (with per-hashtag options for
+  subtodo propagation and list item inclusion), exclude hashtags
+  (with per-hashtag subtodo propagation).
+- List filters: specific lists to include.
+- Folder filters: include/exclude specific folders, include/exclude
+  the root (no folder) level. Strict nesting option.
+- Date bounds: modified after / modified before.
+- Sorting: configurable sort field (created_at or modified_at) and
+  direction for both lists and todos independently.
+- Section order: configurable display order of Lists/Events/Todos
+  (e.g. "LET", "TLE").
+- DokuWiki integration: optional DokuWiki link generation using a
+  configurable date field.
+
+Smart folder results page (/smart-folder/{id}):
+- Renders matching lists, todos (in tree or flat view), and calendar
+  events according to the folder's configuration.
+- Edit and delete the smart folder.
+
+
+7. MANAGE FOLDERS (/folders)
+----------------------------
+Hierarchical folder management for organizing lists.
+
+- Tree view of all folders (nested, with expand/collapse per folder).
+- Root-level (unfoldered) lists shown separately.
+- Active folder indicator (the folder currently filtering the home page).
+
+Actions available:
+- Create folder (with optional parent folder for nesting).
+- Rename folder.
+- Delete folder (only if empty — no child folders or lists).
+- Reorder folders within the same parent (drag-and-drop / form-based).
+- Move a list into a folder (dropdown select).
+- Move a folder under a different parent folder.
+- Set active folder (filters the home page to show only that folder's
+  lists). Clear active folder to show root-level lists.
+- Toggle folder collapse state (persisted).
+
+
+8. ARCHIVED LISTS (/archived)
+-----------------------------
+Displays all archived lists sorted by modification date (newest first).
+
+- Each list shows its name, hashtag pills, and modification date.
+- Lists can be unarchived (toggle via AJAX) to restore them to the
+  home page.
+- Full list of hashtags available for tagging.
+- Bulk select and operations (same as home page).
+
+
+9. COLLATION LISTS (/collations)
+--------------------------------
+Overview of all active collation lists.
+
+- A collation list is a special list that can "collect" todos from
+  other lists into itself. This creates cross-list groupings.
+- Page shows all non-archived lists where is_collation is true,
+  sorted alphabetically.
+- Each collation list links to its standard list view, where
+  collected todos appear alongside or below native todos.
+- Collation membership is managed from individual list views: each
+  todo can be toggled into/out of a collation list.
+- Collation lists have a configurable color (shown as a dot indicator
+  on the home page next to lists that contribute todos).
+- Sort order of collected todos can follow the collation list's own
+  manual sort order or chronological order.
+
+
+10. BILLS (/bills)
+------------------
+Recurring bill and subscription tracker with payment history.
+
+Dashboard sections:
+- Estimated monthly total (normalized across all frequencies).
+- Overdue bills (past due date, not yet paid).
+- Due today.
+- Upcoming (due within 14 days, or with a confirmed invoice).
+- Paid for current cycle (paid early; shows payment details and
+  timing badge — e.g. "3 days early").
+- Future estimates (>14 days away, unconfirmed).
+- Unscheduled active bills (no due date set).
+- Recent payments (last 30 days rolling window).
+- Inactive bills (toggled on/off via "Show inactive" link).
+
+Each bill has:
+- Name, optional payee, optional note, optional custom color.
+- Amount with strategy: fixed, rolling average (recency-weighted
+  moving average of last 4 payments with outlier filtering), or
+  last payment amount. Estimated amounts shown with "Est." badge.
+- Currency (AUD, USD, EUR, GBP, NZD, CAD) with symbol.
+- Frequency: weekly, fortnightly, monthly, quarterly, yearly, or
+  custom (every N days).
+- Anchor day (prevents calendar drift for monthly bills due on
+  specific days like the 31st).
+- Auto-pay flag.
+- Due date confirmation: tracks whether the due date is an estimate
+  or confirmed from an actual invoice/statement.
+- Category for grouping.
+
+Actions available:
+- Create bill (inline form with all fields).
+- Pay bill: records payment with actual due date, amount paid, paid
+  date, optional note, and optional next-due-date override. Auto-
+  advances the next due date based on frequency and anchor day.
+- Confirm invoice: set the exact due date and amount from the
+  provider's bill (marks due date as confirmed).
+- Edit bill (separate page: all fields).
+- Toggle active/inactive.
+- Delete bill (with confirmation; cascades to payment history).
+- View payment history (separate page per bill).
+
+Payment history page (/bills/{id}/history):
+- Table of all payments: due date, paid date, amount, timing badge,
+  notes. Each row has edit, delete, toggle late override, and add
+  note actions.
+- Edit payment: change due date, paid date, and amount.
+- Delete payment.
+- Toggle "late override": manually mark a late payment as on-time.
+- Add timestamped notes to individual payments (stored as JSON array).
+
+
+11. EXPENSES (/expenses)
+-------------------------
+Quick expense entry and spending analytics dashboard.
+
+Quick entry form:
+- Amount, description, category (combobox with known categories),
+  date, payment method (Card/Cash/Transfer/Other), currency, note.
+
+Spending summary:
+- Three-column layout: Expenses only / Bills only / Combined.
+  Each column shows: weekly average vs. past 7 days actual, monthly
+  average vs. this month actual, yearly average vs. YTD actual,
+  and all-time totals.
+- Average per transaction.
+
+Category breakdown:
+- Table showing each category's total spend, transaction count,
+  and percentage of overall spending.
+
+Recent expenses list:
+- All expenses sorted by date descending. Each shows amount,
+  description, category, date, payment method, and note.
+- Inline edit form per expense (all fields editable).
+- Delete expense.
+
+Full expenses list (/expenses/list or /expenses/all):
+- Paginated/filtered view of all expenses.
+- CSV export (/expenses/export/csv).
+
+
+12. CUSTOMIZE (/customization)
+------------------------------
+Global filter settings applied to the home page and list views.
+
+Settings:
+- Include hashtags: comma-separated list of hashtag names. When set,
+  only lists/todos tagged with at least one of these hashtags are
+  shown on the home page and in list views.
+- Exclude hashtags: comma-separated list of hashtag names. Lists/
+  todos tagged with any of these hashtags are hidden.
+
+These filters are stored in the UserSettings model and applied as
+query filters in the home page and list view route handlers.
+
+Also accessible from this screen:
+- Data export (GET /api/export): downloads all app data as a JSON
+  file. Includes lists, todos, notes, hashtags, calendar events,
+  smart folders, folders, bills, payments, expenses, user settings,
+  links, collation mappings, ingredient data, and categories.
+- Data import (POST /api/import): uploads a previously exported
+  JSON file. Performs upsert-only import (creates or updates, never
+  deletes existing data).
+
+
+13. AUTH / LOGIN (/login)
+-------------------------
+Optional session-based authentication using htpasswd files.
+
+Enabled by setting the SIMPLE_TODO_BASIC_AUTH environment variable
+to "1", "true", "yes", or "on". When disabled, all pages are public.
+
+Login page:
+- Username and password form.
+- On successful authentication, sets a signed session cookie
+  (HMAC-SHA256) valid for SESSION_EXPIRY_DAYS (default 30).
+- Cookie is scoped to the app's root path, marked httponly and
+  samesite=lax, and secure when served over HTTPS.
+
+Supported htpasswd password formats:
+- {SHA}base64(sha1(password))
+- $apr1$ (Apache MD5, requires passlib)
+- $2a$/$2b$/$2y$ (bcrypt, requires passlib + bcrypt)
+- Plaintext fallback.
+
+Authentication middleware:
+- Static assets, favicon, and the login page itself are always public.
+- Browser page requests without a valid session redirect to /login.
+- API and sync endpoints accept HTTP Basic Auth headers (for
+  programmatic clients) and return 401 JSON on failure.
+
+Logout (/logout):
+- Clears the session cookie and redirects to /login.
+
+
+==================================================
+DATABASE SCHEMA SUMMARY (SQLite)
+==================================================
+
+The database contains 31 tables: 16 primary entity tables, 4 tracking/
+config tables, and 11 junction tables for many-to-many relationships.
+
+
+PRIMARY ENTITY TABLES
+---------------------
+
+lists
+  A list is the primary container. It has a name, completed flag,
+  pinned flag (with timestamp), archived flag, and belongs to an
+  optional folder. Display options stored per-list: show_completed,
+  show_delayed, sort_ascending, manual_sorting, and
+  partition_by_datetime_headers. A list can be marked as a collation
+  list (is_collation) with an optional collation_color. It can also
+  be a recipe list (is_recipe) for ingredient tracking. Has an
+  optional category string, optional delayed_until date, and flags
+  for DokuWiki integration (show_dokuwiki_item_links,
+  dokuwiki_page_enabled). Tracks created_at and modified_at.
+  intersperse_collated_todos controls whether collected items from
+  other lists are mixed into the main todo stream or shown separately.
+
+todos
+  A todo belongs to exactly one list. It has a title, optional note
+  (free text), optional color, completed flag, pinned flag (with
+  timestamp), and sort_order for manual positioning. Supports
+  nesting via an optional parent_id (self-referencing foreign key
+  to another todo). Has optional delayed_until date, optional alarm
+  window (alarm_start, alarm_end datetimes), optional DokuWiki page
+  link flag, and optional ingredient_group_id for recipe mode.
+  Tracks created_at and modified_at.
+
+notes
+  A named text block that can be attached to a list, a todo, or a
+  calendar event (via optional foreign keys list_id, todo_id,
+  calendar_event_id). Has a text body, optional display name, and
+  optional occurrence_at datetime (to scope a note to a specific
+  calendar event occurrence). Tracks created_at and modified_at.
+
+hashtags
+  A tag with a unique name. Has per-hashtag display settings:
+  show_completed (whether to show completed items when viewing this
+  hashtag), include_list_items (whether to show tagged lists on the
+  hashtag detail page), and hide_completed_list_items. Tracks
+  created_at.
+
+folders
+  Hierarchical organizer for lists. Has a name, optional parent_id
+  (self-referencing for nesting), is_collapsed flag (persists UI
+  expand/collapse state), sort_order for manual positioning, and
+  created_at. Lists reference a folder via folder_id.
+
+calendar_events
+  An event with a title, optional note, start_at datetime, optional
+  rrule string (iCalendar RRULE format for recurrence), optional
+  color, and optional event_group_id. Tracks created_at and
+  modified_at.
+
+calendar_event_completions
+  Records that a specific occurrence of a calendar event has been
+  marked complete. References event_id and stores occurrence_at
+  (the datetime of the specific occurrence). Tracks created_at.
+
+event_groups
+  A named grouping for calendar events. Has a unique name and
+  created_at. Calendar events reference a group via event_group_id.
+
+links
+  A URL attachment. Has a url and optional title. Can be attached to
+  exactly one of: a list, a todo, or a note (via optional foreign
+  keys list_id, todo_id, note_id). Tracks created_at.
+
+list_datetime_headers
+  A lightweight timestamp divider inserted into a list for visual
+  grouping. Belongs to a list (list_id). Only has created_at (the
+  timestamp itself serves as the displayed heading text).
+
+smart_folders
+  A saved query/filter definition. Has a name, content toggles
+  (show_lists, show_todos), grouping options (group_todos_by_list,
+  root_todos_only, nest_subtodos), common filters
+  (uncompleted_only, include_archived_lists), folder scope filters
+  (include_root_folder, exclude_root_folder, strict_nesting),
+  sort configuration (list_sort_field, list_sort_desc,
+  todo_sort_field, todo_sort_desc), optional date bounds
+  (modified_after, modified_before), display order (section_order
+  string like "LET"), sort_order for ordering among smart folders,
+  and DokuWiki settings (dokuwiki_links_enabled,
+  dokuwiki_date_field). Tracks created_at and modified_at.
+
+named_searches
+  A saved multi-hashtag search query. Has a name and
+  uncompleted_only flag. Tracks created_at. Related to hashtags
+  via include and exclude junction tables.
+
+bills
+  A recurring bill or subscription. Has name, optional payee,
+  optional note, expected_amount (float), currency (default AUD),
+  amount_strategy (fixed / rolling_avg / last_payment),
+  next_due_date, optional anchor_day (1-31, prevents month-length
+  drift), is_due_date_confirmed flag, frequency (weekly / fortnightly
+  / monthly / quarterly / yearly / custom), optional frequency_days
+  (for custom frequency), is_auto_pay flag, is_active flag, optional
+  category, optional color. Tracks created_at and modified_at.
+
+bill_payments
+  Records an individual payment against a bill. References bill_id.
+  Stores due_date (what the due date was at the time), paid_date
+  (when actually paid), optional amount_paid (float), optional note
+  (stored as a JSON array of timestamped note objects), and
+  is_late_overridden flag (user override to mark a late payment as
+  on-time). Tracks created_at.
+
+expenses
+  A one-off expense record. Has amount (float), optional description,
+  optional category, date, optional payment_method (Card / Cash /
+  Transfer / Other), currency (default AUD), and optional note.
+  Tracks created_at and modified_at.
+
+
+TRACKING AND CONFIGURATION TABLES
+----------------------------------
+
+journal_entries
+  An audit log entry. Stores action description (e.g. "Created Todo"),
+  optional details text, entity_type (e.g. "todo", "list"),
+  entity_id, and created_at. Written automatically when significant
+  actions occur (create, update, delete of major entities).
+
+user_settings
+  Singleton-style settings record. Stores global hashtag filters
+  (filter_inc_hashtags, filter_exc_hashtags as comma-separated text),
+  hide_empty_lists flag, show_completed and show_delayed flags,
+  active_folder_id (which folder filters the home page),
+  calendar_traditional_view toggle, calendar_event_filter string
+  (all / non_recurring / recurring / group:{id}), and updated_at.
+
+categories
+  Standalone category name registry for list grouping. Has a unique
+  name and created_at. Lists store category as a plain string (not
+  a foreign key), but this table ensures names are centrally managed.
+
+dokuwiki_confirmed_items
+  Tracks which items (todos or lists) have confirmed DokuWiki links.
+  Stores item_type ("todo" or "list"), item_id, confirmed_at, and
+  burst-click tracking fields (click_burst count, last_click time).
+
+ingredient_groups
+  Groups the same ingredient across different recipe-mode lists. Has
+  a canonical_name and created_at. Todos reference a group via
+  ingredient_group_id.
+
+ingredient_events
+  Records ingredient lifecycle events for recipe-mode lists.
+  References todo_id. Stores event_type ("bought", "ran_out", or
+  "reset"), quantity (integer, default 1), event_date, and optional
+  note.
+
+
+JUNCTION / ASSOCIATION TABLES
+-----------------------------
+
+list_hashtags
+  Links lists to hashtags. Columns: list_id, hashtag_id.
+
+todo_hashtags
+  Links todos to hashtags. Columns: todo_id, hashtag_id.
+
+calendar_event_hashtags
+  Links calendar events to hashtags. Columns: calendar_event_id,
+  hashtag_id.
+
+named_search_hashtags
+  Links named searches to their included hashtags. Columns:
+  named_search_id, hashtag_id.
+
+named_search_excluded_hashtags
+  Links named searches to their excluded hashtags. Columns:
+  named_search_id, hashtag_id.
+
+smart_folder_include_hashtags
+  Links smart folders to hashtags they filter by (include). Columns:
+  smart_folder_id, hashtag_id. Also has per-association flags:
+  include_subtodos (propagate match to child todos) and
+  include_list_items (also match lists with this hashtag).
+
+smart_folder_exclude_hashtags
+  Links smart folders to hashtags they exclude. Columns:
+  smart_folder_id, hashtag_id. Also has per-association flag:
+  include_subtodos.
+
+smart_folder_lists
+  Links smart folders to specific lists they scope to. Columns:
+  smart_folder_id, list_id.
+
+smart_folder_include_folders
+  Links smart folders to folders they include. Columns:
+  smart_folder_id, folder_id.
+
+smart_folder_exclude_folders
+  Links smart folders to folders they exclude. Columns:
+  smart_folder_id, folder_id.
+
+collation_todos
+  Links collation lists to todos collected from other lists. Columns:
+  collation_list_id, todo_id, sort_order (integer for manual
+  positioning of the collected todo within the collation list).

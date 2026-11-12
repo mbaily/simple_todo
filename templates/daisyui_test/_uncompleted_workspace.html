@@ -1,0 +1,18 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% from 'daisyui_test/_rows.html' import row with context %}
+<div id="daisy-workspace" data-scope="uncompleted" data-edit-query="{{ query }}&amp;back=home" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Open tasks</h1><span class="eyebrow">{{ total }} across {{ groups|length }} {{ 'list' if groups|length == 1 else 'lists' }}</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>{% if total %}<button type="button" class="btn btn-ghost btn-sm select-mode-button" data-command="toggle-selection" aria-pressed="false">{{ icon('select', 16) }} <span>Select</span></button>{% endif %}</div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    {% if groups %}
+    {% for group in groups %}
+    <section class="section-panel" aria-label="{{ group.list.name }}">
+        <div class="smart-group-heading">{% if group.path %}<span class="smart-group-path">{{ group.path }} ›</span>{% endif %}<a href="{{ prototype_url }}/list/{{ group.list.id }}?sort=user&amp;folder_id={{ group.list.folder_id or 0 }}">{{ group.list.name }}</a><span class="section-count">{{ group.todos|length }}</span></div>
+        <ul class="list">{% for todo in group.todos %}{{ row(todo, 'todo') }}{% endfor %}</ul>
+    </section>
+    {% endfor %}
+    {% else %}<div class="empty-state"><h3>Nothing left to do in any active list.</h3></div>{% endif %}
+    {% include 'daisyui_test/_selection_toolbar.html' %}
+</div>

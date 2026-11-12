@@ -1,0 +1,6 @@
+<label>Invoice <select name="invoice_target" onchange="selectConfirmedInvoice(this)" style="max-width:100%;">
+    <option value="new" data-number="" data-issued="" data-due="{{ bill.next_due_date_iso if not bill.open_invoice else '' }}" data-amount="{{ '%.2f'|format(bill.effective_amount) if not bill.open_invoice and bill.effective_amount is not none else '' }}">Record a new invoice</option>
+    {% for invoice in bill.ordered_invoices|reverse %}
+    <option value="{{ invoice.id }}" data-number="{{ invoice.invoice_number or '' }}" data-issued="{{ invoice.invoice_date.strftime('%Y-%m-%d') if invoice.invoice_date else '' }}" data-due="{{ invoice.due_date_iso }}" data-amount="{{ invoice.amount_cents|cents }}">Correct invoice {{ invoice.invoice_number or (invoice.invoice_date.strftime('%Y-%m-%d') if invoice.invoice_date else 'due ' ~ (invoice.due_date_iso or 'unknown')) }} · {{ bill.currency_symbol }}{{ invoice.amount_cents|cents }} · {{ 'Outstanding' if invoice.outstanding_cents else 'Settled' }}</option>
+    {% endfor %}
+</select></label>

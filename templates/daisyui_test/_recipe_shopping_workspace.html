@@ -1,0 +1,23 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% from 'daisyui_test/_recipe_macros.html' import ingredient_row, recipe_nav, hx with context %}
+<div id="daisy-workspace" data-scope="recipe:{{ back }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    {{ recipe_nav(list) }}
+    <div class="page-heading">
+        <div class="page-title"><h1>Shopping list</h1><span class="eyebrow">{{ needed|length }} to buy</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
+            {% if needed %}<form {{ hx('bulk-bought') }} hx-confirm="Mark all {{ needed|length }} items to buy as bought?"><input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="list_id" value="{{ list.id }}">{% for row in needed %}<input type="hidden" name="todo_ids" value="{{ row.todo.id }}">{% endfor %}<button class="btn btn-primary btn-sm">{{ icon('check', 14) }} Bought everything</button></form>{% endif %}
+        </div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    {% for key, label, symbol, open in [('ran_out', 'Ran out', 'bell', True), ('likely_low', 'Running low', 'clock', True), ('new', 'Never bought', 'info', True), ('in_stock', 'In stock', 'check', False)] %}
+    {% set rows = groups[key] %}
+    {% if rows %}
+    <details class="section-panel recipe-section recipe-{{ key }}" data-persist="shopping-{{ key }}" {% if open %}open{% endif %}>
+        <summary class="section-heading"><div><h2>{{ icon(symbol, 17) }} {{ label }} <span class="section-count">{{ rows|length }}</span></h2></div>{{ icon('down', 14) }}</summary>
+        <ul class="list">{% for row in rows %}{{ ingredient_row(row.todo, row.stats, row.status) }}{% endfor %}</ul>
+    </details>
+    {% endif %}
+    {% endfor %}
+    {% if not (groups.ran_out or groups.likely_low or groups.new or groups.in_stock) %}<div class="empty-state"><h3>This recipe has no open ingredients.</h3></div>
+    {% elif not needed %}<p class="page-hint">Nothing needs buying right now.</p>{% endif %}
+</div>

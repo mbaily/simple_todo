@@ -1,0 +1,58 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set folder = smart_folder %}
+{% set action = prototype_url ~ ('/smart-folder/' ~ folder.id ~ '/edit' if folder else '/smart-folders') ~ query %}
+{% set cancel = prototype_url ~ ('/smart-folder/' ~ folder.id if folder else '/smart-folders') %}
+{% macro mode_select(name, current, label) %}
+<select class="select select-xs rule-mode" name="{{ name }}" aria-label="{{ label }}">
+    <option value="" {% if not current %}selected{% endif %}>Ignore</option>
+    <option value="include" {% if current == 'include' %}selected{% endif %}>Include</option>
+    <option value="exclude" {% if current == 'exclude' %}selected{% endif %}>Exclude</option>
+</select>
+{% endmacro %}
+{% macro check(name, label, checked, value='true') %}<label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="{{ name }}" value="{{ value }}" {% if checked %}checked{% endif %}> {{ label }}</label>{% endmacro %}
+{% macro sort(prefix, label) %}
+<div class="editor-field"><span>{{ label }}</span><div class="join"><select class="select select-sm join-item" name="{{ prefix }}_sort_field" aria-label="{{ label }} field">{% for value, text in sort_fields.items() %}<option value="{{ value }}" {% if values[prefix ~ '_sort_field'] == value %}selected{% endif %}>{{ text }}</option>{% endfor %}</select><select class="select select-sm join-item" name="{{ prefix }}_sort_dir" aria-label="{{ label }} direction"><option value="desc" {% if values[prefix ~ '_sort_dir'] == 'desc' %}selected{% endif %}>Newest first</option><option value="asc" {% if values[prefix ~ '_sort_dir'] == 'asc' %}selected{% endif %}>Oldest first</option></select></div></div>
+{% endmacro %}
+<div id="daisy-workspace" data-scope="smart-edit:{{ folder.id if folder else 'new' }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <header class="page-heading editor-heading">
+        <div class="page-title"><h1>{{ 'Edit smart folder' if folder else 'New smart folder' }}</h1>{% if folder %}<span class="editor-item-title">{{ folder.name }}</span>{% endif %}</div>
+        <div class="detail-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><button id="smart-save" type="submit" form="smart-form" class="btn btn-primary">{{ icon('check', 16) }} {{ 'Save changes' if folder else 'Create smart folder' }}</button><a class="btn" href="{{ cancel }}">Cancel</a>{% if folder %}<form action="{{ prototype_url }}/smart-folder/{{ folder.id }}/delete?view=smart-index" method="post" hx-post="{{ prototype_url }}/smart-folder/{{ folder.id }}/delete?view=smart-index" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete smart folder “{{ folder.name }}”? Only the saved view is deleted; its lists and tasks are kept."><button class="btn delete-button">{{ icon('trash', 15) }} Delete</button></form>{% endif %}</div>
+    </header>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+
+    <form id="smart-form" data-draft action="{{ action }}" method="post" hx-post="{{ action }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="#smart-save" class="smart-editor">
+        <section class="section-panel editor-form">
+            <label class="editor-field editor-wide" for="smart-name"><span>Name</span><input id="smart-name" class="input input-sm" name="name" value="{{ values.name }}" required maxlength="255" autocomplete="off"></label>
+            <div class="editor-field"><span>Show</span><div class="option-row">{{ check('show_lists', 'Lists', values.show_lists) }}{{ check('show_todos', 'Tasks', values.show_todos) }}</div></div>
+            <label class="editor-field" for="smart-section-order"><span>Section order</span><select id="smart-section-order" class="select select-sm" name="section_order">{% for value, text in section_orders.items() %}<option value="{{ value }}" {% if values.section_order == value %}selected{% endif %}>{{ text }}</option>{% endfor %}</select></label>
+            <label class="editor-field" for="smart-after"><span>Modified from</span><input id="smart-after" class="input input-sm" type="date" name="modified_after" value="{{ values.modified_after }}"></label>
+            <label class="editor-field" for="smart-before"><span>Modified until</span><input id="smart-before" class="input input-sm" type="date" name="modified_before" value="{{ values.modified_before }}"></label>
+            {{ sort('list', 'Sort lists by') }}
+            {{ sort('todo', 'Sort tasks by') }}
+            <div class="editor-field editor-wide"><span>Options</span><div class="option-row">{% for name, label in flags.items() %}{{ check(name, label, values.flags.get(name)) }}{% endfor %}</div></div>
+            {% if enable_dokuwiki_links %}<div class="editor-field editor-wide"><span>DokuWiki</span><div class="option-row">{{ check('dokuwiki_links_enabled', 'Show dated DokuWiki links', values.dokuwiki_links_enabled) }}<select class="select select-xs" name="dokuwiki_date_field" aria-label="DokuWiki link date">{% for value, text in sort_fields.items() %}<option value="{{ value }}" {% if values.dokuwiki_date_field == value %}selected{% endif %}>{{ text }} date</option>{% endfor %}</select></div></div>{% endif %}
+        </section>
+
+        <details class="section-panel rule-panel" data-persist="smart-hashtags" {% if values.hashtags %}open{% endif %}>
+            <summary class="capture-summary">{{ icon('hash', 16) }} Hashtags <span class="section-count">{{ values.hashtags|length }} rules</span><small>No included tags means every item is considered.</small>{{ icon('down', 14) }}</summary>
+            {% if all_hashtags %}
+            <ul class="list rule-list">{% for tag in all_hashtags %}{% set rule = values.hashtags.get(tag.id, {}) %}
+                <li class="list-row rule-row"><span class="rule-name">#{{ tag.name }}</span>{{ mode_select('hashtag_mode_' ~ tag.id, rule.mode, 'Rule for #' ~ tag.name) }}{{ check('subtodos_' ~ tag.id, 'Also subtasks', rule.subtodos) }}{{ check('list_items_' ~ tag.id, 'Tasks in tagged lists', rule.list_items) }}</li>
+            {% endfor %}</ul>
+            {% else %}<p class="section-empty">No hashtags yet.</p>{% endif %}
+        </details>
+
+        <details class="section-panel rule-panel" data-persist="smart-folders" {% if values.folders %}open{% endif %}>
+            <summary class="capture-summary">{{ icon('folder', 16) }} Folders <span class="section-count">{{ values.folders|length }} rules</span><small>Included folders take precedence over “Unfiled lists”.</small>{{ icon('down', 14) }}</summary>
+            <ul class="list rule-list">
+                <li class="list-row rule-row"><span class="rule-name">Unfiled lists</span>{{ mode_select('folder_mode_root', values.folders.get('root'), 'Rule for unfiled lists') }}</li>
+                {% for item in all_folders %}<li class="list-row rule-row"><span class="rule-name">{{ item.path_name }}</span>{{ mode_select('folder_mode_' ~ item.id, values.folders.get(item.id), 'Rule for folder ' ~ item.path_name) }}</li>{% endfor %}
+            </ul>
+        </details>
+
+        <details class="section-panel rule-panel" data-persist="smart-lists" {% if values.list_ids %}open{% endif %}>
+            <summary class="capture-summary">{{ icon('list', 16) }} Only these lists <span class="section-count">{{ values.list_ids|length }} selected</span><small>Leave empty for all lists.</small>{{ icon('down', 14) }}</summary>
+            <div class="list-picker">{% for item in all_lists %}{{ check('list_ids', item.name, item.id in values.list_ids, item.id) }}{% endfor %}</div>
+        </details>
+    </form>
+</div>

@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>🛒 Shopping List - {{ list.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <style>
+        /* Minimalist Refactor */
+        .shopping-header {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--input-border);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .shopping-item {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--input-border);
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .shopping-item.ran-out {
+            /* Optional emphasis for ran out items */
+        }
+
+        .item-checkbox {
+            width: 24px;
+            height: 24px;
+            margin-top: 2px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .item-content {
+            flex: 1;
+            min-width: 0;
+            /* Crucial for word wrapping */
+        }
+
+        .item-title {
+            font-size: 1.1rem;
+            font-weight: 500;
+            display: block;
+            margin-bottom: 4px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .item-status {
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+
+        /* Plain text status colors */
+        .status-ran-out {
+            color: #ef4444;
+            font-weight: 600;
+        }
+
+        .status-likely-low {
+            color: #f59e0b;
+        }
+
+        .status-new {
+            color: #6366f1;
+        }
+
+        .status-in-stock {
+            color: #10b981;
+        }
+
+        .item-meta {
+            font-size: 0.85rem;
+            color: var(--dates-color);
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            /* Allow buttons to wrap on very small screens */
+            margin-top: 8px;
+        }
+
+        /* Mobile specific adjustments included by default due to flex/wrap */
+        @media (max-width: 600px) {
+            .shopping-item {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .item-checkbox {
+                /* Place checkbox inline with title on mobile? Or keep separate?
+                   If column, checkbox is on top. 
+                   Let's keep row but maybe wrap actions.
+                */
+                flex-direction: row;
+                align-items: flex-start;
+            }
+
+            /* Actually, let's keep row layout but allow content to wrap */
+            .shopping-item {
+                flex-direction: row;
+            }
+
+            .item-actions {
+                width: 100%;
+                /* Force actions to next line if needed, or keep inline */
+                margin-top: 10px;
+                justify-content: flex-end;
+            }
+        }
+
+        .quantity-input {
+            width: 50px;
+            padding: 6px;
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            text-align: center;
+            background: var(--input-bg);
+            color: var(--text-color);
+        }
+
+        button {
+            background: transparent;
+            border: 1px solid var(--input-border);
+            color: var(--text-color);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: var(--button-bg);
+        }
+
+        .buy-btn {
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .buy-btn:hover {
+            background: #ecfdf5;
+        }
+
+        .ran-out-btn {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .ran-out-btn:hover {
+            background: #fef2f2;
+        }
+
+        /* Dark mode overrides for buttons */
+        @media (prefers-color-scheme: dark) {
+            .buy-btn:hover {
+                background: rgba(16, 185, 129, 0.1);
+            }
+
+            .ran-out-btn:hover {
+                background: rgba(239, 68, 68, 0.1);
+            }
+        }
+
+        .summary-bar {
+            /* Remove gradient box */
+            padding: 10px 0;
+            border-bottom: 1px solid var(--input-border);
+            margin-bottom: 10px;
+            color: var(--text-color);
+            background: none;
+            display: flex;
+            gap: 20px;
+        }
+
+
+        .bulk-actions button.primary {
+            background: #10b981;
+            color: white;
+            border-color: #059669;
+        }
+
+        .bulk-actions button.primary:hover {
+            background: #059669;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .shopping-item {
+                border-color: #374151;
+            }
+
+            .shopping-item.ran-out {
+                background: linear-gradient(90deg, #7f1d1d 0%, var(--card-bg, #1f2937) 10%);
+            }
+
+            .shopping-item.likely-low {
+                background: linear-gradient(90deg, #78350f 0%, var(--card-bg, #1f2937) 10%);
+            }
+
+            .shopping-item.purchased {
+                background: linear-gradient(90deg, #064e3b 0%, var(--card-bg, #1f2937) 10%);
+            }
+
+            .status-ran-out {
+                background: #7f1d1d;
+                color: #fecaca;
+            }
+
+            .status-likely-low {
+                background: #78350f;
+                color: #fde68a;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div style="margin-bottom: 10px;">
+        <a href="{{ request.scope.root_path }}/list/{{ list.id }}" class="nav-icon" title="{{ t('tooltip_back_to_list') }}">⬅️</a>
+        <a href="{{ request.scope.root_path }}/list/{{ list.id }}/ingredient_report" class="nav-icon"
+            title="{{ t('tooltip_ingredient_report') }}">📊</a>
+        <a href="{{ request.scope.root_path }}/pantry" class="nav-icon" title="{{ t('tooltip_pantry_manage_all') }}">🥫</a>
+        <a href="{{ request.scope.root_path }}/classic" class="nav-icon" title="{{ t('title_home') }}">🏠</a>
+    </div>
+
+    <div class="shopping-header">
+        <div>
+            <h1 style="margin: 0;">🛒 {{ t('header_shopping_list') }}</h1>
+            <h2 style="margin: 5px 0 0 0; font-weight: normal; color: var(--dates-color);">
+                <a href="{{ request.scope.root_path }}/list/{{ list.id }}"
+                    style="text-decoration: none; color: inherit; border-bottom: 1px dotted var(--dates-color);">{{
+                    list.name }}</a>
+            </h2>
+        </div>
+        <div>
+            <!-- Header actions if any -->
+        </div>
+    </div>
+
+    {% set ran_out_count = shopping_items|selectattr('status', 'equalto', 'ran_out')|list|length %}
+    {% set low_count = shopping_items|selectattr('status', 'equalto', 'likely_low')|list|length %}
+
+    {% if shopping_items %}
+    <!-- Summary Bar (Plain) -->
+    <div class="summary-bar">
+        <div class="summary-item">
+            <span>{{ t('label_by_status') }}:</span>
+        </div>
+        {% set ran_out_count = shopping_items|selectattr('status', 'equalto', 'ran_out')|list|length %}
+        {% set low_count = shopping_items|selectattr('status', 'equalto', 'likely_low')|list|length %}
+
+        {% if ran_out_count > 0 %}
+        <span style="color: #ef4444; font-weight: bold;">{{ ran_out_count }} {{ t('status_ran_out') }}</span>
+        {% endif %}
+        {% if low_count > 0 %}
+        <span style="color: #f59e0b; font-weight: bold;">{{ low_count }} {{ t('status_likely_low') }}</span>
+        {% endif %}
+    </div>
+
+    <div class="bulk-actions">
+        <!-- Keep bulk actions plain -->
+        <button onclick="selectAllShopping()">{{ t('btn_select_all') }}</button>
+        <button onclick="selectNoneShopping()">{{ t('btn_select_none') }}</button>
+        <button onclick="markSelectedAsBought()">{{ t('btn_mark_selected_bought') }}</button>
+    </div>
+
+    <div id="shopping-list">
+        {% for item in shopping_items %}
+        <div class="shopping-item" id="shopping-item-{{ item.todo.id }}" data-todo-id="{{ item.todo.id }}"
+            data-group-id="{{ item.todo.ingredient_group_id if item.todo.ingredient_group_id else '' }}">
+            <input type="checkbox" class="item-checkbox shopping-checkbox" data-id="{{ item.todo.id }}">
+            <div class="item-content">
+                <span class="item-title">{{ item.todo.title }}</span>
+                <span
+                    class="item-status {% if item.status == 'ran_out' %}status-ran-out{% elif item.status == 'likely_low' %}status-likely-low{% elif item.status == 'new' %}status-new{% else %}status-in-stock{% endif %}">
+                    {% if item.status == 'ran_out' %}
+                    🚨 {{ t('status_ran_out') }}
+                    {% elif item.status == 'likely_low' %}
+                    ⚠️ {{ t('status_likely_low') }}
+                    {% elif item.status == 'new' %}
+                    🆕 {{ t('status_new') }}
+                    {% else %}
+                    ✅ {{ t('status_stocked') }}
+                    {% endif %}
+                </span>
+                <div class="item-meta">
+                    {% if item.stats.days_since_bought %}
+                    <div class="meta-info">
+                        {{ t('label_last_bought') }} {{ item.stats.days_since_bought }} {{ t('text_days_ago') }}
+                        {% if item.stats.last_bought_quantity %}
+                        ({{ t('label_qty') }}: {{ item.stats.last_bought_quantity }})
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    {{ t('text_never_purchased') }}
+                    {% endif %}
+                    {% if item.stats.average_cycle %}
+                    • {{ t('label_avg_cycle') }}: {{ item.stats.average_cycle }}d
+                    {% endif %}
+                </div>
+
+                <!-- Actions aligned under content for mobile wrapping -->
+                <div class="item-actions">
+                    <input type="number" class="quantity-input" id="qty-{{ item.todo.id }}" value="1" min="1"
+                        title="{{ t('tip_quantity') }}">
+                    <button onclick="markBought({{ item.todo.id }})" class="buy-btn" title="{{ t('tip_mark_bought') }}">
+                        {{ t('btn_bought') }}
+                    </button>
+                    <button onclick="markRanOut({{ item.todo.id }})" class="ran-out-btn"
+                        title="{{ t('tip_mark_ran_out') }}">
+                        {{ t('btn_ran_out') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+        <div class="icon">✅</div>
+        <h2>All stocked up!</h2>
+        <p>No items need to be purchased right now.</p>
+        <p style="margin-top: 20px;">
+            <a href="{{ request.scope.root_path }}/list/{{ list.id }}/ingredient_report">{{ t('link_view_full_report') }} →</a>
+        </p>
+    </div>
+    {% endif %}
+
+    <script>
+        const LIST_ID = {{ list.id }};
+
+        async function markBought(todoId) {
+            const quantity = parseInt(document.getElementById('qty-' + todoId).value) || 1;
+            const itemElement = document.getElementById('shopping-item-' + todoId);
+            const groupId = itemElement.dataset.groupId;
+
+            try {
+                let url;
+                if (groupId) {
+                    url = `/api/ingredient/buy_group/${groupId}`;
+                } else {
+                    url = `/api/todo/${todoId}/ingredient_event`;
+                }
+
+                const response = await SimpleTodo.fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event_type: 'bought',
+                        quantity: quantity
+                    })
+                });
+
+                if (response.ok) {
+                    // Mark as purchased visually
+                    if (itemElement) {
+                        itemElement.classList.add('purchased');
+                        itemElement.querySelector('.buy-btn').disabled = true;
+                        itemElement.querySelector('.buy-btn').textContent = '✅ Done';
+                    }
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to record purchase');
+            }
+        }
+
+        async function markRanOut(todoId) {
+            const quantity = parseInt(document.getElementById('qty-' + todoId).value) || 1;
+            const itemElement = document.getElementById('shopping-item-' + todoId);
+            const groupId = itemElement.dataset.groupId;
+
+            try {
+                let url;
+                let body;
+
+                if (groupId) {
+                    url = `/api/ingredient/ran_out_group/${groupId}`;
+                    body = { quantity: quantity };
+                } else {
+                    url = `/api/todo/${todoId}/ingredient_event`;
+                    body = { event_type: 'ran_out', quantity: quantity };
+                }
+
+                const response = await SimpleTodo.fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (response.ok) {
+                    // Update visual status
+                    if (itemElement) {
+                        itemElement.classList.remove('in-stock', 'likely-low', 'new');
+                        itemElement.classList.add('ran-out');
+                        const statusSpan = itemElement.querySelector('.item-status');
+                        statusSpan.className = 'item-status status-ran-out';
+                        statusSpan.textContent = '🚨 Ran Out';
+                    }
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to record event');
+            }
+        }
+
+        function selectAllShopping() {
+            document.querySelectorAll('.shopping-checkbox').forEach(cb => cb.checked = true);
+        }
+
+        function selectNoneShopping() {
+            document.querySelectorAll('.shopping-checkbox').forEach(cb => cb.checked = false);
+        }
+
+        async function markSelectedAsBought() {
+            const selected = Array.from(document.querySelectorAll('.shopping-checkbox:checked'))
+                .map(cb => parseInt(cb.dataset.id, 10));
+
+            if (selected.length === 0) {
+                alert('No items selected');
+                return;
+            }
+
+            const quantity = prompt('Enter quantity for all items (default: 1):', '1');
+            if (quantity === null) return;
+
+            const qty = parseInt(quantity, 10) || 1;
+
+            try {
+                const response = await SimpleTodo.fetch(`/api/list/${LIST_ID}/bulk_ingredient_event`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        todo_ids: selected,
+                        event_type: 'bought',
+                        quantity: qty
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(`Marked ${data.updated_count} items as bought!`);
+                    window.location.reload();
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to update items');
+            }
+        }
+    </script>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

@@ -1,0 +1,32 @@
+[
+    {
+        "name": "Uncompleted",
+        "show_lists": true,
+        "show_todos": true,
+        "group_todos_by_list": true,
+        "root_todos_only": false,
+        "nest_subtodos": true,
+        "uncompleted_only": true,
+        "include_archived_lists": false,
+        "list_sort_field": "modified_at",
+        "list_sort_desc": true,
+        "todo_sort_field": "modified_at",
+        "todo_sort_desc": true,
+        "modified_after": null,
+        "modified_before": null,
+        "dokuwiki_links_enabled": true,
+        "dokuwiki_date_field": "created_at",
+        "include_root_folder": true,
+        "exclude_root_folder": false,
+        "strict_nesting": false,
+        "section_order": "TEL",
+        "include_hashtags": [],
+        "exclude_hashtags": [
+            {
+                "name": "old",
+                "include_subtodos": true
+            }
+        ],
+        "lists": []
+    }
+]

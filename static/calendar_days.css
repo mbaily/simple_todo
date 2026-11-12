@@ -1,0 +1,245 @@
+.cal-day-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1px;
+    /* Toolbar controls must not change the event-driven column widths. */
+    container: calendar-day-toolbar / inline-size;
+}
+
+.cal-day-date,
+.cal-day-actions button,
+.cal-day-count {
+    background: transparent;
+    color: inherit;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+}
+
+.cal-day-date {
+    font-weight: bold;
+}
+
+.cal-day-actions {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+}
+
+.cal-day-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 20px;
+    border-radius: 3px;
+}
+
+/* Resolve compact controls during layout, before the first paint or a resize. */
+@container calendar-day-toolbar (width < 85px) {
+    .cal-day-actions .cal-day-add,
+    .cal-day-actions .cal-day-open {
+        display: none;
+    }
+
+    .cal-day-actions .cal-day-more {
+        width: 12px;
+    }
+}
+
+.cal-day-count {
+    display: block;
+    width: 100%;
+    margin: 2px 0;
+    text-align: left;
+    font-size: 0.85em;
+    color: var(--dates-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    contain: inline-size;
+}
+
+.cal-grid-hide-counts .cal-day-count {
+    display: none;
+}
+
+.cal-day-count-short,
+.cal-day-marker {
+    display: none;
+}
+
+.cal-day[data-hide-completed="true"] > .cal-event-completed {
+    display: none;
+}
+
+#calendar-day-menu {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 6px;
+    width: 210px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    border: 1px solid var(--input-border);
+    border-radius: 5px;
+    color: var(--text-color);
+    background: var(--bg-color);
+    box-shadow: 0 4px 12px #0003;
+}
+
+#calendar-day-menu strong {
+    display: block;
+    padding: 5px 8px;
+}
+
+#calendar-day-menu form {
+    margin: 0;
+}
+
+#calendar-day-menu button {
+    display: block;
+    width: 100%;
+    padding: 7px 8px;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.cal-day-actions button:hover,
+#calendar-day-menu button:hover,
+#calendar-day-menu button:focus-visible {
+    background: var(--pill-hover);
+}
+
+#calendar-day-menu button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+#calendar-day-dialog {
+    box-sizing: border-box;
+    width: min(680px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+    padding: 16px;
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    color: var(--text-color);
+    background: var(--bg-color);
+    overflow: auto;
+}
+
+#calendar-day-dialog::backdrop {
+    background: #0007;
+}
+
+.cal-day-dialog-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cal-day-dialog-heading h2 {
+    font-size: 1.2em;
+}
+
+#calendar-day-events {
+    margin: 12px 0;
+}
+
+#calendar-day-events .cal-event {
+    align-items: flex-start;
+    font-size: 1em;
+    padding: 6px 0;
+    white-space: normal;
+}
+
+#calendar-day-events .cal-event-title {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.cal-day-event-note {
+    margin: 0 0 8px 20px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+#calendar-day-note-form {
+    margin-top: 16px;
+}
+
+#calendar-day-note {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 5px 0;
+    resize: vertical;
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+    .cal-grid-container > .cal-grid {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .cal-grid .cal-day {
+        min-height: 56px;
+    }
+
+    .cal-grid .cal-day > .cal-event {
+        display: none;
+    }
+
+    .cal-grid .cal-day-add,
+    .cal-grid .cal-day-open {
+        display: none;
+    }
+
+    .cal-grid .cal-day-more {
+        width: 12px;
+    }
+
+    .cal-grid .cal-day-date {
+        flex: 1;
+        min-width: 20px;
+        min-height: 24px;
+        text-align: left;
+    }
+
+    .cal-grid .cal-day-count {
+        text-align: center;
+        font-size: 0.85rem;
+    }
+
+    .cal-grid .cal-day-count-full {
+        display: none;
+    }
+
+    .cal-grid .cal-day-count-short {
+        display: inline-block;
+        min-width: 1.4em;
+        line-height: 1.4;
+        padding: 0 2px;
+        border-radius: 999px;
+        background: var(--pill-bg);
+    }
+
+    .cal-grid-hide-counts .cal-day-marker:not([data-count="0"]) {
+        display: block;
+        width: 100%;
+        height: 24px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--link-color);
+        cursor: pointer;
+        font-size: 1rem;
+    }
+}

@@ -1,0 +1,506 @@
+/* Base styles with CSS variables for theming */
+:root {
+    --bg-color: #ffffff;
+    --text-color: #1a1a1a;
+    --link-color: #0066cc;
+    --pill-bg: #e0e0e0;
+    --pill-hover: #d0d0d0;
+    --input-bg: #ffffff;
+    --input-border: #cccccc;
+    --button-bg: #f0f0f0;
+    --dates-color: #666666;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #1a1a1a;
+        --text-color: #e0e0e0;
+        --link-color: #6db3f2;
+        --pill-bg: #3a3a3a;
+        --pill-hover: #4a4a4a;
+        --input-bg: #2a2a2a;
+        --input-border: #444444;
+        --button-bg: #3a3a3a;
+        --dates-color: #999999;
+    }
+}
+
+html {
+    font-size: 16px;
+    scrollbar-gutter: stable;
+}
+
+@media (max-width: 600px) {
+    html {
+        font-size: 18px;
+    }
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 8px;
+}
+
+h1 {
+    margin-top: 0;
+}
+
+h2 {
+    margin-bottom: 0.25em;
+}
+
+a {
+    color: var(--link-color);
+}
+
+.pill {
+    display: inline-block;
+    background-color: var(--pill-bg);
+    border-radius: 12px;
+    padding: 2px 8px;
+    margin: 1px;
+    text-decoration: none;
+    color: var(--text-color);
+    font-size: 0.875rem;
+    font-weight: normal;
+}
+
+a.pill:hover {
+    background-color: var(--pill-hover);
+}
+
+.dates {
+    font-size: 0.75em;
+    font-family: sans-serif;
+    color: var(--dates-color);
+}
+
+.note-icon {
+    text-decoration: none;
+    margin-left: 0.35rem;
+    font-size: 0.95em;
+    vertical-align: baseline;
+}
+
+.note-icon:hover {
+    text-decoration: underline;
+}
+
+/* The dates that appear/disappear when selecting items should match
+   the normal todo/list name text size for readability. */
+#selected-dates {
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+/* Custom circular selection checkbox */
+.select-item {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1em;
+    height: 1em;
+    border: 2px solid #6366f1;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    vertical-align: -0.23em;
+}
+
+.select-item:checked {
+    background: #6366f1;
+    box-shadow: inset 0 0 0 2px var(--bg-color);
+}
+
+.select-item:hover {
+    border-color: #4f46e5;
+}
+
+input[type="text"],
+textarea,
+select {
+    font-size: 1rem;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--input-border);
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+textarea {
+    width: 100%;
+}
+
+input[type="text"],
+select {
+    width: 100%;
+}
+
+/* Ensure edit form fields can actually expand full width on mobile.
+   (Inline labels can shrink-wrap their contents, making 100% ineffective.) */
+.edit-todo-form label {
+    display: block;
+}
+
+.edit-todo-form input[type="text"],
+.edit-todo-form textarea,
+.edit-todo-form select {
+    display: block;
+    width: 100%;
+}
+
+button {
+    font-size: 1rem;
+    background-color: var(--button-bg);
+    color: var(--text-color);
+    border: 1px solid var(--input-border);
+}
+
+.calendar-sort {
+    position: relative;
+    font-size: 1rem;
+}
+
+.calendar-sort > summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    box-sizing: border-box;
+    list-style: none;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background: var(--button-bg);
+}
+
+.calendar-sort > summary::-webkit-details-marker {
+    display: none;
+}
+
+.calendar-sort > summary:hover {
+    background: var(--pill-hover);
+}
+
+.calendar-sort-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 10;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    margin: 4px 0 0;
+    padding: 4px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background: var(--bg-color);
+    box-shadow: 0 4px 12px #0003;
+}
+
+.calendar-sort-menu button {
+    display: block;
+    width: 100%;
+    padding: 6px 10px;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.calendar-sort-menu button:hover,
+.calendar-sort-menu button:focus-visible {
+    background: var(--pill-hover);
+}
+
+.calendar-sort-menu button[aria-pressed="true"] {
+    background: var(--pill-bg);
+    font-weight: bold;
+}
+
+/* Collation list toggle dots */
+.collation-dots {
+    display: inline-flex;
+    gap: 6px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.collation-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--collation-color, #888);
+    background: transparent;
+    padding: 0;
+    line-height: 0;
+    cursor: pointer;
+}
+
+.collation-dot.on {
+    background: var(--collation-color, #888);
+}
+
+/* Datetime headers inside list views */
+.datetime-header-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.35rem 0;
+}
+
+/* Fill remaining row width with a divider line */
+.datetime-header-row::after {
+    content: "";
+    flex: 1;
+    border-bottom: 1px solid var(--input-border);
+    margin-left: 0.5rem;
+    transform: translateY(0.1em);
+}
+
+.datetime-header {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    color: var(--dates-color);
+}
+
+/* DokuWiki Delete Mode */
+.dokuwiki-link.delete-mode {
+    color: red !important;
+    text-decoration: line-through;
+}
+
+.dokuwiki-link.delete-mode svg {
+    fill: red !important;
+    stroke: red !important;
+}
+
+/* Only the first line reserves space for the calendar controls and date.
+   Event text stays inline so continuation lines use the full row width. */
+.calendar-occurrence {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.calendar-event-prefix {
+    display: inline-grid;
+    grid-template-columns: 1em 1em max-content;
+    column-gap: 4px;
+    align-items: baseline;
+    white-space: nowrap;
+    overflow-wrap: normal;
+}
+
+.calendar-event-prefix input[type="checkbox"] {
+    width: 1em;
+    height: 1em;
+    margin: 0;
+}
+
+.calendar-occurrence-date {
+    display: inline-block;
+    min-width: 14ch;
+    font-family: monospace;
+    font-size: 1em;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.calendar-occurrence-content {
+    display: inline;
+}
+
+.calendar-today-heading {
+    display: flex;
+    font-weight: bold;
+}
+
+.calendar-today-label {
+    width: calc(2em + 8px);
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.calendar-title-nonrecurring {
+    color: #0f766e;
+}
+
+@media (prefers-color-scheme: dark) {
+    .calendar-title-nonrecurring {
+        color: #5eead4;
+    }
+}
+
+/* Late unchecked calendar events (important) */
+.calendar-occurrence-important,
+.cal-event.cal-event-important,
+.cal-week-event.cal-week-event-important {
+    background-color: rgba(220, 38, 38, 0.1) !important;
+    border-left: 3px solid #dc2626 !important;
+    padding-left: 4px;
+    border-radius: 2px;
+}
+
+.calendar-important-badge {
+    display: inline-block;
+    background-color: #fee2e2;
+    color: #991b1b;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 10px;
+    border: 1px solid #fca5a5;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+@media (prefers-color-scheme: dark) {
+    .calendar-occurrence-important,
+    .cal-event.cal-event-important,
+    .cal-week-event.cal-week-event-important {
+        background-color: rgba(220, 38, 38, 0.2) !important;
+        border-left: 3px solid #f87171 !important;
+    }
+    .calendar-important-badge {
+        background-color: #450a0a;
+        color: #fca5a5;
+        border-color: #991b1b;
+    }
+}
+
+.alert-success {
+    background-color: #dcfce7;
+    border: 1px solid #86efac;
+    color: #166534;
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+.alert-success a {
+    color: #15803d;
+    font-weight: 600;
+}
+@media (prefers-color-scheme: dark) {
+    .alert-success {
+        background-color: #064e3b;
+        border-color: #059669;
+        color: #a7f3d0;
+    }
+    .alert-success a {
+        color: #6ee7b7;
+    }
+}
+
+/* Disabled checkboxes (calendar section read-only items) */
+input[type="checkbox"]:disabled {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1em;
+    height: 1em;
+    border: 2px solid #16a34a;
+    border-radius: 3px;
+    background: transparent;
+    cursor: default;
+    vertical-align: -0.23em;
+}
+
+input[type="checkbox"]:disabled:checked {
+    background: #16a34a;
+    position: relative;
+}
+
+input[type="checkbox"]:disabled:checked::after {
+    content: "✓";
+    position: absolute;
+    color: white;
+    font-size: 0.75em;
+    font-weight: bold;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+@media (prefers-color-scheme: dark) {
+    input[type="checkbox"]:disabled {
+        border-color: #4ade80;
+    }
+
+    input[type="checkbox"]:disabled:checked {
+        background: #4ade80;
+    }
+
+    input[type="checkbox"]:disabled:checked::after {
+        color: #1a1a1a;
+    }
+}
+
+/* Offline indicator banner */
+body.is-offline::before {
+    content: "📡 You are offline";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #dc2626;
+    color: white;
+    text-align: center;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    z-index: 10000;
+}
+
+body.is-offline {
+    padding-top: 28px !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    body.is-offline::before {
+        background: #991b1b;
+    }
+}
+
+/* Navigation Icons */
+.nav-icon {
+    font-size: 1.5rem;
+    text-decoration: none !important;
+    /* No underline for emojis */
+    display: inline-block;
+    width: 2rem;
+    /* Fixed width for consistent positioning */
+    text-align: center;
+    vertical-align: middle;
+    cursor: pointer;
+    line-height: 1;
+    margin: 0 2px;
+}
+
+span.nav-icon {
+    opacity: 0.3;
+    /* Dimmed state for disabled icons */
+    cursor: default;
+    filter: grayscale(100%);
+}
+
+.nav-counter {
+    font-size: 1.2rem;
+    font-family: sans-serif;
+    color: var(--dates-color);
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+@media (max-width: 600px) {
+    .nav-icon {
+        font-size: 2.25rem;
+        width: 3rem;
+    }
+}
+
+.cal-view-picker { display: inline-flex; gap: 3px; margin: 0; }
+.cal-view-picker button[aria-pressed="true"] { font-weight: bold; outline: 2px solid #2563eb; outline-offset: -2px; }

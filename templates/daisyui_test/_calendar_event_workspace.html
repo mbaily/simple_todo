@@ -1,0 +1,56 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set action = (prototype_url ~ '/calendar/event/' ~ event.id ~ '/edit' if event else prototype_url ~ '/calendar/events') ~ query %}
+<div id="daisy-workspace" data-scope="calendar-event:{{ event.id if event else 'new' }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <header class="page-heading editor-heading">
+        <div class="page-title"><h1>{{ 'Edit event' if event else 'New event' }}</h1>{% if event %}<span class="editor-item-title">{{ event.title }}</span>{% endif %}</div>
+        <div class="detail-actions">
+            <span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
+            <button id="event-save" type="submit" form="event-form" class="btn btn-primary">{{ icon('check', 16) }} {{ 'Save changes' if event else 'Create event' }}</button>
+            <a class="btn" href="{{ return_url }}">Cancel</a>
+            {% if event %}<form action="{{ prototype_url }}/calendar/event/{{ event.id }}/delete{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/event/{{ event.id }}/delete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete “{{ event.title }}”{% if event.rrule %} and its entire recurring series{% endif %}, including notes and completion history? This cannot be undone."><button class="btn delete-button">{{ icon('trash', 15) }} Delete</button></form>{% endif %}
+        </div>
+    </header>
+    {% if event %}<div class="detail-context">Created {{ event.created_at_formatted }} · Modified {{ event.modified_at_formatted }}</div>{% endif %}
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    {% if copied_event %}<div class="alert alert-success copy-notice" role="status">Copied as a one-off event on {{ copied_event.start_at.strftime('%-d %b %Y') }}. <a href="{{ prototype_url }}/calendar/event/{{ copied_event.id }}/edit">Edit the copy</a></div>{% endif %}
+
+    <form id="event-form" data-draft action="{{ action }}" method="post" hx-post="{{ action }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="#event-save" class="editor-form section-panel event-form">
+        <label class="editor-field editor-wide" for="event-title"><span>Title</span><input id="event-title" class="input input-sm" name="title" value="{{ values.title }}" required maxlength="500" autocomplete="off"></label>
+        <label class="editor-field" for="event-date"><span>Date</span><input id="event-date" class="input input-sm" type="date" name="start_at" value="{{ values.start_at }}" required></label>
+        <div class="editor-field"><span>Time</span><div class="inline-fields"><input id="event-time" class="input input-sm" type="time" name="start_time" value="{{ values.start_time }}" aria-label="Start time"><input class="input input-sm duration-input" type="number" name="duration_minutes" min="1" max="10080" step="1" value="{{ values.duration_minutes }}" placeholder="Minutes" aria-label="Duration in minutes"></div><small>Leave the time blank for an all-day event. Duration is optional.</small></div>
+        <label class="editor-field" for="event-group"><span>Event group</span><select id="event-group" class="select select-sm" name="event_group_id"><option value="">None</option>{% for group in event_groups %}<option value="{{ group.id }}" {% if values.event_group_id == group.id|string %}selected{% endif %}>{{ group.name }}</option>{% endfor %}</select></label>
+        <div class="editor-field"><span>Hashtags</span><div class="inline-fields"><input class="input input-sm grow-input" name="hashtags" value="{{ values.hashtags }}" placeholder="#tags" aria-label="Event hashtags">{% if all_hashtags %}<select class="select select-sm" data-add-tag aria-label="Add existing hashtag"><option value="">Existing tag…</option>{% for tag in all_hashtags %}<option value="{{ tag.name }}">#{{ tag.name }}</option>{% endfor %}</select>{% endif %}</div></div>
+        <div class="editor-field"><span>Display</span><div class="option-row"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="use_color" value="true" {% if values.use_color %}checked{% endif %}> Custom colour</label><input class="colour-input" type="color" name="color" value="{{ values.color if values.color|length == 7 else '#6fe0b1' }}" aria-label="Event colour"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="important_if_late" value="true" {% if values.important_if_late %}checked{% endif %}> Important when overdue</label></div></div>
+
+        <fieldset class="editor-field editor-wide recurrence">
+            <legend>Repeat</legend>
+            <div class="inline-fields">
+                <select id="event-repeat" class="select select-sm" name="repeat" aria-label="Repeat"><option value="" {% if not values.repeat %}selected{% endif %}>Does not repeat</option>{% for value, label in frequencies.items() %}<option value="{{ value }}" {% if values.repeat == value %}selected{% endif %}>{{ label }}</option>{% endfor %}<option value="custom" {% if values.repeat == 'custom' %}selected{% endif %}>Custom rule</option></select>
+                <label class="repeat-builder">every <input class="input input-sm interval-input" type="number" name="interval" min="1" max="999" value="{{ values.interval }}" aria-label="Repeat interval"></label>
+                <label class="repeat-builder">until <input class="input input-sm" type="date" name="until" value="{{ values.until }}" aria-label="Repeat end date"></label>
+            </div>
+            <div class="weekly-days option-row" role="group" aria-label="Weekdays">{% for code, label in weekdays %}<label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="byday" value="{{ code }}" {% if code in values.byday %}checked{% endif %}> {{ label }}</label>{% endfor %}<small>No days selected repeats on the event's weekday.</small></div>
+            <label class="custom-rule" for="event-rule"><input id="event-rule" class="input input-sm" name="custom_rule" value="{{ values.custom_rule }}" placeholder="FREQ=MONTHLY;BYMONTHDAY=1" aria-label="Custom recurrence rule" autocomplete="off"><small>An RFC 5545 rule. Rules the simple builder cannot show stay here so nothing is lost.</small></label>
+        </fieldset>
+        <label class="editor-field editor-wide" for="event-note"><span>Note</span><textarea id="event-note" class="textarea textarea-sm" name="note" rows="3">{{ values.note }}</textarea></label>
+    </form>
+
+    {% if event %}
+    <div class="event-tools">
+        {% if event.rrule %}<form action="{{ prototype_url }}/calendar/event/{{ event.id }}/end-recurrence{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/event/{{ event.id }}/end-recurrence{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="End this repeat as of yesterday? Past occurrences and completions are kept."><button class="btn btn-sm">{{ icon('clock', 14) }} End repeat now</button></form>{% endif %}
+        <form class="inline-fields" action="{{ prototype_url }}/calendar/event/{{ event.id }}/duplicate{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/event/{{ event.id }}/duplicate{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><label for="copy-date">Copy as a one-off on</label><input id="copy-date" class="input input-sm" type="date" name="target_date" value="{{ occurrence_at or today }}" required><button class="btn btn-sm" name="copy_mode" value="details">{{ icon('plus', 14) }} {{ 'Copy event details' if event.rrule and occurrence_at else 'Copy' }}</button>{% if event.rrule and occurrence_at %}<input type="hidden" name="source_occurrence" value="{{ occurrence_at }}"><button class="btn btn-sm" name="copy_mode" value="occurrence">{{ icon('note', 14) }} Copy this occurrence</button><small>From {{ occurrence_at }}: includes the main note, event-wide notes and this occurrence’s notes. Copy event details includes only the main note.</small>{% endif %}</form>
+    </div>
+
+    <section class="section-panel" aria-labelledby="event-notes-heading">
+        <header class="section-heading"><div><h2 id="event-notes-heading">{{ icon('note', 17) }} Notes <span class="section-count">{{ event.notes|length }}</span></h2></div></header>
+        {% if event.notes %}<ul class="list">{% for note in event.notes|sort(attribute='created_at') %}
+        <li id="event-note-{{ note.id }}" tabindex="-1" class="list-row item-row event-note-row"><div class="item-content">{% if note.name %}<strong>{{ note.name }}: </strong>{% endif %}<span class="note-text">{{ note.text | daisy_note }}</span>{% if note.occurrence_at %}<span class="badge badge-ghost badge-sm">{{ note.occurrence_at.strftime('%-d %b %Y') }} only</span>{% endif %}</div>
+            <form action="{{ prototype_url }}/calendar/event/{{ event.id }}/notes/{{ note.id }}/delete{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/event/{{ event.id }}/notes/{{ note.id }}/delete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete this note?"><button class="btn btn-ghost btn-square btn-sm" aria-label="Delete note{{ ' ' ~ note.name if note.name else '' }}">{{ icon('close', 15) }}</button></form></li>
+        {% endfor %}</ul>{% endif %}
+        <form id="event-note-form" data-draft class="event-note-form" action="{{ prototype_url }}/calendar/event/{{ event.id }}/notes{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/event/{{ event.id }}/notes{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button">
+            <div class="inline-fields"><input class="input input-sm" name="name" placeholder="Optional name" aria-label="Note name"><textarea class="textarea textarea-sm grow-input" name="text" rows="2" required placeholder="Add a note" aria-label="Note text"></textarea><button class="btn btn-sm">Add note</button></div>
+            {% if event.rrule %}<div class="inline-fields"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="occurrence_only" value="true" {% if occurrence_at %}checked{% endif %}> Only for the occurrence on</label><input class="input input-sm" type="date" name="occurrence_at" value="{{ occurrence_at }}" aria-label="Occurrence date"></div>{% endif %}
+        </form>
+    </section>
+    {% endif %}
+</div>

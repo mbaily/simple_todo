@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Manage Folders</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/htmx.min.js"></script>
+    <script src="{{ request.scope.root_path }}/static/alpine.min.js" defer></script>
+    <style>
+        .folder-tree-view {
+            list-style: none;
+            padding-left: 20px;
+            margin: 2px 0;
+        }
+
+        .folder-tree-view li {
+            margin: 2px 0;
+        }
+
+        .folder-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 4px;
+            border-radius: 3px;
+            user-select: none;
+        }
+
+        .folder-row:hover {
+            background-color: var(--button-bg, #f5f5f5);
+        }
+
+        .folder-row.is-dragging {
+            opacity: 0.35;
+        }
+
+        .folder-row.drag-over-into {
+            background-color: var(--pill-hover, #e2e8f0) !important;
+            outline: 2px dashed var(--link-color, #0066cc);
+        }
+
+        .folder-row.drag-over-above {
+            border-top: 2px solid var(--link-color, #0066cc) !important;
+        }
+
+        .folder-row.drag-over-below {
+            border-bottom: 2px solid var(--link-color, #0066cc) !important;
+        }
+
+        .drag-handle {
+            cursor: grab;
+            user-select: none;
+            color: var(--dates-color, #888);
+            margin-right: 2px;
+            font-size: 1.05rem;
+            line-height: 1;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .item-icon {
+            width: 18px;
+            text-align: center;
+            display: inline-block;
+            user-select: none;
+        }
+
+        .item-actions {
+            margin-left: 8px;
+            display: inline-flex;
+            gap: 2px;
+            opacity: 0.35;
+            transition: opacity 0.15s ease;
+        }
+
+        .folder-row:hover .item-actions {
+            opacity: 1;
+        }
+
+        .btn-action {
+            background: none;
+            border: none;
+            padding: 1px 3px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            line-height: 1;
+            border-radius: 2px;
+        }
+
+        .btn-action:hover {
+            background-color: var(--pill-bg, #eee);
+        }
+
+        .btn-mini {
+            font-size: 0.8rem;
+            padding: 1px 6px;
+            cursor: pointer;
+        }
+
+        .active-star {
+            color: #f59e0b;
+            font-size: 1rem;
+        }
+
+        .star-btn {
+            color: var(--dates-color, #888);
+            font-size: 1rem;
+        }
+
+        .root-dropzone {
+            padding: 4px 8px;
+            border: 1px dashed var(--input-border, #ccc);
+            margin: 6px 0 10px 0;
+            border-radius: 4px;
+            display: inline-block;
+            cursor: default;
+        }
+
+        .root-dropzone.drag-active {
+            background-color: var(--pill-hover, #e2e8f0);
+            border-color: var(--link-color, #0066cc);
+        }
+
+        .empty-folder-dropzone {
+            padding-left: 24px;
+            margin: 2px 0;
+        }
+
+        .empty-folder-dropzone.drag-active {
+            background-color: var(--pill-hover, #e2e8f0);
+            outline: 1px dashed var(--link-color, #0066cc);
+        }
+
+        .folder-children {
+            min-height: 4px;
+            transition: background-color 0.15s ease;
+        }
+
+        .folder-children.drag-active-children {
+            background-color: var(--pill-hover, #e2e8f0);
+            outline: 2px dashed var(--link-color, #0066cc);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+    <h2>Manage Folders</h2>
+
+    <div style="margin-bottom: 12px; padding: 6px 10px; border: 1px solid var(--input-border); background: var(--button-bg);">
+        <strong>Operations:</strong> <span id="selection-status">Select items to perform operations.</span>
+        <div id="operations" style="display:block; margin-top:6px; min-height: 24px;">
+            <button id="btn-move" type="button" style="display:none;">Move</button>
+            <button id="btn-rename" type="button" style="display:none;">Rename</button>
+            <button id="btn-delete" type="button" style="display:none;">Delete</button>
+            <button id="btn-reorder" type="button" style="display:none;">Reorder</button>
+            <button id="btn-set-active" type="button" style="display:none;">Set Active</button>
+        </div>
+    </div>
+
+    <!-- Tagged Items Info -->
+    <div id="tagged-items-panel"
+        style="margin-bottom: 15px; padding: 8px 10px; border: 1px solid #f59e0b; background: #fef3c7; display:none;">
+        <strong>Tagged Items:</strong> <span id="tagged-count">None</span>
+        <div style="margin-top: 6px;">
+            <em>Select a folder or list below, then:</em><br>
+            <button type="button" id="btn-move-tagged" onclick="moveTaggedToSelected()">Move Tagged Here</button>
+            <button type="button" onclick="moveTaggedLists(0)">Move Lists to Root</button>
+            <button type="button" onclick="clearTaggedItems(); updateTaggedDisplay();">Clear Tagged</button>
+        </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+        <h3 style="margin: 0;">Folder Tree</h3>
+        <span class="item-icon" style="cursor:pointer;" title="Create Unfiled Folder"
+              onclick="window.folderTreeHandlerInstance && window.folderTreeHandlerInstance.promptCreateRootFolder()">➕</span>
+    </div>
+
+    <div style="margin-bottom: 10px;" id="active-folder-header">
+        {% if settings.active_folder_id %}
+        Current Active: <strong>{{ active_folder.name if active_folder else 'None' }}</strong>
+        <button type="button" class="btn-mini" onclick="window.folderTreeHandlerInstance && window.folderTreeHandlerInstance.setActive(0)">Clear Active (Show Unfiled)</button>
+        {% else %}
+        Current Active: <strong>Unfiled</strong>
+        {% endif %}
+    </div>
+
+    <script>
+        // Existing selection mechanism for tagged / bulk actions
+        let selectedItems = [];
+
+        function toggleSelection(checkbox, type, id, name) {
+            if (checkbox.checked) {
+                selectedItems.push({ type: type, id: id, name: name });
+            } else {
+                selectedItems = selectedItems.filter(item => !(item.type === type && item.id === id));
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            const statusEl = document.getElementById('selection-status');
+            const opsEl = document.getElementById('operations');
+            const moveBtn = document.getElementById('btn-move');
+            const renameBtn = document.getElementById('btn-rename');
+            const deleteBtn = document.getElementById('btn-delete');
+            const reorderBtn = document.getElementById('btn-reorder');
+            const setActiveBtn = document.getElementById('btn-set-active');
+
+            moveBtn.style.display = 'none';
+            if (renameBtn) renameBtn.style.display = 'none';
+            if (deleteBtn) deleteBtn.style.display = 'none';
+            if (reorderBtn) reorderBtn.style.display = 'none';
+            if (setActiveBtn) setActiveBtn.style.display = 'none';
+
+            if (selectedItems.length === 0) {
+                statusEl.textContent = "Select items to perform operations.";
+            } else if (selectedItems.length === 1) {
+                const item = selectedItems[0];
+                statusEl.textContent = `Selected: ${item.name} (${item.type})`;
+                opsEl.style.display = 'block';
+
+                moveBtn.style.display = 'inline-block';
+                moveBtn.textContent = "Move To Root";
+                moveBtn.onclick = () => window.folderTreeHandlerInstance.moveItem(item.type, item.id, 0);
+
+                if (item.type === 'folder') {
+                    if (renameBtn) {
+                        renameBtn.style.display = 'inline-block';
+                        renameBtn.onclick = () => window.folderTreeHandlerInstance.startRename(item.id, item.name);
+                    }
+                    if (deleteBtn) {
+                        deleteBtn.style.display = 'inline-block';
+                        deleteBtn.onclick = () => window.folderTreeHandlerInstance.deleteFolder(item.id, item.name);
+                    }
+                    if (setActiveBtn) {
+                        setActiveBtn.style.display = 'inline-block';
+                        setActiveBtn.onclick = () => window.folderTreeHandlerInstance.setActive(item.id);
+                    }
+                }
+            } else if (selectedItems.length === 2) {
+                const first = selectedItems[0];
+                const second = selectedItems[1];
+                opsEl.style.display = 'block';
+
+                if (first.type === 'folder' && second.type === 'folder') {
+                    statusEl.textContent = `Selected: ${first.name} and ${second.name}.`;
+                    moveBtn.style.display = 'inline-block';
+                    moveBtn.textContent = `Move "${first.name}" Into "${second.name}"`;
+                    moveBtn.onclick = () => window.folderTreeHandlerInstance.moveItem(first.type, first.id, second.id);
+
+                    if (reorderBtn) {
+                        reorderBtn.style.display = 'inline-block';
+                        reorderBtn.textContent = "Reorder (Move 1st below 2nd)";
+                        reorderBtn.onclick = () => window.folderTreeHandlerInstance.reorderFolder(first.id, second.id);
+                    }
+                } else if ((first.type === 'list' && second.type === 'folder') || (first.type === 'folder' && second.type === 'list')) {
+                    const listObj = first.type === 'list' ? first : second;
+                    const folderObj = first.type === 'folder' ? first : second;
+                    statusEl.textContent = `Move "${listObj.name}" into "${folderObj.name}"?`;
+                    moveBtn.style.display = 'inline-block';
+                    moveBtn.textContent = `Move "${listObj.name}" Into "${folderObj.name}"`;
+                    moveBtn.onclick = () => window.folderTreeHandlerInstance.moveItem('list', listObj.id, folderObj.id);
+                } else {
+                    statusEl.textContent = "Error: Cannot move a list into another list.";
+                }
+            } else {
+                statusEl.textContent = "Error: Please select only 2 items to perform a 'Move item to folder' operation.";
+                opsEl.style.display = 'none';
+            }
+        }
+
+        function toggleLocal(id) {
+            const el = document.getElementById(id);
+            const arrow = document.getElementById('arrow-' + id);
+            if (!el) return;
+            if (el.style.display === 'none') {
+                el.style.display = 'block';
+                if (arrow) arrow.textContent = '▼';
+            } else {
+                el.style.display = 'none';
+                if (arrow) arrow.textContent = '▶';
+            }
+        }
+
+        function moveTaggedToSelected() {
+            if (selectedItems.length === 0) {
+                alert('Please select a destination folder or list first using the checkboxes.');
+                return;
+            }
+            if (selectedItems.length > 1) {
+                alert('Please select only ONE destination folder or list.');
+                return;
+            }
+
+            const dest = selectedItems[0];
+            const tagged = getTaggedItems();
+            const hasTaggedLists = tagged.lists && tagged.lists.length > 0;
+            const hasTaggedTodos = tagged.todos && tagged.todos.length > 0;
+            const hasTaggedNotes = tagged.notes && tagged.notes.length > 0;
+
+            if (!hasTaggedLists && !hasTaggedTodos && !hasTaggedNotes) {
+                alert('No items are tagged. Tag items from other pages first.');
+                return;
+            }
+
+            if (dest.type === 'folder') {
+                if (hasTaggedLists) {
+                    moveTaggedLists(dest.id);
+                } else if (hasTaggedTodos || hasTaggedNotes) {
+                    alert('You selected a folder as destination, but only lists can be moved to folders.');
+                }
+            } else if (dest.type === 'list') {
+                if (hasTaggedTodos || hasTaggedNotes) {
+                    moveTaggedTodosNotes(dest.id);
+                } else if (hasTaggedLists) {
+                    alert('Lists can only be moved to folders, not into other lists.');
+                }
+            }
+        }
+
+        function promptCreateFolder(parentId) {
+            if (window.folderTreeHandlerInstance) {
+                if (parentId === 0 || !parentId) {
+                    window.folderTreeHandlerInstance.promptCreateRootFolder();
+                } else {
+                    const name = prompt("Enter new folder name:");
+                    if (name && name.trim()) {
+                        window.folderTreeHandlerInstance.createFolder(name.trim(), parentId);
+                    }
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------------------
+        // Alpine Tree Handler for Reactive Drag-and-Drop, Expand, Rename & Delete
+        // ---------------------------------------------------------------------------
+        function folderTreeHandler() {
+            const handler = {
+                dragData: null, // { type: 'folder'|'list', id: int, parentId: int|null }
+                rootPath: "{{ request.scope.root_path }}",
+
+                init() {
+                    window.folderTreeHandlerInstance = this;
+                    this.initDelegatedListeners();
+                },
+
+                initDelegatedListeners() {
+                    const container = document.getElementById('tree-view-wrapper');
+                    if (container && !container._dragInitialized) {
+                        container._dragInitialized = true;
+                        container.addEventListener('dragstart', (e) => this.onDragStart(e));
+                        container.addEventListener('dragover', (e) => this.onDragOver(e));
+                        container.addEventListener('dragleave', (e) => this.onDragLeave(e));
+                        container.addEventListener('drop', (e) => this.onDrop(e));
+                        container.addEventListener('dragend', (e) => this.onDragEnd(e));
+                    }
+                },
+
+                // 1. Expand / Collapse
+                toggleCollapse(folderId, arrowEl) {
+                    const childrenEl = document.getElementById('folder-children-' + folderId);
+                    if (!childrenEl) return;
+                    const isCurrentlyHidden = childrenEl.style.display === 'none';
+                    if (isCurrentlyHidden) {
+                        childrenEl.style.display = 'block';
+                        if (arrowEl) arrowEl.textContent = '▼';
+                    } else {
+                        childrenEl.style.display = 'none';
+                        if (arrowEl) arrowEl.textContent = '▶';
+                    }
+
+                    // Background sync to persist in database without reload
+                    const formData = new FormData();
+                    formData.append('folder_id', folderId);
+                    fetch(this.rootPath + '/folders/toggle_collapse', {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'HX-Request': 'true' }
+                    }).catch(err => console.error('Collapse sync error:', err));
+                },
+
+                // 2. Drag & Drop
+                onDragStart(event) {
+                    if (event.target.closest('button, input, select, textarea')) {
+                        return;
+                    }
+                    const itemEl = event.target.closest('.tree-item');
+                    if (!itemEl) return;
+                    const type = itemEl.dataset.type;
+                    const id = parseInt(itemEl.dataset.id, 10);
+                    const parentId = itemEl.dataset.parentId ? parseInt(itemEl.dataset.parentId, 10) : null;
+                    this.dragData = { type, id, parentId };
+
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', JSON.stringify(this.dragData));
+
+                    const row = itemEl.querySelector('.folder-row');
+                    if (row) row.classList.add('is-dragging');
+                },
+
+                onDragOver(event) {
+                    if (!this.dragData) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+
+                    // 1. Root dropzone
+                    const rootDz = event.target.closest('#root-dropzone');
+                    if (rootDz) {
+                        this.clearHighlights();
+                        rootDz.classList.add('drag-active');
+                        return;
+                    }
+
+                    // 2. Folder row or List row
+                    const targetRow = event.target.closest('.folder-row');
+                    if (targetRow) {
+                        const targetItem = targetRow.closest('.tree-item');
+                        if (!targetItem) return;
+                        const targetType = targetItem.dataset.type;
+                        const targetId = parseInt(targetItem.dataset.id, 10);
+
+                        // Cannot drop on oneself
+                        if (this.dragData.type === targetType && this.dragData.id === targetId) return;
+
+                        this.clearHighlights();
+
+                        if (targetType === 'folder') {
+                            if (this.dragData.type === 'list') {
+                                // Dragging a list over a folder row -> ALWAYS into folder!
+                                targetRow.classList.add('drag-over-into');
+                            } else {
+                                // Dragging a folder over a folder row
+                                const rect = targetRow.getBoundingClientRect();
+                                const relY = (event.clientY - rect.top) / rect.height;
+                                if (relY < 0.25) {
+                                    targetRow.classList.add('drag-over-above');
+                                } else if (relY > 0.75) {
+                                    targetRow.classList.add('drag-over-below');
+                                } else {
+                                    targetRow.classList.add('drag-over-into');
+                                }
+                            }
+                        } else if (targetType === 'list') {
+                            const rect = targetRow.getBoundingClientRect();
+                            const relY = (event.clientY - rect.top) / rect.height;
+                            if (relY < 0.5) {
+                                targetRow.classList.add('drag-over-above');
+                            } else {
+                                targetRow.classList.add('drag-over-below');
+                            }
+                        }
+                        return;
+                    }
+
+                    // 3. Children container underneath folder (indented subtree)
+                    const childrenContainer = event.target.closest('.folder-children');
+                    if (childrenContainer) {
+                        const folderId = parseInt(childrenContainer.dataset.folderId, 10);
+                        if (this.dragData.type === 'folder' && this.dragData.id === folderId) return;
+                        this.clearHighlights();
+                        childrenContainer.classList.add('drag-active-children');
+                    }
+                },
+
+                onDragLeave(event) {
+                    const row = event.target.closest('.folder-row');
+                    if (row && (!event.relatedTarget || !row.contains(event.relatedTarget))) {
+                        row.classList.remove('drag-over-above', 'drag-over-below', 'drag-over-into');
+                    }
+                    const rootDz = event.target.closest('#root-dropzone');
+                    if (rootDz && (!event.relatedTarget || !rootDz.contains(event.relatedTarget))) {
+                        rootDz.classList.remove('drag-active');
+                    }
+                    const childrenContainer = event.target.closest('.folder-children');
+                    if (childrenContainer && (!event.relatedTarget || !childrenContainer.contains(event.relatedTarget))) {
+                        childrenContainer.classList.remove('drag-active-children');
+                    }
+                },
+
+                onDrop(event) {
+                    if (!this.dragData) return;
+                    event.preventDefault();
+                    const drag = this.dragData;
+                    this.cleanupDrag();
+
+                    // Case A: Root Dropzone
+                    if (event.target.closest('#root-dropzone')) {
+                        this.moveItem(drag.type, drag.id, 0);
+                        return;
+                    }
+
+                    // Case B: Drop on a folder row or list row
+                    const targetRow = event.target.closest('.folder-row');
+                    if (targetRow) {
+                        const targetItem = targetRow.closest('.tree-item');
+                        if (!targetItem) return;
+                        const targetType = targetItem.dataset.type;
+                        const targetId = parseInt(targetItem.dataset.id, 10);
+                        const targetParentId = targetItem.dataset.parentId ? parseInt(targetItem.dataset.parentId, 10) : null;
+
+                        if (drag.type === targetType && drag.id === targetId) return;
+
+                        if (targetType === 'folder') {
+                            // Dragging a LIST onto a folder: ALWAYS move into this folder!
+                            if (drag.type === 'list') {
+                                this.moveItem('list', drag.id, targetId);
+                                return;
+                            }
+
+                            // Dragging a FOLDER onto a folder:
+                            const rect = targetRow.getBoundingClientRect();
+                            const relY = (event.clientY - rect.top) / rect.height;
+                            if (relY >= 0.25 && relY <= 0.75) {
+                                // Drop INTO folder
+                                this.moveItem('folder', drag.id, targetId);
+                            } else {
+                                // Sibling reordering or move adjacent
+                                if (drag.parentId === targetParentId) {
+                                    this.reorderFolder(drag.id, targetId);
+                                } else {
+                                    this.moveItem('folder', drag.id, targetParentId || 0);
+                                }
+                            }
+                            return;
+                        }
+
+                        if (targetType === 'list') {
+                            // Dropped on a list: move into that list's folder!
+                            this.moveItem(drag.type, drag.id, targetParentId || 0);
+                            return;
+                        }
+                    }
+
+                    // Case C: Drop into folder-children container (underneath folder header)
+                    const childrenContainer = event.target.closest('.folder-children');
+                    if (childrenContainer) {
+                        const folderId = parseInt(childrenContainer.dataset.folderId, 10);
+                        if (drag.type === 'folder' && drag.id === folderId) return;
+                        this.moveItem(drag.type, drag.id, folderId);
+                        return;
+                    }
+                },
+
+                onDragEnd(event) {
+                    this.cleanupDrag();
+                },
+
+                clearHighlights() {
+                    document.querySelectorAll('.folder-row').forEach(r => {
+                        r.classList.remove('drag-over-above', 'drag-over-below', 'drag-over-into');
+                    });
+                    const rootDz = document.getElementById('root-dropzone');
+                    if (rootDz) rootDz.classList.remove('drag-active');
+                    document.querySelectorAll('.folder-children').forEach(el => el.classList.remove('drag-active-children'));
+                    document.querySelectorAll('.empty-folder-dropzone').forEach(el => el.classList.remove('drag-active'));
+                },
+
+                cleanupDrag() {
+                    this.dragData = null;
+                    this.clearHighlights();
+                    document.querySelectorAll('.folder-row').forEach(r => r.classList.remove('is-dragging'));
+                },
+
+                // Drop on Root dropzone
+                onDragOverRoot(event) {
+                    this.onDragOver(event);
+                },
+
+                onDragLeaveRoot(event) {
+                    this.onDragLeave(event);
+                },
+
+                onDropRoot(event) {
+                    this.onDrop(event);
+                },
+
+                // Drop into empty folder dropzone
+                onDragOverDropzone(event) {
+                    this.onDragOver(event);
+                },
+
+                onDragLeaveDropzone(event) {
+                    this.onDragLeave(event);
+                },
+
+                onDropIntoFolder(folderId, event) {
+                    event.preventDefault();
+                    if (!this.dragData) return;
+                    const data = this.dragData;
+                    this.cleanupDrag();
+                    this.moveItem(data.type, data.id, folderId);
+                },
+
+                // 3. API Actions with HTMX / partial refresh
+                async refreshTree() {
+                    const res = await fetch(this.rootPath + '/folders/tree', {
+                        headers: { 'HX-Request': 'true' }
+                    });
+                    if (res.ok) {
+                        const html = await res.text();
+                        const container = document.getElementById('tree-view-wrapper');
+                        if (container) {
+                            container.innerHTML = html;
+                            if (window.Alpine) {
+                                Alpine.initTree(container);
+                            }
+                        }
+                    }
+                },
+
+                async moveItem(sourceType, sourceId, targetFolderId) {
+                    const formData = new FormData();
+                    formData.append('source_type', sourceType);
+                    formData.append('source_id', sourceId);
+                    formData.append('target_folder_id', targetFolderId || 0);
+
+                    const res = await fetch(this.rootPath + '/folders/move', {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'HX-Request': 'true' }
+                    });
+                    if (res.ok) {
+                        await this.refreshTree();
+                    } else {
+                        const err = await res.json().catch(() => ({}));
+                        alert(err.detail || 'Could not move item.');
+                    }
+                },
+
+                async reorderFolder(sourceId, targetId) {
+                    const formData = new FormData();
+                    formData.append('source_id', sourceId);
+                    formData.append('target_id', targetId);
+
+                    const res = await fetch(this.rootPath + '/folders/reorder', {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'HX-Request': 'true' }
+                    });
+                    if (res.ok) {
+                        await this.refreshTree();
+                    }
+                },
+
+                // 4. Inline Rename
+                startRename(folderId, currentName) {
+                    const container = document.getElementById('folder-name-' + folderId);
+                    if (!container) return;
+                    const escapedName = currentName.replace(/"/g, '&quot;');
+                    container.innerHTML = `
+                        <span style="display:inline-flex; align-items:center; gap:2px;">
+                            <input type="text" id="rename-input-${folderId}" value="${escapedName}"
+                                   style="font-size:0.9rem; padding:1px 3px; font-weight:bold; width:140px;"
+                                   onkeydown="if(event.key==='Enter') window.folderTreeHandlerInstance.saveRename(${folderId}); if(event.key==='Escape') window.folderTreeHandlerInstance.cancelRename(${folderId}, '${escapedName}');">
+                            <button type="button" class="btn-mini" onclick="window.folderTreeHandlerInstance.saveRename(${folderId})">✓</button>
+                            <button type="button" class="btn-mini" onclick="window.folderTreeHandlerInstance.cancelRename(${folderId}, '${escapedName}')">✕</button>
+                        </span>
+                    `;
+                    const input = document.getElementById('rename-input-' + folderId);
+                    if (input) {
+                        input.focus();
+                        input.select();
+                    }
+                },
+
+                cancelRename(folderId, originalName) {
+                    const container = document.getElementById('folder-name-' + folderId);
+                    if (!container) return;
+                    container.innerHTML = `
+                        <a href="${this.rootPath}/?folder_id=${folderId}" style="color:inherit; text-decoration:none;">
+                            <strong>${originalName}</strong>
+                        </a>
+                    `;
+                },
+
+                async saveRename(folderId) {
+                    const input = document.getElementById('rename-input-' + folderId);
+                    if (!input) return;
+                    const newName = input.value.trim();
+                    if (!newName) return;
+
+                    const formData = new FormData();
+                    formData.append('folder_id', folderId);
+                    formData.append('new_name', newName);
+
+                    const res = await fetch(this.rootPath + '/folders/rename', {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'HX-Request': 'true' }
+                    });
+                    if (res.ok) {
+                        const container = document.getElementById('folder-name-' + folderId);
+                        if (container) {
+                            container.innerHTML = `
+                                <a href="${this.rootPath}/?folder_id=${folderId}" style="color:inherit; text-decoration:none;">
+                                    <strong>${newName}</strong>
+                                </a>
+                            `;
+                        }
+                    }
+                },
+
+                // 5. Delete Folder
+                async deleteFolder(folderId, folderName) {
+                    if (!confirm(`Delete folder "${folderName}"? Lists and subfolders will be moved to root.`)) {
+                        return;
+                    }
+                    const formData = new FormData();
+                    formData.append('folder_id', folderId);
+
+                    const res = await fetch(this.rootPath + '/folders/delete', {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'HX-Request': 'true' }
+                    });
+                    if (res.ok) {
+                        await this.refreshTree();
+                    }
+                },
+
+                // 6. Create Folder / Subfolder
+                promptCreateRootFolder() {
+                    const name = prompt("Enter new root folder name:");
+                    if (name && name.trim()) {
+                        this.createFolder(name.trim(), 0);
+                    }
+                },
+
+                showCreateSubfolder(folderId) {
+                    const form = document.getElementById('subfolder-create-' + folderId);
+                    if (form) {
+                        form.style.display = 'block';
+                        const input = document.getElementById('subfolder-input-' + folderId);
+                        if (input) input.focus();
+                    }
+                },
+
+                hideCreateSubfolder(folderId) {
+                    const form = document.getElementById('subfolder-create-' + folderId);
+                    if (form) form.style.display = 'none';
+                },
+
+                async submitCreateFolder(parentId) {
+                    const input = document.getElementById('subfolder-input-' + parentId);
+                    if (!input) return;
+                    const name = input.value.trim();
+                    if (!name) return;
+                    await this.createFolder(name, parentId);
+                },
+
+                async createFolder(name, parentId) {
+                    const formData = new FormData();
+                    formData.append('name', name);
+                    formData.append('parent_id', parentId || 0);
+
+                    const res = await fetch(this.rootPath + '/folders/create', {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'HX-Request': 'true' }
+                    });
+                    if (res.ok) {
+                        await this.refreshTree();
+                    }
+                },
+
+                // 7. Set Active
+                async setActive(folderId) {
+                    const formData = new FormData();
+                    formData.append('folder_id', folderId || 0);
+
+                    const res = await fetch(this.rootPath + '/folders/set_active', {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'HX-Request': 'true' }
+                    });
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                }
+            };
+
+            return handler;
+        }
+
+        document.addEventListener('alpine:init', function() {
+            Alpine.data('folderTree', folderTreeHandler);
+        });
+    </script>
+
+    <!-- Tree View with Alpine Progressive Enhancement -->
+    <div x-data="folderTreeHandler()" id="folder-tree-root">
+        <div id="tree-view-wrapper">
+            {% include "partials/folder_tree.html" %}
+        </div>
+    </div>
+
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

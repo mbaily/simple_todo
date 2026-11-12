@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Smart Folder: {{ folder.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    {% from "macros.html" import render_links, dokuwiki_icon, dokuwiki_page_icon, nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h2 style="margin:0;">{{ folder.name }}</h2>
+    <button id="dokuwiki-delete-toggle" type="button" onclick="toggleDokuWikiDeleteMode()"
+        style="background:none; border:none; cursor:pointer; padding:2px; opacity:0.5; vertical-align:middle; float:right;"
+        title="Toggle DokuWiki Link Delete Mode">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="red" xmlns="http://www.w3.org/2000/svg">
+            <path
+                d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+            <path fill-rule="evenodd"
+                d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+        </svg>
+    </button>
+
+    <div class="dates" style="margin-top:4px;">
+        Showing:
+        {% if folder.show_lists and folder.show_todos %}lists + todos{% elif folder.show_lists %}lists{% elif
+        folder.show_todos %}todos{% else %}nothing{% endif %}
+        {% if folder.uncompleted_only %}| uncompleted only{% endif %}
+        {% if folder.include_archived_lists %}| includes archived lists{% endif %}
+        {% if modified_after_display %}| modified after {{ modified_after_display }}{% endif %}
+        {% if modified_before_display %}| modified before {{ modified_before_display }}{% endif %}
+    </div>
+
+    <div style="margin-top: 6px;">
+        {% if folder.lists %}
+        <span class="dates">Lists:</span>
+        {% for lst in folder.lists %}
+        <a href="{{ request.scope.root_path }}/list/{{ lst.id }}" class="pill">{{ lst.name }}</a>
+        {% endfor %}
+        {% else %}
+        <span class="dates">Lists: All</span>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 6px;">
+        <span class="dates">Hashtags:</span>
+        {% if folder.include_hashtags_assoc %}
+        {% for assoc in folder.include_hashtags_assoc %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ assoc.hashtag.id }}" class="pill">#{{ assoc.hashtag.name }}{% if assoc.include_subtodos %}
+            (w/ subs){% endif %}{% if assoc.include_list_items %} (inc. list items){% endif %}</a>
+        {% endfor %}
+        {% else %}
+        <span class="dates">All items</span>
+        {% endif %}
+        {% if folder.exclude_hashtags_assoc %}
+        <span class="dates">Excluding:</span>
+        {% for assoc in folder.exclude_hashtags_assoc %}
+        <span class="pill">NOT #{{ assoc.hashtag.name }}{% if assoc.include_subtodos %} (w/ subs){% endif %}</span>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    {% set section_rendered = namespace(value=false) %}
+    {% for char in folder.section_order or 'LET' %}
+    {% if char|upper == 'L' and folder.show_lists %}
+    {% if section_rendered.value %}
+    <hr>{% endif %}
+    {% include "partials/sf_lists.html" %}
+    {% set section_rendered.value = true %}
+    {% elif char|upper == 'E' and events %}
+    {% if section_rendered.value %}
+    <hr>{% endif %}
+    {% include "partials/sf_events.html" %}
+    {% set section_rendered.value = true %}
+    {% elif char|upper == 'T' and folder.show_todos %}
+    {% if section_rendered.value %}
+    <hr>{% endif %}
+    {% include "partials/sf_todos.html" %}
+    {% set section_rendered.value = true %}
+    {% endif %}
+    {% endfor %}
+
+    {% if lists or todos %}
+    <hr>
+    <h3 style="margin-bottom:0;margin-top:0">Operations</h3>
+    <span id="selection-count">0 selected</span> |
+    <button type="button" onclick="selectAll()">Select All</button>
+    <button type="button" onclick="selectNone()">Select None</button><br>
+    <span id="selected-dates" class="dates" style="display:none;"></span>
+    <div>
+        Todos:
+        <button type="button" onclick="bulkPin('todo')">Pin</button>
+        <button type="button" onclick="bulkUnpin('todo')">Unpin</button>
+        <button type="button" onclick="bulkEdit('todo')">Edit</button>
+        <button type="button" onclick="bulkDelete('todo')">Delete</button>
+    </div>
+    <div>
+        Lists:
+        <button type="button" onclick="bulkEdit('list')">Edit</button>
+        <button type="button" onclick="bulkDelete('list')">Delete</button>
+    </div>
+    {% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

@@ -1,0 +1,24 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{# One folder's actions. row=True: a folder shown as a row (in the tree or as a subfolder), with Open, ordering and Delete.
+   row=False: the folder being viewed in the overview. Forms return to the page they are on through {{ query }}. #}
+{% macro folder_menu(folder, siblings=None, is_default=False, row=True) %}
+<details class="dropdown dropdown-end row-dropdown">
+    {% if row %}<summary class="btn btn-ghost btn-square btn-sm" aria-label="Actions for {{ folder.name }}">{{ icon('more', 19) }}</summary>
+    {% else %}<summary class="btn btn-ghost btn-sm" aria-label="Actions for {{ folder.name }}">{{ icon('folder', 15) }} Folder {{ icon('down', 14) }}</summary>{% endif %}
+    <div class="dropdown-content row-menu folder-menu">
+        {% if row %}<a class="btn btn-ghost btn-sm folder-menu-item" href="{{ prototype_url }}?sort=user&amp;folder_id={{ folder.id }}">{{ icon('home', 15) }} Open in overview</a>{% endif %}
+        <button type="button" class="btn btn-ghost btn-sm folder-menu-item" data-command="move-item" data-key="folder:{{ folder.id }}">{{ icon('arrow', 15) }} Move folder…</button>
+        <form action="{{ prototype_url }}/folders/{{ folder.id }}/default{{ query }}" method="post" hx-post="{{ prototype_url }}/folders/{{ folder.id }}/default{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button">{% if not is_default %}<input type="hidden" name="enabled" value="true">{% endif %}<button class="btn btn-ghost btn-sm folder-menu-item">{{ icon('pin', 15) }} {{ 'Stop using as default view' if is_default else 'Use as default view' }}</button></form>
+        {% if row and siblings %}
+        <div class="folder-menu-pair">
+            {% for direction, label in [('up', 'Move up'), ('down', 'Move down')] %}
+            <form action="{{ prototype_url }}/folders/{{ folder.id }}/order/{{ direction }}{{ query }}" method="post" hx-post="{{ prototype_url }}/folders/{{ folder.id }}/order/{{ direction }}{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><button class="btn btn-ghost btn-sm folder-menu-item" {% if (direction == 'up' and siblings[0] == folder) or (direction == 'down' and siblings[-1] == folder) %}disabled{% endif %}>{{ label }}</button></form>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <form class="folder-menu-form" action="{{ prototype_url }}/folders/{{ folder.id }}/rename{{ query }}" method="post" hx-post="{{ prototype_url }}/folders/{{ folder.id }}/rename{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><label for="rename-{{ folder.id }}">Rename</label><div class="inline-fields"><input id="rename-{{ folder.id }}" class="input input-sm grow-input" name="name" value="{{ folder.name }}" required maxlength="255" autocomplete="off"><button class="btn btn-sm">Save</button></div></form>
+        <form class="folder-menu-form" action="{{ prototype_url }}/folders{{ query }}" method="post" hx-post="{{ prototype_url }}/folders{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><input type="hidden" name="parent_id" value="{{ folder.id }}"><label for="subfolder-{{ folder.id }}">Add subfolder</label><div class="inline-fields"><input id="subfolder-{{ folder.id }}" class="input input-sm grow-input" name="name" placeholder="Subfolder name" required maxlength="255" autocomplete="off"><button class="btn btn-sm">{{ icon('plus', 14) }} Add</button></div></form>
+        {% if row %}<form action="{{ prototype_url }}/folders/{{ folder.id }}/delete{{ query }}" method="post" hx-post="{{ prototype_url }}/folders/{{ folder.id }}/delete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Delete folder “{{ folder.name }}”? Its lists become unfiled and its subfolders move to the top level. No lists or tasks are deleted."><button class="btn btn-ghost btn-sm folder-menu-item delete-button">{{ icon('trash', 15) }} Delete folder</button></form>{% endif %}
+    </div>
+</details>
+{% endmacro %}

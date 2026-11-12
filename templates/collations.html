@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Collation Lists</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    {% from "macros.html" import render_links, nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h1 style="margin-top:0; margin-bottom:0;">Collation Lists</h1>
+    <p class="dates">These lists can collect todos from other lists via the colored dots.</p>
+
+    {% if collation_lists %}
+    {% for list in collation_lists %}
+    <div>
+        <span class="collation-dots">
+            <span class="collation-dot on"
+                style="--collation-color: {{ list.collation_color or '#888' }}; cursor: default;"></span>
+        </span>
+        <a href="{{ request.scope.root_path }}/list/{{ list.id }}">{{ list.name }}</a>
+        {{ render_links(list.links, "inherit") }}
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>No collation lists yet.</p>
+    {% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

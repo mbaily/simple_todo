@@ -1,0 +1,64 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% from 'daisyui_test/_rows.html' import row with context %}
+{% set rp = request.scope.root_path %}
+{% set searching = results_kind == 'search' %}
+{% set total = lists|length + todos|length + events|length %}
+{% set nav_query = '?sort=' ~ sort ~ ('&folder_id=' ~ folder_param if folder_param is not none else '') %}
+<div id="daisy-workspace" data-scope="{{ results_kind }}:{{ q if searching else hashtag.id }}" data-results="{{ results_kind }}" data-edit-query="{{ query }}&amp;back=results" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" data-folder="{{ folder_param if folder_param is not none else '' }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title">
+            <h1>{% if searching %}Search{% else %}#{{ hashtag.name }}{% endif %}</h1>
+            {% if not searching or q %}<span class="eyebrow" id="results-summary">{{ total }} {{ 'result' if total == 1 else 'results' }}{% if searching %} for “{{ q }}”{% endif %}</span>{% endif %}
+        </div>
+        <div class="page-heading-actions">
+            <span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
+            {% if not searching %}<a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/search{{ nav_query }}&amp;q={{ hashtag.name|urlencode }}" hx-get="{{ prototype_url }}/search{{ nav_query }}&amp;q={{ hashtag.name|urlencode }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ icon('search', 16) }} Search text</a><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/hashtags">{{ icon('hash', 16) }} All hashtags</a>{% endif %}
+            {% if lists or todos %}<button type="button" class="btn btn-ghost btn-sm select-mode-button" data-command="toggle-selection" aria-pressed="false">{{ icon('select', 16) }} <span>Select</span></button>{% endif %}
+        </div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+
+    {% if searching %}
+    <form id="search-form" class="search-form" role="search" method="get" action="{{ prototype_url }}/search" hx-get="{{ prototype_url }}/search" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">
+        <input type="hidden" name="sort" value="{{ sort }}">{% if folder_param is not none %}<input type="hidden" name="folder_id" value="{{ folder_param }}">{% endif %}
+        <label class="input search-input">{{ icon('search', 17) }}<input id="search-q" type="search" name="q" value="{{ q }}" maxlength="200" placeholder="Search lists, tasks, notes, tags and events" aria-label="Search text" autocomplete="off"></label>
+        <button class="btn btn-primary" type="submit">Search</button>
+        {% if q %}<a class="btn btn-ghost" href="{{ prototype_url }}/search{{ nav_query }}" hx-get="{{ prototype_url }}/search{{ nav_query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ icon('close', 15) }} Clear</a>{% endif %}
+    </form>
+    {% else %}
+    <div class="results-options" aria-label="Hashtag view options">
+        {% for name, label in hashtag_options.items() %}
+        <form action="{{ prototype_url }}/hashtag/{{ hashtag.id }}/options/{{ name }}{{ query }}" method="post" hx-post="{{ prototype_url }}/hashtag/{{ hashtag.id }}/options/{{ name }}{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find input"><label class="option-checkbox"><input id="hashtag-option-{{ name }}" type="checkbox" class="checkbox checkbox-xs" name="enabled" value="true" {% if hashtag[name] %}checked{% endif %} {% if name == 'hide_completed_list_items' and not hashtag.include_list_items %}disabled{% endif %}> {{ label }}</label><noscript><button>Save</button></noscript></form>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if searching and not q %}
+    <div class="empty-state"><h3>Search names, task notes, hashtags and calendar events.</h3></div>
+    {% elif not total %}
+    <div class="empty-state"><h3>{% if searching %}Nothing matches “{{ q }}”.{% else %}Nothing is tagged #{{ hashtag.name }}{% if not hashtag.show_completed %} that is still open{% endif %}.{% endif %}</h3></div>
+    {% else %}
+    {% if lists %}
+    <section class="section-panel" aria-labelledby="results-lists-heading"><header class="section-heading"><div><h2 id="results-lists-heading">{{ icon('list', 19) }} Lists <span class="section-count">{{ lists|length }}</span></h2></div></header><ul class="list">{% for item in lists %}{{ row(item) }}{% endfor %}</ul></section>
+    {% endif %}
+    {% if todos %}
+    <section class="section-panel" aria-labelledby="results-tasks-heading"><header class="section-heading"><div><h2 id="results-tasks-heading">{{ icon('check', 19) }} Tasks <span class="section-count">{{ todos|length }}</span></h2></div></header><ul class="list">{% for item in todos %}{{ row(item, 'todo') }}{% endfor %}</ul></section>
+    {% endif %}
+    {% if events %}
+    <section class="section-panel" aria-labelledby="results-events-heading"><header class="section-heading"><div><h2 id="results-events-heading">{{ icon('calendar', 19) }} Calendar events <span class="section-count">{{ events|length }}</span></h2></div><a class="btn btn-ghost btn-sm" href="{{ prototype_url }}/calendar">Open calendar {{ icon('arrow', 15) }}</a></header>
+        <ul class="list agenda-list">{% for event in events %}
+        <li class="list-row agenda-row">
+            <div class="agenda-date"><span>{{ event.display_start_at.strftime('%d') }}</span><small>{{ event.display_start_at.strftime('%b') }}</small></div>
+            <div class="agenda-content">
+                <div class="item-title-line"><a class="item-title {{ 'one-off-event' if not event.rrule else '' }}" {% if event.color and event.color|lower not in ['#000000', '#000', 'black'] %}style="color: {{ event.color }}"{% endif %} href="{{ prototype_url }}/calendar?month={{ event.display_start_at.strftime('%Y-%m') }}&amp;day={{ event.display_start_at.strftime('%Y-%m-%d') }}">{{ event.title }}</a></div>
+                <div class="item-context"><span>{{ event.display_start_at.strftime('%A') }}{% if event.display_start_at.year != today_year %} {{ event.display_start_at.year }}{% endif %} · {{ 'All day' if event.all_day else event.display_start_at.strftime('%H:%M') }}</span>{% if event.rrule %}<span>Recurring</span>{% endif %}{% if event.note %}<span class="event-summary">{{ event.note }}</span>{% endif %}</div>
+                {% if event.hashtags %}<div class="item-tags">{% for tag in event.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">#{{ tag.name }}</a>{% endfor %}</div>{% endif %}
+            </div>
+            <a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/calendar/event/{{ event.id }}/edit" title="Edit event" aria-label="Edit event {{ event.title }}">{{ icon('edit', 17) }}</a>
+        </li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+    {% endif %}
+
+    {% include 'daisyui_test/_selection_toolbar.html' %}
+</div>

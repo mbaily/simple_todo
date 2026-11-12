@@ -1,0 +1,165 @@
+{% macro nav_bar(active="") %}
+{% set rp = request.scope.root_path %}
+<div style="margin-bottom: 5px; display: flex; align-items: center; flex-wrap: wrap;">
+    <a href="{{ rp }}/classic" class="nav-icon" title="{{ t('title_home') }}">🏠</a>
+    <a href="{{ rp }}/search" class="nav-icon" title="{{ t('title_search', 'Search') }}">🔍</a>
+    <a href="{{ rp }}/classic/calendar" class="nav-icon" title="{{ t('title_calendar', 'Calendar') }}">📅</a>
+    <a href="{{ rp }}/hashtags" class="nav-icon" title="{{ t('title_hashtags', 'Hashtags') }}">#️⃣</a>
+    <a href="{{ rp }}/smart-folders" class="nav-icon" title="{{ t('title_smart_folders', 'Smart Folders') }}"
+        style="position: relative;">📁<span
+            style="position: absolute; bottom: -2px; right: -2px; font-size: 0.6em;">⚙️</span></a>
+    <a href="{{ rp }}/folders" class="nav-icon" title="{{ t('title_folders', 'Folders') }}">📂</a>
+    <a href="{{ rp }}/archived" class="nav-icon" title="{{ t('title_archived', 'Archived') }}">📦</a>
+    <a href="{{ rp }}/collations" class="nav-icon" title="{{ t('title_collations', 'Collations') }}">🧺</a>
+    <a href="{{ rp }}/classic/bills" class="nav-icon" title="Bills">💰</a>
+    <a href="{{ rp }}/expenses" class="nav-icon" title="Quick Expenses">💸</a>
+    <a href="{{ rp }}/customization" class="nav-icon" title="{{ t('title_customize', 'Customize') }}">⚙️</a>
+    {% if basic_auth_enabled %}
+    <a href="{{ rp }}/logout" class="nav-icon" title="Logout">🚪</a>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro link_icon() %}
+<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"
+    style="vertical-align: text-bottom;">
+    <path
+        d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z" />
+    <path
+        d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z" />
+</svg>
+{% endmacro %}
+
+{% macro render_links(links, link_color="var(--link-color)") %}
+{% if links %}
+{% if links|length == 1 %}
+<a href="{{ links[0].url }}" target="_blank" title="{{ links[0].title or links[0].url }}"
+    style="text-decoration:none; color:{{ link_color }};">
+    {{ link_icon() }}
+</a>
+{% else %}
+<details style="display:inline; position:relative;">
+    <summary style="list-style:none; cursor:pointer; color:{{ link_color }};" title="Links">
+        {{ link_icon() }}
+    </summary>
+    <div
+        style="position:absolute; background:var(--bg-color); border:1px solid var(--border-color); padding:5px; z-index:10; min-width:200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+        {% for link in links %}
+        <div style="margin-bottom:4px;">
+            <a href="{{ link.url }}" target="_blank"
+                style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ link.title or
+                link.url }}</a>
+        </div>
+        {% endfor %}
+    </div>
+</details>
+{% endif %}
+{% endif %}
+{% endmacro %}
+
+{% macro folder_icon() %}
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"
+    style="vertical-align: text-bottom; margin-right: 4px;">
+    <path
+        d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.5a.5.5 0 0 1 .354.146l1.292 1.293a.5.5 0 0 0 .354.146H13.5A1.5 1.5 0 0 1 15 5v8a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13V3.5z"
+        fill="#F4D03F" />
+    <rect x="3" y="5" width="10" height="8" fill="white" fill-opacity="0.8" />
+    <rect x="13" y="6" width="2" height="2" fill="#FF6B6B" />
+    <rect x="13" y="9" width="2" height="2" fill="#4ECDC4" />
+    <rect x="13" y="12" width="2" height="2" fill="#FFE66D" />
+</svg>
+{% endmacro %}
+
+{% macro dokuwiki_icon(confirmed=False) %}
+<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"
+    style="vertical-align: text-bottom; margin-left: 4px; {% if confirmed %}color: #2ecc71;{% else %}opacity: 0.5;{% endif %}">
+    <path
+        d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z" />
+    <path
+        d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z" />
+</svg>
+{% endmacro %}
+
+{% macro dokuwiki_page_icon(color=None) %}
+<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"
+    style="vertical-align: text-bottom; margin-left: 4px; {% if color %}color: {{ color }};{% else %}opacity: 0.5;{% endif %}">
+    <path
+        d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z" />
+    <path
+        d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z" />
+</svg>
+{% endmacro %}
+
+
+{% macro collation_dot(collation_list, is_on=False, onclick=None) %}
+<span class="collation-dots">
+    <span class="collation-dot {% if is_on %}on{% endif %}"
+        style="--collation-color: {{ collation_list.collation_color or '#888' }}; cursor: default;"></span>
+</span>
+{% endmacro %}
+
+{% macro list_icon() %}
+<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"
+    style="vertical-align: text-bottom; opacity: 0.7;">
+    <path fill-rule="evenodd"
+        d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z" />
+</svg>
+{% endmacro %}
+
+{% macro render_todo_default(todo) %}
+<div id="todo-row-{{ todo.id }}">
+    <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+        data-created="{{ todo.created_at_formatted }}" data-modified="{{ todo.modified_at_formatted }}"
+        onchange="updateSelectionCount()">
+    <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+        onchange="toggleItem(this)">
+    {% if todo.pinned %}📌{% endif %}
+    <span
+        style="color: {% if todo.color and todo.color|lower not in ['#000000', '#ffffff'] %}{{ todo.color }}{% else %}inherit{% endif %}">{{
+        todo.title }}</span>
+    {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit" title="Edit todo (note)">📝</a>{%
+    endif %}
+
+    {{ render_links(todo.links, "inherit") }}
+
+    {% for h in todo.hashtags %}
+    <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+    {% endfor %}
+    <a href="{{ request.scope.root_path }}/list/{{ todo.list_id }}?highlight={{ todo.id }}" style="text-decoration: none;"
+        title="{{ todo.list.name }}{% if todo.parent %} > {{ todo.parent.title }}{% endif %}">
+        <span class="icon-button">⤴️</span>
+    </a>
+</div>
+{% endmacro %}
+
+{% macro render_tree_node(node, render_item=None) %}
+{# Render Lists at this level #}
+{% for group in node.lists %}
+<div style="margin-bottom: 5px;">
+    <h4 style="margin-top: 5px; margin-bottom: 2px; color: var(--text-muted); font-weight: normal;">
+        <a href="{{ request.scope.root_path }}/list/{{ group.list.id }}" style="font-weight: bold;">{{ group.list.name }}</a>
+    </h4>
+    <div style="margin-left: 20px;">
+        {% for todo in group.todos %}
+        {% if render_item %}
+        {{ render_item(todo) }}
+        {% else %}
+        {{ render_todo_default(todo) }}
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+{# Render Subfolders #}
+{% for child_node in node.folder_nodes %}
+<div>
+    <h4 style="margin-top: 10px; margin-bottom: 2px;">
+        📂 {{ child_node.folder.name }}
+    </h4>
+    <div style="margin-left: 20px;">
+        {{ render_tree_node(child_node, render_item) }}
+    </div>
+</div>
+{% endfor %}
+{% endmacro %}

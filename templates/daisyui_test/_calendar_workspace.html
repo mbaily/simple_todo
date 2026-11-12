@@ -1,0 +1,149 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set rp = request.scope.root_path %}
+{% macro event_title(row, compact=False) %}
+{% set event = row.event %}
+<a class="item-title calendar-title {{ 'one-off-event' if not event.rrule else '' }}" {% if event.color and event.color|lower not in ['#000000', '#000', 'black'] %}style="color: {{ event.color }}"{% endif %} href="{{ prototype_url }}/calendar/event/{{ event.id }}/edit?occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{{ '&' ~ nav_query if nav_query else '' }}" title="{{ event.title }}">{{ event.title }}</a>
+{% endmacro %}
+{% macro note_icons(row) %}
+{% if row.note_previews %}<span class="event-note-icons">{% for note in row.note_previews %}<a class="event-note-icon" hx-boost="false" href="{{ prototype_url }}/calendar/event/{{ row.event.id }}/edit?occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{{ '&' ~ nav_query if nav_query else '' }}#{{ note.anchor }}" title="{{ note.text }}" aria-label="Note for {{ row.event.title }}: {{ note.text }}">{{ icon('note', 14) }}</a>{% endfor %}</span>{% endif %}
+{% endmacro %}
+{% macro check(row) %}
+{% set event = row.event %}
+<form class="completion-form" action="{{ prototype_url }}/calendar/occurrence/{{ event.id }}{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/occurrence/{{ event.id }}{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find input"><input type="hidden" name="occurrence_at" value="{{ row.occurrence_at.isoformat() }}"><input class="checkbox checkbox-xs completion-checkbox" type="checkbox" name="completed" value="true" {% if row.completed %}checked{% endif %} aria-label="Mark {{ event.title }} on {{ row.occurrence_at.strftime('%-d %b') }} {{ 'not done' if row.completed else 'done' }}"><noscript><button>Save</button></noscript></form>
+{% endmacro %}
+{% macro occurrence(row, show_date=False) %}
+{% set event = row.event %}
+<li class="list-row item-row calendar-row {{ 'is-completed' if row.completed else '' }} {{ 'is-late' if row.is_late else '' }} {{ 'is-important' if row.is_important else '' }}">
+    {{ check(row) }}
+    <div class="item-content">
+        <div class="item-title-line">
+            <span class="calendar-time">{{ 'All day' if event.all_day else row.occurrence_at.strftime('%H:%M') }}</span>
+            {{ event_title(row) }}
+            {{ note_icons(row) }}
+            {% if row.is_important %}<span class="badge badge-warning badge-sm">Important</span>{% elif row.is_late %}<span class="badge badge-outline badge-sm late-badge">Overdue</span>{% endif %}
+            {% if event.rrule %}<span class="item-context">Recurring</span>{% endif %}
+            {% if event.event_group %}<span class="item-context">{{ event.event_group.name }}</span>{% endif %}
+        </div>
+        {% if event.note %}<div class="item-context event-summary">{{ event.note }}</div>{% endif %}
+        {% if event.hashtags %}<div class="item-tags">{% for tag in event.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">#{{ tag.name }}</a>{% endfor %}</div>{% endif %}
+    </div>
+    <a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/calendar/event/{{ event.id }}/edit?occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{{ '&' ~ nav_query if nav_query else '' }}" title="Edit event" aria-label="Edit event {{ event.title }}">{{ icon('edit', 16) }}</a>
+</li>
+{% endmacro %}
+{% macro day_menu(date, label, remaining, hide_completed, note, open_url=None) %}
+<details class="dropdown dropdown-end row-dropdown day-menu">
+    <summary class="btn btn-ghost btn-square btn-xs" aria-label="Actions for {{ label }}" title="Day actions">{{ icon('more', 16) }}</summary>
+    <div class="dropdown-content row-menu folder-menu">
+        <span class="menu-label day-menu-title">{{ label }}</span>
+        <a class="btn btn-ghost btn-sm folder-menu-item" href="{{ prototype_url }}/calendar/event/new?date={{ date }}{{ '&' ~ nav_query if nav_query else '' }}">{{ icon('plus', 15) }} Add event…</a>
+        {% if open_url %}<a class="btn btn-ghost btn-sm folder-menu-item" href="{{ open_url }}" hx-get="{{ open_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ icon('calendar', 15) }} Open day</a>{% endif %}
+        {% if remaining %}<form action="{{ prototype_url }}/calendar/day/{{ date }}/complete{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/day/{{ date }}/complete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Mark all {{ remaining }} open events on {{ date }} as done?"><button class="btn btn-ghost btn-sm folder-menu-item">{{ icon('check', 15) }} Complete day</button></form>{% endif %}
+        <form class="folder-menu-form" action="{{ prototype_url }}/calendar/day/{{ date }}/hide-completed{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/day/{{ date }}/hide-completed{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="enabled" value="true" {% if hide_completed %}checked{% endif %}> Hide done{{ ' in grid' if view == 'month' else '' }}</label><noscript><button>Apply</button></noscript></form>
+        <form class="folder-menu-form day-menu-note" action="{{ prototype_url }}/calendar/day/{{ date }}/note{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/day/{{ date }}/note{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><textarea class="textarea textarea-sm" name="note" rows="2" maxlength="2000" placeholder="Note for this day" aria-label="Note for {{ label }}">{{ note }}</textarea><button class="btn btn-sm">Save note</button></form>
+    </div>
+</details>
+{% endmacro %}
+<div id="daisy-workspace" data-scope="calendar" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" data-calendar-contains-today="{{ 'true' if calendar_contains_today else 'false' }}" data-calendar-today="{{ today_local.strftime('%Y-%m-%d') }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    <div class="page-heading">
+        <div class="page-title"><h1>Calendar</h1><span class="eyebrow" id="calendar-period">{{ period_title }}</span><a class="calendar-today-link" href="{{ today_url }}#calendar-today" data-command="calendar-today" hx-boost="false" hx-get="{{ today_url }}" hx-trigger="calendar-today" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true" title="Jump to today" aria-label="Jump to today">{{ icon('calendar-today', 21) }}</a></div>
+        <div class="page-heading-actions calendar-actions">
+            <span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
+            <a class="btn btn-primary btn-sm" href="{{ prototype_url }}/calendar/event/new?date={{ selected_day or today_local.strftime('%Y-%m-%d') }}{{ '&' ~ nav_query if nav_query else '' }}">{{ icon('plus', 15) }} New event</a>
+            <div class="join" role="group" aria-label="Calendar period">
+                <a class="btn btn-sm join-item" href="{{ prev_url }}" hx-get="{{ prev_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true" aria-label="Previous {{ 'week' if view == 'week' else 'month' if view == 'month' else 'period' }}">‹</a>
+                <a class="btn btn-sm join-item" href="{{ today_url }}" hx-get="{{ today_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">Today</a>
+                <a class="btn btn-sm join-item" href="{{ next_url }}" hx-get="{{ next_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true" aria-label="Next {{ 'week' if view == 'week' else 'month' if view == 'month' else 'period' }}">›</a>
+            </div>
+            <form class="join" role="group" aria-label="Calendar layout" action="{{ prototype_url }}/calendar/view{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/view{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph">
+                {% for value, label in [('list', 'Agenda'), ('month', 'Month'), ('week', 'Week')] %}<button class="btn btn-sm join-item {{ 'layout-active' if view == value else '' }}" name="layout" value="{{ value }}" aria-pressed="{{ 'true' if view == value else 'false' }}">{{ label }}</button>{% endfor %}
+            </form>
+            <details class="dropdown dropdown-end" data-persist="calendar-options">
+                <summary class="btn btn-ghost btn-sm">{{ icon('settings', 15) }} Options</summary>
+                <div class="dropdown-content row-menu folder-menu">
+                    <form class="folder-menu-form" action="{{ prototype_url }}/calendar/filter{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/filter{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph"><label for="calendar-filter">Show events</label><select id="calendar-filter" class="select select-sm" name="calendar_event_filter"><option value="all" {% if calendar_event_filter == 'all' %}selected{% endif %}>All events</option><option value="non_recurring" {% if calendar_event_filter == 'non_recurring' %}selected{% endif %}>One-off only</option><option value="recurring" {% if calendar_event_filter == 'recurring' %}selected{% endif %}>Recurring only</option>{% for group in event_groups %}<option value="group:{{ group.id }}" {% if calendar_event_filter == 'group:' ~ group.id %}selected{% endif %}>Group: {{ group.name }}</option>{% endfor %}</select><noscript><button>Apply</button></noscript></form>
+                    <form class="folder-menu-form" action="{{ prototype_url }}/calendar/sort{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/sort{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph"><label for="calendar-sort">Same-day order</label><select id="calendar-sort" class="select select-sm" name="calendar_sort_order">{% for value, label in calendar_sort_options.items() %}<option value="{{ value }}" {% if calendar_sort_order == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><noscript><button>Apply</button></noscript></form>
+                    {% if view == 'month' %}
+                    <div class="folder-menu-form"><span class="menu-label">Month grid</span>
+                        {% for name, label, value in [('calendar_show_counts', 'Show open counts', calendar_show_counts), ('calendar_word_wrap', 'Wrap event titles', calendar_word_wrap)] %}
+                        <form action="{{ prototype_url }}/calendar/display/{{ name }}{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/display/{{ name }}{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="enabled" value="true" {% if value %}checked{% endif %}> {{ label }}</label></form>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <a class="btn btn-ghost btn-sm folder-menu-item" href="{{ prototype_url }}/calendar/groups">{{ icon('layers', 15) }} Manage event groups</a>
+                </div>
+            </details>
+        </div>
+    </div>
+    {# While a day is open its dialog covers the page, so messages are shown inside it. #}
+    {% if not selected %}<div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>{% endif %}
+
+    {% if invalid_recurrences %}
+    <div role="alert" class="alert alert-warning calendar-warning"><div><strong>{{ invalid_recurrences|length }} {{ 'event has' if invalid_recurrences|length == 1 else 'events have' }} an invalid recurrence rule and may be missing.</strong>{% for item in invalid_recurrences %}<div><a href="{{ prototype_url }}/calendar/event/{{ item.event.id }}/edit">{{ item.event.title }}</a>: {{ item.error }}</div>{% endfor %}</div></div>
+    {% endif %}
+
+    {% if view == 'list' %}
+    {% if agenda_days %}
+    {% for day in agenda_days %}
+    {% set is_today = day.date == today_local.date() %}
+    <section {% if is_today %}id="calendar-today"{% endif %} class="section-panel agenda-day {{ 'is-today' if is_today else '' }} {{ 'is-past' if day.date < today_local.date() else '' }}" data-calendar-date="{{ day.date.isoformat() }}" aria-label="{{ day.date.strftime('%A %-d %B') }}">
+        <header class="section-heading"><div><h2>{{ day.date.strftime('%a %-d %b') }}{% if day.date.year != today_local.year %} {{ day.date.year }}{% endif %}</h2>{% if is_today %}<span class="badge badge-primary badge-sm">Today</span>{% endif %}<span class="section-count">{{ day.rows|selectattr('completed', 'false')|list|length }} open</span></div></header>
+        <ul class="list">{% for row in day.rows %}{{ occurrence(row) }}{% endfor %}</ul>
+    </section>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state"><h3>No events between {{ range_start.strftime('%-d %b') }} and {{ range_end.strftime('%-d %b %Y') }}.</h3></div>
+    {% endif %}
+
+    {% elif view == 'month' %}
+    <div class="month-scroll">
+    <div class="month-grid {{ 'wrap-titles' if calendar_word_wrap else '' }}" role="grid" aria-label="{{ period_title }}">
+        {% for name in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}<div class="month-weekday" role="columnheader">{{ name }}</div>{% endfor %}
+        {% for week in weeks %}{% for day in week %}
+        {% if day.day %}
+        {% set day_url = calendar_url ~ '?month=' ~ current_month_str ~ '&day=' ~ day.date %}
+        <div {% if day.is_today %}id="calendar-today"{% endif %} class="month-cell {{ 'is-today' if day.is_today else '' }} {{ 'is-selected' if day.date == selected_day else '' }}" data-calendar-date="{{ day.date }}" role="gridcell">
+            <div class="month-cell-head"><a class="month-day" href="{{ day_url }}" hx-get="{{ day_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true" aria-label="{{ day.date }}: {{ day.events|length }} events, {{ day.remaining }} open">{{ day.day }}{% if calendar_show_counts and day.remaining %}<span class="month-count">{{ day.remaining }}</span>{% endif %}{% if day.note %}<span class="month-note-dot" title="Has a day note">•</span>{% endif %}</a>{{ day_menu(day.date, day.date, day.remaining, day.hide_completed, day.note, day_url) }}</div>
+            <ul class="month-events">{% for row in day.events %}{% if not (day.hide_completed and row.completed) %}<li class="{{ 'is-completed' if row.completed else '' }} {{ 'is-late' if row.is_late else '' }} {{ 'is-important' if row.is_important else '' }} {{ 'has-note' if row.note_previews else '' }}">{{ check(row) }}{{ event_title(row, True) }}{{ note_icons(row) }}</li>{% endif %}{% endfor %}</ul>
+        </div>
+        {% else %}<div class="month-cell is-outside" role="gridcell"></div>{% endif %}
+        {% endfor %}{% endfor %}
+    </div>
+    </div>
+    <p class="month-notes-legend"><span aria-hidden="true">◉</span> Ringed dots have event notes. Tap a day to view.</p>
+
+    {% else %}
+    <div class="week-grid">
+        {% for day in week_days %}
+        {% set is_today = day.date.date() == today_local.date() %}
+        <section {% if is_today %}id="calendar-today"{% endif %} class="section-panel week-day {{ 'is-today' if is_today else '' }}" data-calendar-date="{{ day.date.strftime('%Y-%m-%d') }}" aria-label="{{ day.date.strftime('%A %-d %B') }}">
+            <header class="week-day-heading"><span>{{ day.date.strftime('%a') }}</span><strong>{{ day.date.strftime('%-d %b') }}</strong>{% if is_today %}<span class="badge badge-primary badge-xs">Today</span>{% endif %}{{ day_menu(day.date.strftime('%Y-%m-%d'), day.date.strftime('%a %-d %b'), day.remaining, day.hide_completed, day.note, calendar_url ~ '?week=' ~ current_week_str ~ '&day=' ~ day.date.strftime('%Y-%m-%d')) }}</header>
+            {% if day.note %}<p class="week-day-note">{{ day.note }}</p>{% endif %}
+            {% set rows = day.rows|rejectattr('completed')|list if day.hide_completed else day.rows %}
+            {% if rows %}<ul class="list">{% for row in rows %}
+            <li class="list-row week-event {{ 'is-completed' if row.completed else '' }} {{ 'is-late' if row.is_late else '' }} {{ 'is-important' if row.is_important else '' }}">{{ check(row) }}<div class="item-content"><span class="calendar-time">{{ 'All day' if row.event.all_day else row.occurrence_at.strftime('%H:%M') }}</span>{{ event_title(row, True) }}</div>{{ note_icons(row) }}</li>
+            {% endfor %}</ul>{% elif day.rows %}<p class="section-empty">{{ day.rows|length }} done, hidden</p>{% else %}<p class="section-empty">Free</p>{% endif %}
+        </section>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if selected %}
+    {% set close_url = calendar_url ~ ('?' ~ nav_query if nav_query else '') %}
+    <dialog id="day-dialog" open class="modal modal-open day-modal" aria-labelledby="day-heading">
+    <div class="modal-box day-panel">
+        <header class="section-heading"><div><h2 id="day-heading">{{ icon('calendar', 17) }} {{ day_label }}</h2><span class="section-count">{{ selected.remaining }} open of {{ selected.events|length }}</span></div><a class="btn btn-ghost btn-square btn-sm" data-close-day href="{{ close_url }}" hx-get="{{ close_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true" aria-label="Close day">{{ icon('close', 15) }}</a></header>
+        <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+        <form id="day-event-form" data-draft class="inline-fields day-event-form" action="{{ prototype_url }}/calendar/day/{{ selected.date }}/event{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/day/{{ selected.date }}/event{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button[type=submit]"><input class="input input-sm grow-input" name="title" required maxlength="500" placeholder="New event…" aria-label="New event title" autocomplete="off"><input class="input input-sm" type="time" name="start_time" aria-label="Start time (optional)"><button type="submit" class="btn btn-primary btn-sm">{{ icon('plus', 14) }} Add</button></form>
+        <div class="day-tools">
+            <form id="day-note-form" data-draft class="inline-fields grow-form" action="{{ prototype_url }}/calendar/day/{{ selected.date }}/note{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/day/{{ selected.date }}/note{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><textarea class="textarea textarea-sm grow-input" name="note" rows="2" maxlength="2000" placeholder="Note for this day" aria-label="Day note">{{ selected.note }}</textarea><button class="btn btn-sm">Save note</button></form>
+            <div class="day-buttons">
+                <form action="{{ prototype_url }}/calendar/day/{{ selected.date }}/hide-completed{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/day/{{ selected.date }}/hide-completed{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph"><label class="option-checkbox"><input type="checkbox" class="checkbox checkbox-xs" name="enabled" value="true" {% if selected.hide_completed %}checked{% endif %}> Hide done{{ ' in grid' if view == 'month' else '' }}</label></form>
+                <a class="btn btn-sm" href="{{ prototype_url }}/calendar/event/new?date={{ selected.date }}&amp;{{ nav_query }}">{{ icon('plus', 14) }} Add with details…</a>
+                {% if selected.remaining %}<form action="{{ prototype_url }}/calendar/day/{{ selected.date }}/complete{{ query }}" method="post" hx-post="{{ prototype_url }}/calendar/day/{{ selected.date }}/complete{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-confirm="Mark all {{ selected.remaining }} open events on {{ selected.date }} as done?"><button class="btn btn-sm">{{ icon('check', 14) }} Complete day</button></form>{% endif %}
+            </div>
+        </div>
+        {% if selected.events %}<ul class="list">{% for row in selected.events %}{{ occurrence(row) }}{% endfor %}</ul>{% else %}<p class="section-empty">No events on this day.</p>{% endif %}
+    </div>
+    <a class="modal-backdrop" href="{{ close_url }}" hx-get="{{ close_url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true" tabindex="-1" aria-label="Close day"></a>
+    </dialog>
+    {% endif %}
+</div>

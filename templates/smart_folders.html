@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Smart Folders</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/smart_folder_ui.js?v=20251231"></script>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h2 style="margin:0;">Smart Folders</h2>
+    <p class="dates" style="margin-top:4px;">Saved views for lists and todos (with include/exclude hashtags, list scope,
+        completion, and date filters).</p>
+
+    {% if folders %}
+    {% for f in folders %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="smart-folder" data-id="{{ f.id }}"
+            onchange="toggleSmartFolderSelection(this, {{ f.id }}, '{{ f.name|e }}')">
+        <a href="{{ request.scope.root_path }}/smart-folder/{{ f.id }}">{{ f.name }}</a>
+        <span class="dates">
+            {% if f.show_lists and f.show_todos %}(lists + todos){% elif f.show_lists %}(lists){% elif f.show_todos
+            %}(todos){% else %}(empty){% endif %}
+            {% if f.uncompleted_only %} | uncompleted only{% endif %}
+            {% if f.include_archived_lists %} | includes archived lists{% endif %}
+            {% if f.lists %} | {{ f.lists|length }} list(s){% endif %}
+            {% if f.include_hashtags_assoc %} | +{{ f.include_hashtags_assoc|length }} hashtag(s){% endif %}
+            {% if f.exclude_hashtags_assoc %} | -{{ f.exclude_hashtags_assoc|length }} hashtag(s){% endif %}
+        </span>
+    </div>
+    {% endfor %}
+
+    <h3 style="margin-bottom:0;margin-top:10px;">Operations</h3>
+    <span id="selection-count">0 selected</span> | <button type="button" onclick="selectAll('smart-folder')">Select
+        All</button> <button type="button" onclick="selectNone('smart-folder')">Select None</button><br>
+    <div style="margin-top: 6px;">
+        <button type="button" onclick="bulkEdit('smart-folder')">Edit</button>
+        <button type="button" onclick="bulkDelete('smart-folder')">Delete</button>
+        <button id="btn-reorder" type="button" style="display:none;">Reorder</button>
+    </div>
+    {% else %}
+    <p>No smart folders yet.</p>
+    {% endif %}
+
+    <hr>
+
+    <details open>
+        <summary>
+            <h3 style="display:inline; margin:0;">Create Smart Folder</h3>
+        </summary>
+
+        <form action="{{ request.scope.root_path }}/smart-folder/create" method="post">
+            <label>Name: <input type="text" name="name" required></label>
+            <br>
+
+            <p style="margin-bottom:6px;">What should this smart folder show?</p>
+            <label><input type="checkbox" name="show_todos" value="true" checked> Todos</label>
+            <label style="margin-left: 10px;"><input type="checkbox" name="show_lists" value="true"> Lists</label>
+            <label style="margin-left: 10px;"><input type="checkbox" name="group_todos_by_list" value="true" checked>
+                Group todos by list</label>
+
+            <div style="margin-top: 6px;">
+                <label><input type="checkbox" name="root_todos_only" value="true"> Root todos only</label>
+                <label style="margin-left: 10px;"><input type="checkbox" name="nest_subtodos" value="true"> Nest
+                    subtodos</label>
+            </div>
+
+            <div style="margin-top: 10px;">
+                <label>Section Order: <input type="text" name="section_order" value="LET"
+                        style="width: 50px; text-transform: uppercase;" pattern="[LETlet]{3}"
+                        title="Three letters: L (Lists), E (calendar Events), T (Todos)"></label>
+                <div class="dates" style="margin-top:2px;">
+                    Specify display order using letters: <strong>T</strong> (Todos), <strong>E</strong> (Calendar
+                    Events), <strong>L</strong> (Lists).
+                    <br>Example: <strong>TCL</strong> means Todos first, then Calendar (E), then Lists (L).
+                </div>
+            </div>
+
+            <p style="margin-bottom:6px;">Filters:</p>
+            <label><input type="checkbox" name="uncompleted_only" value="true"> Uncompleted only</label>
+            <label style="margin-left: 10px;"><input type="checkbox" name="include_archived_lists" value="true"> Include
+                archived lists</label>
+            <br><br>
+
+            <label>Modified after: <input type="date" name="modified_after"></label>
+            <label style="margin-left: 10px;">Modified before: <input type="date" name="modified_before"></label>
+
+            <details style="margin-top: 12px;" open>
+                <summary><strong>Sorting</strong></summary>
+                <div class="dates" style="margin-top:4px; margin-bottom:8px;">
+                    When grouping todos by list, the list-group order follows the list sort.
+                </div>
+                <div>
+                    <label>
+                        Lists sort by:
+                        <select name="list_sort_field">
+                            <option value="modified_at" selected>Modified</option>
+                            <option value="created_at">Created</option>
+                        </select>
+                    </label>
+                    <label style="margin-left: 10px;">
+                        <select name="list_sort_dir">
+                            <option value="desc" selected>Descending</option>
+                            <option value="asc">Ascending</option>
+                        </select>
+                    </label>
+                </div>
+                <div style="margin-top: 6px;">
+                    <label>
+                        Todos sort by:
+                        <select name="todo_sort_field">
+                            <option value="modified_at" selected>Modified</option>
+                            <option value="created_at">Created</option>
+                        </select>
+                    </label>
+                    <label style="margin-left: 10px;">
+                        <select name="todo_sort_dir">
+                            <option value="desc" selected>Descending</option>
+                            <option value="asc">Ascending</option>
+                        </select>
+                    </label>
+                </div>
+            </details>
+
+            <details style="margin-top: 12px;">
+                <summary><strong>Limit to specific lists</strong> <span class="dates">(optional)</span></summary>
+                {% if lists %}
+                {% for lst in lists %}
+                <div>
+                    <label>
+                        <input type="checkbox" name="list_ids" value="{{ lst.id }}">
+                        {{ lst.name }}
+                    </label>
+                    {% for h in lst.hashtags %}
+                    <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+                    {% endfor %}
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="dates">No lists available.</p>
+                {% endif %}
+            </details>
+
+            <details style="margin-top: 12px;" open>
+                <summary><strong>Hashtag filters</strong></summary>
+                {% if hashtags %}
+                <div>
+                    <label>
+                        <input type="checkbox" name="all_items" value="true">
+                        <strong>All items</strong>
+                    </label>
+                    <span class="dates">(ignore include-hashtag selection)</span>
+                </div>
+                <div class="dates" style="margin-top:4px; margin-bottom:8px;">
+                    Select include hashtags and/or exclude hashtags (NOT). NOT wins if both are checked.
+                    <br>
+                    Check "w/ subtodos" to apply the filter to subtodos of matching parents.
+                    <br>
+                    Check "inc. list items" to include all items from lists matching the hashtag.
+                </div>
+                {% for hashtag in hashtags %}
+                <div style="margin-bottom: 4px;">
+                    <label>
+                        <input type="checkbox" name="hashtag_ids" value="{{ hashtag.id }}">
+                        #{{ hashtag.name }}
+                    </label>
+                    <label class="dates" style="font-size: 0.85em;">
+                        <input type="checkbox" name="include_subtodos_{{ hashtag.id }}" value="true">
+                        w/ subtodos
+                    </label>
+                    <label class="dates" style="font-size: 0.85em; margin-left:6px;">
+                        <input type="checkbox" name="include_list_items_{{ hashtag.id }}" value="true">
+                        inc. list items
+                    </label>
+
+                    <span style="display:inline-block; width: 12px;"></span>
+
+                    <label>
+                        <input type="checkbox" name="exclude_hashtag_ids" value="{{ hashtag.id }}">
+                        NOT
+                    </label>
+                    <label class="dates" style="font-size: 0.85em;">
+                        <input type="checkbox" name="exclude_subtodos_{{ hashtag.id }}" value="true">
+                        w/ subtodos
+                    </label>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="dates">No hashtags available.</p>
+                {% endif %}
+            </details>
+
+            <details style="margin-top: 12px;" open>
+                <summary><strong>Folder filters</strong></summary>
+                <div class="dates" style="margin-top:4px; margin-bottom:8px;">
+                    Filter content by specific folders.
+                </div>
+
+                <div id="folder-filters-container">
+                    <!-- Dynamic rows will look like this:
+            <div class="folder-filter-row" style="margin-bottom: 4px;">
+                <select name="folder_filter_mode[]">
+                    <option value="include">Include</option>
+                    <option value="exclude">Exclude</option>
+                </select>
+                <select name="folder_filter_id[]">
+                    <option value="1">Work</option>
+                    ...
+                </select>
+                <button type="button" onclick="removeFolderFilter(this)">x</button>
+            </div>
+            -->
+                </div>
+
+                <button type="button" onclick="addFolderFilter()" style="margin-top:4px;">+ Add Folder Filter</button>
+
+                <template id="folder-filter-template">
+                    <div class="folder-filter-row"
+                        style="margin-bottom: 4px; display: flex; gap: 6px; align-items: center;">
+                        <select name="folder_filter_mode">
+                            <option value="include">Include</option>
+                            <option value="exclude">Exclude</option>
+                        </select>
+                        <select name="folder_filter_id">
+                            <option value="">Select Folder...</option>
+                            {% for folder in all_folders %}
+                            <option value="{{ folder.id }}">{{ folder.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" onclick="removeFolderFilter(this)" style="padding: 2px 6px;">x</button>
+                    </div>
+                </template>
+
+            </details>
+
+            <br>
+            <button type="submit">Create Smart Folder</button>
+        </form>
+    </details>
+    <script>
+        let selectedSmartFolders = [];
+
+        function toggleSmartFolderSelection(checkbox, id, name) {
+            updateSelectionCount(); // update global count
+
+            if (checkbox.checked) {
+                selectedSmartFolders.push({ id: id, name: name });
+            } else {
+                selectedSmartFolders = selectedSmartFolders.filter(item => item.id !== id);
+            }
+            updateSmartFolderButtons();
+        }
+
+        // Handle Select All/None effects (rough approximation since they don't trigger inline onchange usually, 
+        // asking users to manually select for reorder)
+        // We can hook into the global functions if needed, but for Reorder feature, manual selection is key.
+        // Only Select All/None buttons call global functions. 
+        // If user clicks "Select All", our array might get out of sync. 
+        // Let's clear our array if we detect mismatch or just rely on manual checking for Reorder.
+
+        function updateSmartFolderButtons() {
+            const reorderBtn = document.getElementById('btn-reorder');
+
+            if (selectedSmartFolders.length === 2) {
+                const first = selectedSmartFolders[0];
+                const second = selectedSmartFolders[1];
+                reorderBtn.style.display = 'inline-block';
+                reorderBtn.textContent = "Reorder (Move 1st below 2nd)";
+                reorderBtn.onclick = () => submitSmartFolderReorder(first.id, second.id);
+            } else {
+                reorderBtn.style.display = 'none';
+            }
+        }
+
+        function submitSmartFolderReorder(sourceId, targetId) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ request.scope.root_path }}/smart-folder/reorder';
+
+            const sourceInput = document.createElement('input');
+            sourceInput.type = 'hidden';
+            sourceInput.name = 'source_id';
+            sourceInput.value = sourceId;
+            form.appendChild(sourceInput);
+
+            const targetInput = document.createElement('input');
+            targetInput.type = 'hidden';
+            targetInput.name = 'target_id';
+            targetInput.value = targetId;
+            form.appendChild(targetInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    </script>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

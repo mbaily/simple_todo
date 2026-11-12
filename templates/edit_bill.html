@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Edit Bill — {{ bill.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20260311" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <style>
+        h2 { margin: 0; }
+        p { margin: 0; }
+    </style>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h2>Edit Bill — {% if bill.color and bill.color != '#000000' %}<span style="color: {{ bill.color }}">{{ bill.name }}</span>{% else %}{{ bill.name }}{% endif %}</h2>
+
+    <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/update" method="post">
+        <label>Name:<br>
+            <input type="text" name="name" value="{{ bill.name }}" required style="width: 300px;">
+        </label><br><br>
+
+        <label>Payee:<br>
+            <input type="text" name="payee" value="{{ bill.payee or '' }}" placeholder="optional" style="width: 300px;">
+        </label><br><br>
+
+        <label>{% if bill.ledger_enabled %}Forecast Amount{% else %}Expected Amount{% endif %}:<br>
+            <input type="text" name="expected_amount" value="{{ '%.2f'|format(bill.expected_amount) if bill.expected_amount is not none else '' }}" inputmode="decimal" placeholder="e.g. 180.00" title="Enter a non-negative amount with at most two decimal places. Leave blank if unknown." style="width: 120px;">
+        </label>
+        <span style="margin-left: 15px;">
+            <label>Amount Type:<br>
+                <select name="amount_strategy" style="width: 220px;">
+                    <option value="fixed" {% if bill.amount_strategy == 'fixed' %}selected{% endif %}>Fixed (stays as entered)</option>
+                    <option value="rolling_avg" {% if bill.amount_strategy == 'rolling_avg' %}selected{% endif %}>Variable (rolling average)</option>
+                    <option value="last_payment" {% if bill.amount_strategy == 'last_payment' %}selected{% endif %}>Variable (same as last payment)</option>
+                </select>
+            </label>
+        </span>
+        <br><br>
+
+        <label>Next Due Date:<br>
+            <input type="date" name="next_due_date" value="{{ bill.next_due_date_iso }}">
+        </label>
+        <span style="margin-left: 15px;">
+            <label>Anchor day:
+                <input type="number" name="anchor_day" min="1" max="31" value="{{ bill.anchor_day or '' }}" placeholder="auto" style="width: 60px;" title="Anchor day of month (1-31) to prevent calendar drift on month advances">
+            </label>
+        </span>
+        <br><br>
+
+        <label>
+            <input type="checkbox" name="is_due_date_confirmed" value="true" {% if bill.is_due_date_confirmed %}checked{% endif %}>
+            Confirmed due date (bill/statement already received)
+        </label><br><br>
+
+        <label>Frequency:<br>
+            <select name="frequency" onchange="toggleCustomDays(this)">
+                <option value="weekly" {% if bill.frequency == 'weekly' %}selected{% endif %}>Weekly</option>
+                <option value="fortnightly" {% if bill.frequency == 'fortnightly' %}selected{% endif %}>Fortnightly</option>
+                <option value="monthly" {% if bill.frequency == 'monthly' %}selected{% endif %}>Monthly</option>
+                <option value="bimonthly" {% if bill.frequency == 'bimonthly' %}selected{% endif %}>Every 2 months</option>
+                <option value="quarterly" {% if bill.frequency == 'quarterly' %}selected{% endif %}>Quarterly</option>
+                <option value="yearly" {% if bill.frequency == 'yearly' %}selected{% endif %}>Yearly</option>
+                <option value="custom" {% if bill.frequency == 'custom' %}selected{% endif %}>Custom (days)</option>
+            </select>
+        </label>
+        <span id="custom-days-input" style="{% if bill.frequency != 'custom' %}display:none;{% endif %}">
+            <label>Every <input type="number" name="frequency_days" min="1" value="{{ bill.frequency_days or '' }}" style="width:60px;"> days</label>
+        </span>
+        <br><br>
+
+        <label>Category:<br>
+            <input type="text" name="category" value="{{ bill.category or '' }}" placeholder="e.g. Utilities" style="width: 200px;">
+        </label><br><br>
+
+        <label><input type="checkbox" name="is_auto_pay" value="true" {% if bill.is_auto_pay %}checked{% endif %}> Auto-pay</label><br><br>
+
+        <label>Note:<br>
+            <textarea name="note" rows="3" style="width: 400px;">{{ bill.note or '' }}</textarea>
+        </label><br><br>
+
+        {% set has_color = bill.color and bill.color != '#000000' %}
+        <label>
+            <input type="checkbox" id="use-color-edit" {% if has_color %}checked{% endif %}
+                onchange="onEditColorToggle(this)"> Custom colour:
+            <input type="color" id="color-picker-edit" value="{{ bill.color if has_color else '#3b82f6' }}"
+                style="display:{% if has_color %}inline{% else %}none{% endif %};"
+                oninput="document.getElementById('color-val-edit').value = this.value">
+        </label>
+        <input type="hidden" name="color" id="color-val-edit" value="{{ bill.color if has_color else '' }}"><br><br>
+
+        <p><label><input type="checkbox" name="ledger_enabled" value="true" {% if bill.ledger_enabled %}checked disabled{% endif %}> Track invoices, payments and account credit</label></p>
+        {% if bill.ledger_enabled %}
+        <input type="hidden" name="ledger_enabled" value="true">
+        <p class="dates">Invoice tracking is enabled. Account history is retained when you edit this bill.</p>
+        {% else %}
+        <p class="dates">Enable to record invoices, partial payments, credits and refunds in History. Existing payments are retained.</p>
+        {% endif %}
+        <button type="submit">Save Changes</button>
+    </form>
+    {% if bill.ledger_enabled %}<p class="dates">Invoice charges and credits are recorded in History. Next Due Date updates the earliest outstanding invoice.</p>{% endif %}
+
+    <hr>
+
+    <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/toggle-active" method="post" style="display:inline;">
+        {% if bill.is_active %}
+        <button type="submit" onclick="return confirm('Deactivate this bill? It will be hidden from the active dashboard.')" style="color: #6b7280;">Deactivate Bill</button>
+        {% else %}
+        <button type="submit" style="color: #16a34a;">Reactivate Bill</button>
+        {% endif %}
+    </form>
+
+    <form action="{{ request.scope.root_path }}/bills/{{ bill.id }}/delete" method="post" style="display:inline; margin-left: 10px;" onsubmit="return confirm('Permanently delete this bill and all its payment records? This cannot be undone.');">
+        <button type="submit" style="color: #b91c1c; font-weight: 500;">Delete Bill</button>
+    </form>
+
+    <a href="{{ request.scope.root_path }}/bills/{{ bill.id }}/history" style="margin-left: 15px;">View Payment History</a>
+
+    <br><br>
+    <p class="dates">Created: {{ bill.created_at_formatted }} | Modified: {{ bill.modified_at_formatted }}</p>
+
+    <script>
+        function onEditColorToggle(cb) {
+            var picker = document.getElementById('color-picker-edit');
+            var val = document.getElementById('color-val-edit');
+            if (picker) picker.style.display = cb.checked ? 'inline' : 'none';
+            if (val) val.value = cb.checked ? picker.value : '';
+        }
+        function toggleCustomDays(select) {
+            var el = document.getElementById('custom-days-input');
+            if (el) {
+                el.style.display = select.value === 'custom' ? 'inline' : 'none';
+            }
+        }
+    </script>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

@@ -1,0 +1,16 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% from 'daisyui_test/_recipe_macros.html' import ingredient_row, recipe_nav, hx with context %}
+<div id="daisy-workspace" data-scope="recipe:{{ back }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    {{ recipe_nav(list) }}
+    <div class="page-heading">
+        <div class="page-title"><h1>Ingredients</h1><span class="eyebrow">{{ ingredients|length }} open · likely to run out first</span></div>
+        <div class="page-heading-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span>
+            {% if ingredients %}<form {{ hx('reset') }} hx-confirm="Mark every open ingredient in {{ list.name }} as just bought? This starts a new cycle for all of them."><input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="list_id" value="{{ list.id }}"><button class="btn btn-sm">{{ icon('check', 14) }} Restock everything</button></form>{% endif %}
+        </div>
+    </div>
+    <div id="page-feedback" aria-live="polite">{% include 'daisyui_test/_feedback.html' %}</div>
+    {% if ingredients %}
+    <section class="section-panel" aria-label="Ingredients"><ul class="list">{% for row in ingredients %}{{ ingredient_row(row.todo, row.stats, 'likely_low' if row.stats.likely_to_run_out else none) }}{% endfor %}</ul></section>
+    <p class="page-hint">“Usually lasts” averages the time from buying to running out. An ingredient is running low after 80% of that time, or a month after running out without being bought again.</p>
+    {% else %}<div class="empty-state"><h3>This recipe has no open ingredients.</h3></div>{% endif %}
+</div>

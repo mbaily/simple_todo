@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>Edit Smart Folder: {{ folder.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script src="{{ request.scope.root_path }}/static/smart_folder_ui.js?v=20251231"></script>
+</head>
+
+<body>
+    {% from "macros.html" import nav_bar with context %}
+    {{ nav_bar() }}
+
+    <h2 style="margin:0;">Edit Smart Folder: {{ folder.name }}</h2>
+
+    <form action="{{ request.scope.root_path }}/smart-folder/{{ folder.id }}/update" method="post">
+        <label>Name: <input type="text" name="name" value="{{ folder.name }}" required></label>
+        <br>
+
+        <p style="margin-bottom:6px;">What should this smart folder show?</p>
+        <label><input type="checkbox" name="show_todos" value="true" {% if folder.show_todos %}checked{% endif %}>
+            Todos</label>
+        <label style="margin-left: 10px;"><input type="checkbox" name="show_lists" value="true" {% if folder.show_lists
+                %}checked{% endif %}> Lists</label>
+        <label style="margin-left: 10px;"><input type="checkbox" name="group_todos_by_list" value="true" {% if
+                folder.group_todos_by_list %}checked{% endif %}> Group todos by list</label>
+
+        <div style="margin-top: 6px;">
+            <label><input type="checkbox" name="root_todos_only" value="true" {% if folder.root_todos_only %}checked{%
+                    endif %}> Root todos only</label>
+            <label style="margin-left: 10px;"><input type="checkbox" name="nest_subtodos" value="true" {% if
+                    folder.nest_subtodos %}checked{% endif %}> Nest subtodos</label>
+        </div>
+        <div style="margin-top: 6px; margin-left: 20px;">
+            <label><input type="checkbox" name="strict_nesting" value="true" {% if folder.strict_nesting %}checked{%
+                    endif %}>
+                Strict nesting (only matching subtodos)</label>
+        </div>
+
+        <div style="margin-top: 10px;">
+            <label>Section Order: <input type="text" name="section_order" value="{{ folder.section_order or 'LET' }}"
+                    style="width: 50px; text-transform: uppercase;" pattern="[LETlet]{3}"
+                    title="Three letters: L (Lists), E (calendar Events), T (Todos)"></label>
+            <div class="dates" style="margin-top:2px;">
+                Specify display order using letters: <strong>T</strong> (Todos), <strong>E</strong> (Calendar Events),
+                <strong>L</strong> (Lists).
+                <br>Example: <strong>TCL</strong> means Todos first, then Calendar (E), then Lists (L).
+            </div>
+        </div>
+
+        <p style="margin-bottom:6px;">Filters:</p>
+        <label><input type="checkbox" name="uncompleted_only" value="true" {% if folder.uncompleted_only %}checked{%
+                endif %}> Uncompleted only</label>
+        <label style="margin-left: 10px;"><input type="checkbox" name="include_archived_lists" value="true" {% if
+                folder.include_archived_lists %}checked{% endif %}> Include archived lists</label>
+        <br><br>
+
+        <label>Modified after: <input type="date" name="modified_after" value="{{ modified_after_val }}"></label>
+        <label style="margin-left: 10px;">Modified before: <input type="date" name="modified_before"
+                value="{{ modified_before_val }}"></label>
+
+        <details style="margin-top: 12px;">
+            <summary><strong>DokuWiki Integration</strong></summary>
+            <div style="margin-top: 6px;">
+                <label>
+                    <input type="checkbox" name="dokuwiki_links_enabled" value="true" {% if
+                        folder.dokuwiki_links_enabled %}checked{% endif %}>
+                    Enable DokuWiki links
+                </label>
+            </div>
+            <div style="margin-top: 6px;">
+                <label>
+                    Use date field:
+                    <select name="dokuwiki_date_field">
+                        <option value="created_at" {% if folder.dokuwiki_date_field=='created_at' %}selected{% endif %}>
+                            Created At</option>
+                        <option value="modified_at" {% if folder.dokuwiki_date_field=='modified_at' %}selected{% endif
+                            %}>Modified At</option>
+                    </select>
+                </label>
+            </div>
+        </details>
+
+        <details style="margin-top: 12px;" open>
+            <summary><strong>Sorting</strong></summary>
+            <div class="dates" style="margin-top:4px; margin-bottom:8px;">
+                When grouping todos by list, the list-group order follows the list sort.
+            </div>
+            <div>
+                <label>
+                    Lists sort by:
+                    <select name="list_sort_field">
+                        <option value="modified_at" {% if folder.list_sort_field=='modified_at' %}selected{% endif %}>
+                            Modified</option>
+                        <option value="created_at" {% if folder.list_sort_field=='created_at' %}selected{% endif %}>
+                            Created</option>
+                    </select>
+                </label>
+                <label style="margin-left: 10px;">
+                    <select name="list_sort_dir">
+                        <option value="desc" {% if folder.list_sort_desc %}selected{% endif %}>Descending</option>
+                        <option value="asc" {% if not folder.list_sort_desc %}selected{% endif %}>Ascending</option>
+                    </select>
+                </label>
+            </div>
+            <div style="margin-top: 6px;">
+                <label>
+                    Todos sort by:
+                    <select name="todo_sort_field">
+                        <option value="modified_at" {% if folder.todo_sort_field=='modified_at' %}selected{% endif %}>
+                            Modified</option>
+                        <option value="created_at" {% if folder.todo_sort_field=='created_at' %}selected{% endif %}>
+                            Created</option>
+                    </select>
+                </label>
+                <label style="margin-left: 10px;">
+                    <select name="todo_sort_dir">
+                        <option value="desc" {% if folder.todo_sort_desc %}selected{% endif %}>Descending</option>
+                        <option value="asc" {% if not folder.todo_sort_desc %}selected{% endif %}>Ascending</option>
+                    </select>
+                </label>
+            </div>
+        </details>
+
+        <details style="margin-top: 12px;">
+            <summary><strong>Limit to specific lists</strong> <span class="dates">(optional)</span></summary>
+            {% if lists %}
+            {% for lst in lists %}
+            <div>
+                <label>
+                    <input type="checkbox" name="list_ids" value="{{ lst.id }}" {% if lst.id in folder_list_ids
+                        %}checked{% endif %}>
+                    {{ lst.name }}
+                </label>
+                {% for h in lst.hashtags %}
+                <a href="{{ request.scope.root_path }}/hashtag/{{ h.id }}" class="pill">#{{ h.name }}</a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="dates">No lists available.</p>
+            {% endif %}
+        </details>
+
+        <details style="margin-top: 12px;" open>
+            <summary><strong>Hashtag filters</strong></summary>
+            {% if hashtags %}
+            <div>
+                <label>
+                    <input type="checkbox" name="all_items" value="true" {% if not folder_include_ids and not
+                        folder_exclude_ids %}checked{% endif %}>
+                    <strong>All items</strong>
+                </label>
+                <span class="dates">(ignore include-hashtag selection)</span>
+            </div>
+            <div class="dates" style="margin-top:4px; margin-bottom:8px;">
+                Select include hashtags and/or exclude hashtags (NOT). NOT wins if both are checked.
+                <br>
+                Check "w/ subtodos" to apply the filter to subtodos of matching parents.
+                <br>
+                Check "inc. list items" to include all items from lists matching the hashtag.
+            </div>
+            {% for hashtag in hashtags %}
+            <div style="margin-bottom: 4px;">
+                <label>
+                    <input type="checkbox" name="hashtag_ids" value="{{ hashtag.id }}" {% if hashtag.id in
+                        folder_include_ids %}checked{% endif %}>
+                    #{{ hashtag.name }}
+                </label>
+                <label class="dates" style="font-size: 0.85em;">
+                    <input type="checkbox" name="include_subtodos_{{ hashtag.id }}" value="true" {% if
+                        folder_include_subtodos_map.get(hashtag.id) %}checked{% endif %}>
+                    w/ subtodos
+                </label>
+                <label class="dates" style="font-size: 0.85em; margin-left:6px;">
+                    <input type="checkbox" name="include_list_items_{{ hashtag.id }}" value="true" {% if
+                        folder_include_list_items_map.get(hashtag.id) %}checked{% endif %}>
+                    inc. list items
+                </label>
+
+                <span style="display:inline-block; width: 12px;"></span>
+
+                <label>
+                    <input type="checkbox" name="exclude_hashtag_ids" value="{{ hashtag.id }}" {% if hashtag.id in
+                        folder_exclude_ids %}checked{% endif %}>
+                    NOT
+                </label>
+                <label class="dates" style="font-size: 0.85em;">
+                    <input type="checkbox" name="exclude_subtodos_{{ hashtag.id }}" value="true" {% if
+                        folder_exclude_subtodos_map.get(hashtag.id) %}checked{% endif %}>
+                    w/ subtodos
+                </label>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="dates">No hashtags available.</p>
+            {% endif %}
+        </details>
+
+        <details style="margin-top: 12px;" open>
+            <summary><strong>Folder filters</strong></summary>
+            <div class="dates" style="margin-top:4px; margin-bottom:8px;">
+                Filter content by specific folders.
+            </div>
+
+            <div id="folder-filters-container">
+                {% if folder.include_root_folder %}
+                <div class="folder-filter-row"
+                    style="margin-bottom: 4px; display: flex; gap: 6px; align-items: center;">
+                    <select name="folder_filter_mode">
+                        <option value="include" selected>Include</option>
+                        <option value="exclude">Exclude</option>
+                    </select>
+                    <select name="folder_filter_id">
+                        <option value="">Select Folder...</option>
+                        <option value="root" selected>Unfiled</option>
+                        {% for f in all_folders %}
+                        <option value="{{ f.id }}">{{ f.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="removeFolderFilter(this)" style="padding: 2px 6px;">x</button>
+                </div>
+                {% endif %}
+                {% if folder.exclude_root_folder %}
+                <div class="folder-filter-row"
+                    style="margin-bottom: 4px; display: flex; gap: 6px; align-items: center;">
+                    <select name="folder_filter_mode">
+                        <option value="include">Include</option>
+                        <option value="exclude" selected>Exclude</option>
+                    </select>
+                    <select name="folder_filter_id">
+                        <option value="">Select Folder...</option>
+                        <option value="root" selected>Unfiled</option>
+                        {% for f in all_folders %}
+                        <option value="{{ f.id }}">{{ f.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="removeFolderFilter(this)" style="padding: 2px 6px;">x</button>
+                </div>
+                {% endif %}
+                {% for folder_id in folder_folder_ids %}
+                <div class="folder-filter-row"
+                    style="margin-bottom: 4px; display: flex; gap: 6px; align-items: center;">
+                    <select name="folder_filter_mode">
+                        <option value="include" selected>Include</option>
+                        <option value="exclude">Exclude</option>
+                    </select>
+                    <select name="folder_filter_id">
+                        <option value="">Select Folder...</option>
+                        <option value="root">Unfiled</option>
+                        {% for f in all_folders %}
+                        <option value="{{ f.id }}" {% if f.id==folder_id %}selected{% endif %}>{{ f.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="removeFolderFilter(this)" style="padding: 2px 6px;">x</button>
+                </div>
+                {% endfor %}
+
+                {% for folder_id in folder_exclude_folder_ids %}
+                <div class="folder-filter-row"
+                    style="margin-bottom: 4px; display: flex; gap: 6px; align-items: center;">
+                    <select name="folder_filter_mode">
+                        <option value="include">Include</option>
+                        <option value="exclude" selected>Exclude</option>
+                    </select>
+                    <select name="folder_filter_id">
+                        <option value="">Select Folder...</option>
+                        <option value="root">Unfiled</option>
+                        {% for f in all_folders %}
+                        <option value="{{ f.id }}" {% if f.id==folder_id %}selected{% endif %}>{{ f.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="removeFolderFilter(this)" style="padding: 2px 6px;">x</button>
+                </div>
+                {% endfor %}
+            </div>
+
+            <button type="button" onclick="addFolderFilter()" style="margin-top:4px;">+ Add Folder Filter</button>
+
+            <template id="folder-filter-template">
+                <div class="folder-filter-row"
+                    style="margin-bottom: 4px; display: flex; gap: 6px; align-items: center;">
+                    <select name="folder_filter_mode">
+                        <option value="include">Include</option>
+                        <option value="exclude">Exclude</option>
+                    </select>
+                    <select name="folder_filter_id">
+                        <option value="">Select Folder...</option>
+                        <option value="root">Unfiled</option>
+                        {% for folder in all_folders %}
+                        <option value="{{ folder.id }}">{{ folder.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="removeFolderFilter(this)" style="padding: 2px 6px;">x</button>
+                </div>
+            </template>
+
+        </details>
+
+        <br>
+        <button type="submit">Save Changes</button>
+    </form>
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    {% include "_page_render_start.html" %}
+    <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
+    <title>{{ t('app_title') }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ request.scope.root_path }}/static/style.css?v=20251231" crossorigin="anonymous">
+    <script src="{{ request.scope.root_path }}/static/app.js?v=20261021" crossorigin="anonymous"></script>
+    <script>
+        // Force unregister any zombie service workers that might be causing Safari fetch errors
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (let registration of registrations) {
+                    if (registration.scope === window.location.origin + '{{ request.scope.root_path }}/') {
+                        console.log('Unregistering zombie service worker:', registration);
+                        registration.unregister();
+                    }
+                }
+            });
+        }
+    </script>
+</head>
+
+<body>
+    {% from "macros.html" import link_icon, render_links, folder_icon, dokuwiki_icon, dokuwiki_page_icon, collation_dot,
+    list_icon, nav_bar with context %}
+    {% macro render_home_calendar(occurrences, range_start, range_end, range_days, all_hashtags) %}
+    {% if occurrences %}
+    <h3 style="margin-bottom:0;margin-top:0;">
+        <a href="{{ request.scope.root_path }}/classic/calendar#cal-{{ occurrences[0].occurrence_at.strftime('%Y-%m-%d') }}"
+            style="text-decoration:none;">📅</a>
+        <span class="dates" style="font-weight:normal; font-size:rem;">{{ range_start | date_format }} →
+            {{ range_end | date_format }} (± {{ range_days }} {{ t('text_days') }})</span>
+    </h3>
+    {% for row in occurrences %}
+    {% set ev = row.event %}
+    <div class="{% if row.is_important %}calendar-occurrence-important{% endif %}">
+        <input type="checkbox" {% if row.completed %}checked{% endif %} disabled>
+        <span class="dates">{{ row.occurrence_at | date_format }}{% if not ev.all_day %} {{ row.occurrence_at.strftime('%H:%M') }}{% endif %}</span>
+        {% if ev.color %}
+        <span style="color: {{ ev.color }}">{{ ev.title }}</span>
+        {% elif ev.rrule %}
+        {{ ev.title }}
+        {% else %}
+        <span class="calendar-title-nonrecurring">{{ ev.title }}</span>
+        {% endif %}
+        {% if ev.rrule %}<span class="dates">({{ t('text_recurring') }})</span>{% endif %}
+        {% if row.is_important %}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{% endif %}
+        {% if ev.note or ev.notes %}<a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit{% if row.occurrence_at %}?occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{% endif %}" class="note-icon"
+            title="{{ t('tip_edit_event_note') }}">📝</a>{%
+        endif %}
+        {% for hashtag in ev.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+    </div>
+    {% for note in ev.notes %}
+    {% if not note.occurrence_at or note.occurrence_at.strftime('%Y-%m-%d') == row.occurrence_at.strftime('%Y-%m-%d') %}
+    <div style="margin-left: 25px; margin-bottom: 4px;">
+        <span style="margin-right: 5px;" title="{{ t('tooltip_note') }}">📝</span>
+        {% if note.name %}<strong style="margin-right: 5px;">{{ note.name }}:</strong>{% endif %}
+        <span style="white-space: pre-wrap; word-break: break-word;">{{ note.text }}</span>
+        {% if note.occurrence_at %}<span class="dates">({{ note.occurrence_at | date_format }})</span>{% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% endfor %}
+    <hr>
+    {% endif %}
+    {% endmacro %}
+
+    {{ nav_bar() }}
+
+    {% if active_folder_name %}
+    <h2>
+        <a href="{{ request.scope.root_path }}/{% if sort and sort != 'user' %}?sort={{ sort }}{% endif %}"
+            style="text-decoration:none; vertical-align:middle; margin-right:5px;" title="{{ t('title_back_main') }}">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+        </a>
+        {{ t('label_folder') }}: {{ active_folder_name }}
+    </h2>
+    {% endif %}
+
+    <script>
+        function toggleCreateListForm() {
+            var form = document.getElementById('create-list-form');
+            var quickForm = document.getElementById('quick-add-list-form');
+            if (form.style.display === 'none') {
+                form.style.display = 'block';
+                if (quickForm) quickForm.style.display = 'none';
+            } else {
+                form.style.display = 'none';
+                if (quickForm) quickForm.style.display = 'flex';
+            }
+        }
+
+        function createDailyPlan(offsetDays) {
+            const date = new Date();
+            date.setDate(date.getDate() + offsetDays);
+
+            const d = date.getDate();
+            const m = date.getMonth() + 1;
+            const y = date.getFullYear();
+            const dateStr = d + '/' + m + '/' + y;
+            const title = 'Daily Plan ' + dateStr;
+
+            const existingForm = document.getElementById('create-list-form');
+            let folderId = null;
+            if (existingForm) {
+                const folderInput = existingForm.querySelector('input[name="folder_id"]');
+                if (folderInput) folderId = folderInput.value;
+            }
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ request.scope.root_path }}/list/create';
+
+            const nameInput = document.createElement('input');
+            nameInput.type = 'hidden';
+            nameInput.name = 'name';
+            nameInput.value = title;
+            form.appendChild(nameInput);
+
+            const manualSortInput = document.createElement('input');
+            manualSortInput.type = 'hidden';
+            manualSortInput.name = 'manual_sorting';
+            manualSortInput.value = 'true';
+            form.appendChild(manualSortInput);
+
+            if (folderId) {
+                const folderIdInput = document.createElement('input');
+                folderIdInput.type = 'hidden';
+                folderIdInput.name = 'folder_id';
+                folderIdInput.value = folderId;
+                form.appendChild(folderIdInput);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        function createDailyPlanFromSelect() {
+            const select = document.getElementById('daily-plan-offset');
+            const offset = parseInt(select.value, 10);
+            createDailyPlan(offset);
+        }
+    </script>
+    <div
+        style="font-size: 1.2rem; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; display: flex; align-items: center;">
+        <!-- Standard Create List -->
+        <span onclick="toggleCreateListForm()" title="{{ t('title_create_list') }}"
+            style="cursor: pointer; user-select: none; margin-right: 15px;">➕</span>
+
+        <!-- Daily Plan: Icon + Select Offset -->
+        <div style="display: flex; align-items: center;">
+            <!-- Blue Tinted Plus for Daily Plan -->
+            <span onclick="createDailyPlanFromSelect()" title="{{ t('tooltip_create_daily_plan') }}"
+                style="cursor: pointer; user-select: none; margin-right: 5px; color: transparent; text-shadow: 0 0 0 #28a745;">➕</span>
+            <select id="daily-plan-offset" style="font-size: 1rem; padding: 2px;">
+                {% for i in range(0, 10) %}
+                <option value="{{ i }}">{{ i }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    {% if show_quick_add_forms %}
+    <!-- Quick Add List (always visible) -->
+    <form id="quick-add-list-form" action="{{ request.scope.root_path }}/list/create" method="post"
+        style="display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
+        {% if current_folder_id %}
+        <input type="hidden" name="folder_id" value="{{ current_folder_id }}">
+        {% endif %}
+        <input type="text" name="name" placeholder="{{ t('label_name') }}" required
+            style="flex: 1; min-width: 120px; padding: 4px 8px; font-size: 0.95rem;">
+        {% if all_hashtags %}
+        <select name="hashtag_ids" multiple size="1"
+            style="min-width: 150px; max-width: 200px; padding: 4px; font-size: 0.9rem;">
+            {% for h in all_hashtags %}
+            <option value="{{ h.id }}">#{{ h.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <button type="submit" style="padding: 4px 12px; font-size: 0.95rem;">{{ t('btn_add_list') }}</button>
+    </form>
+    {% endif %}
+
+    <form id="create-list-form" action="{{ request.scope.root_path }}/list/create" method="post" style="display:none;">
+        {% if current_folder_id %}
+        <input type="hidden" name="folder_id" value="{{ current_folder_id }}">
+        {% endif %}
+        <label>{{ t('label_name') }}: <input type="text" name="name" required></label>
+        <label>{{ t('label_hashtags') }}: <input type="text" id="hashtags-create" name="hashtags"
+                placeholder="#example #tags"></label>
+        {% if all_hashtags %}
+        <select onchange="addHashtagFromSelect(this, 'hashtags-create')">
+            <option value="">Add existing...</option>
+            {% for h in all_hashtags %}
+            <option value="{{ h.name }}">#{{ h.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <button type="submit">{{ t('btn_create_list') }}</button>
+    </form>
+
+    {% if not current_folder_id or current_folder_id == active_folder_id %}
+    {% if active_alarms %}
+    <h3 style="margin-bottom:0;margin-top:0;">⏰</h3>
+    {% for todo in active_alarms %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+            data-created="{{ todo.created_at_formatted }}" data-modified="{{ todo.modified_at_formatted }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        🔔 <span
+            style="color: {% if todo.color and todo.color|lower not in ['#000000', '#ffffff'] %}{{ todo.color }}{% else %}inherit{% endif %}">{{
+            todo.title }}</span>
+        {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit"
+            title="{{ t('tip_edit_event_note') }}">📝</a>{%
+        endif %}
+        <span class="dates">({{ t('text_alarm_set') }}: {{ todo.alarm_start | datetime_format }}{% if todo.alarm_end !=
+            todo.alarm_start %} - {{ todo.alarm_end.strftime('%H:%M') }}{% endif %})</span>
+        {% for hashtag in todo.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+        {{ list_icon() }} <a
+            href="{{ request.scope.root_path }}/list/{{ todo.list_id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
+            todo.list.name }}</a>{% if todo.parent %} &gt; {{ todo.parent.title
+        }}{% endif %}
+    </div>
+    {% endfor %}
+    <hr>
+    {% endif %}
+    {% endif %}
+
+    {% if not current_folder_id or current_folder_id == active_folder_id %}
+    {% if resuming_todos or resuming_lists %}
+    <h3 style="margin-bottom:0;margin-top:0;">{{ t('header_resuming') }}</h3>
+
+    {% for list in resuming_lists %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="list" data-id="{{ list.id }}"
+            data-created="{{ list.created_at_formatted }}" data-modified="{{ list.modified_at_formatted }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="list" data-id="{{ list.id }}" {% if list.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        ⏰
+        <a
+            href="{{ request.scope.root_path }}/list/{{ list.id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
+            list.name }}</a>
+        <span class="dates">({{ t('text_was_deferred_until') }} {{ list.delayed_until | date_format }})</span>
+        {% for hashtag in list.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+    {% for todo in resuming_todos %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+            data-created="{{ todo.created_at_formatted }}" data-modified="{{ todo.modified_at_formatted }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        ⏰ <span
+            style="color: {% if todo.color and todo.color|lower not in ['#000000', '#ffffff'] %}{{ todo.color }}{% else %}inherit{% endif %}">{{
+            todo.title }}</span>
+        {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit"
+            title="{{ t('tip_edit_event_note') }}">📝</a>{%
+        endif %}
+        <span class="dates">({{ t('text_was_deferred_until') }} {{ todo.delayed_until | date_format }})</span>
+        {% for hashtag in todo.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+        {{ list_icon() }} <a
+            href="{{ request.scope.root_path }}/list/{{ todo.list_id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
+            todo.list.name }}</a>{% if todo.parent %} &gt; {{ todo.parent.title
+        }}{% endif %}
+    </div>
+    {% endfor %}
+    <hr>
+    {% endif %}
+    {% endif %}
+
+    {% set has_old_pinned = (pinned_todos_old or pinned_lists_old) %}
+    {% if not current_folder_id or current_folder_id == active_folder_id %}
+
+    {% if show_today_calendar_above_pinned and today_calendar_occurrences %}
+    {% for row in today_calendar_occurrences %}
+    {% set ev = row.event %}
+    <div class="{% if row.is_important %}calendar-occurrence-important{% endif %}">
+        📅 <input type="checkbox" {% if row.completed %}checked{% endif %} disabled>
+        <span class="dates">{{ row.occurrence_at | date_format }}{% if not ev.all_day %} {{ row.occurrence_at.strftime('%H:%M') }}{% endif %}</span>
+        {% if ev.color %}
+        <span style="color: {{ ev.color }}">{{ ev.title }}</span>
+        {% elif ev.rrule %}
+        {{ ev.title }}
+        {% else %}
+        <span class="calendar-title-nonrecurring">{{ ev.title }}</span>
+        {% endif %}
+        {% if ev.rrule %}<span class="dates">({{ t('text_recurring', 'Recurring') }})</span>{% endif %}
+        {% if row.is_important %}<span class="calendar-important-badge" title="Important (late and unchecked)">⚠️ Important</span>{% endif %}
+        {% if ev.note or ev.notes %}<a href="{{ request.scope.root_path }}/calendar/event/{{ ev.id }}/edit{% if row.occurrence_at %}?occurrence_at={{ row.occurrence_at.strftime('%Y-%m-%d') }}{% endif %}" class="note-icon" title="{{ t('tip_edit_event_note', 'Edit Note') }}">📝</a>{% endif %}
+        {% for hashtag in ev.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+    </div>
+    {% endfor %}
+    <hr>
+    {% endif %}
+
+    {% if pinned_todos_recent or pinned_lists_recent %}
+    <h3 style="margin-bottom:0;margin-top:0;">{{ t('header_pinned') }}{% if has_old_pinned %} ({{ t('text_more_below')
+        }}){% endif %}</h3>
+
+    {% for list in pinned_lists_recent %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="list" data-id="{{ list.id }}"
+            data-created="{{ list.created_at_formatted }}" data-modified="{{ list.modified_at_formatted }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="list" data-id="{{ list.id }}" {% if list.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        📌
+        {% if list.is_collation %}
+        <span class="collation-dots"><span class="collation-dot on"
+                style="--collation-color: {{ list.collation_color or '#888' }}; cursor: default;"></span></span>
+        {% endif %}
+        <a
+            href="{{ request.scope.root_path }}/list/{{ list.id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
+            list.name }}</a>
+        {{ render_links(list.links) }}
+        <span class="dates" data-list-id="{{ list.id }}"
+            data-uncompleted-count="{{ uncompleted_counts.get(list.id, 0) }}">{{ uncompleted_counts.get(list.id, 0)
+            }}</span>
+        {% for hashtag in list.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+    {% for todo in pinned_todos_recent %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+            data-created="{{ todo.created_at_formatted }}" data-modified="{{ todo.modified_at_formatted }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        📌 <span
+            style="color: {% if todo.color and todo.color|lower not in ['#000000', '#ffffff'] %}{{ todo.color }}{% else %}inherit{% endif %}">{{
+            todo.title }}</span>
+        {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit"
+            title="{{ t('tip_edit_event_note') }}">📝</a>{%
+        endif %}
+        {{ render_links(todo.links) }}
+        {% for hashtag in todo.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+        {{ list_icon() }} <a
+            href="{{ request.scope.root_path }}/list/{{ todo.list_id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
+            todo.list.name }}</a>{% if todo.parent %} &gt; {{ todo.parent.title
+        }}{% endif %}
+    </div>
+    {% endfor %}
+    <hr>
+    {% endif %}
+    {% endif %}
+
+    {% if show_calendar_above_lists and (not current_folder_id or current_folder_id == active_folder_id) %}
+    {{ render_home_calendar(home_calendar_occurrences, home_calendar_start, home_calendar_end, home_calendar_days,
+    all_hashtags) }}
+    {% endif %}
+
+    {# Macro for rendering a single list item #}
+    {% macro render_list_item(list) %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="list" data-id="{{ list.id }}"
+            data-created="{{ list.created_at_formatted }}" data-modified="{{ list.modified_at_formatted }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="list" data-id="{{ list.id }}" {% if list.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        {% if list.pinned %}📌{% endif %}
+        {% if list.is_collation %}
+        <span class="collation-dots"><span class="collation-dot on"
+                style="--collation-color: {{ list.collation_color or '#888' }}; cursor: default;"></span></span>
+        {% endif %}
+        <a
+            href="{{ request.scope.root_path }}/list/{{ list.id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
+            list.name }}</a>
+        {{ render_links(list.links) }}
+        {% if enable_dokuwiki_links and list.dokuwiki_page_enabled and dokuwiki_item_link_fn %}
+        <a href="{{ dokuwiki_item_link_fn('list', list.id) }}" target="_blank" title="Open DokuWiki page"
+            style="text-decoration: none;">{{ dokuwiki_page_icon() }}</a>
+        {% endif %}
+        <span class="dates" data-list-id="{{ list.id }}"
+            data-uncompleted-count="{{ uncompleted_counts.get(list.id, 0) }}">{{ uncompleted_counts.get(list.id, 0)
+            }}</span>
+        {% for hashtag in list.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+    </div>
+    {% endmacro %}
+
+    {% if lists %}
+    {# Uncategorized lists first #}
+    {% if uncategorized_lists %}
+    {% for list in uncategorized_lists %}
+    {{ render_list_item(list) }}
+    {% endfor %}
+    {% endif %}
+
+    {# Categorized lists in sections, separated by horizontal rules #}
+    {% for category in sorted_categories %}
+    {% if loop.first and uncategorized_lists %}
+    <hr>{% endif %}
+    <span style="color: var(--text-muted, #888); font-weight: 500;">{{ category }}:</span>
+    {% for list in categorized_lists[category] %}
+    {{ render_list_item(list) }}
+    {% endfor %}
+    {% if not loop.last %}
+    <hr>{% endif %}
+    {% endfor %}
+    {% else %}
+    <p>{{ t('text_no_lists') }}</p>
+    {% endif %}
+    <hr>
+    {% if not show_calendar_above_lists and (not current_folder_id or current_folder_id == active_folder_id) %}
+    {{ render_home_calendar(home_calendar_occurrences, home_calendar_start, home_calendar_end, home_calendar_days,
+    all_hashtags) }}
+    {% endif %}
+    <div style="margin-bottom: 10px;">
+        <a href="{{ request.scope.root_path }}/journal">{{ t('link_journal') }}</a> | <a href="{{ request.scope.root_path }}/lists/reorder{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}">{{ t('link_reorder_lists', 'Reorder Lists') }}</a>
+    </div>
+    <div style="margin-bottom: 10px;">
+        {{ t('label_sort_by') }}:
+        {% if sort == 'modified' %}
+        <b>{{ t('label_modified') }}</b> |
+        <a href="{{ request.scope.root_path }}/?sort=created{% if current_folder_id %}&folder_id={{ current_folder_id }}{% endif %}">{{ t('label_created') }}</a> |
+        <a href="{{ request.scope.root_path }}/{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}">{{ t('label_user', 'User') }}</a>
+        {% elif sort == 'created' %}
+        <a href="{{ request.scope.root_path }}/?sort=modified{% if current_folder_id %}&folder_id={{ current_folder_id }}{% endif %}">{{ t('label_modified') }}</a> |
+        <b>{{ t('label_created') }}</b> |
+        <a href="{{ request.scope.root_path }}/{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}">{{ t('label_user', 'User') }}</a>
+        {% else %}
+        <a href="{{ request.scope.root_path }}/?sort=modified{% if current_folder_id %}&folder_id={{ current_folder_id }}{% endif %}">{{ t('label_modified') }}</a> |
+        <a href="{{ request.scope.root_path }}/?sort=created{% if current_folder_id %}&folder_id={{ current_folder_id }}{% endif %}">{{ t('label_created') }}</a> |
+        <b>{{ t('label_user', 'User') }}</b> (<a href="{{ request.scope.root_path }}/lists/reorder{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}">{{ t('link_reorder', 'reorder') }}</a>)
+        {% endif %}
+    </div>
+
+    {% if lists or pinned_todos %}
+    <h3 style="margin-bottom:0;margin-top:0">{{ t('header_operations') }}</h3>
+    <span id="selection-count" data-text-selected="{{ t('text_selected_suffix') }}">0 {{ t('text_selected_suffix')
+        }}</span> | <button type="button" onclick="selectAll()">{{ t('btn_select_all') }}</button>
+    <button type="button" onclick="selectNone()">{{ t('btn_select_none') }}</button><br>
+    <span id="selected-dates" class="dates" style="display:none;"></span>
+    <div style="display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 5px;">
+        <button type="button" onclick="bulkPin()">{{ t('btn_pin') }}</button>
+        <button type="button" onclick="bulkUnpin()">{{ t('btn_unpin') }}</button>
+        <button type="button" onclick="bulkArchive()">{{ t('btn_archive') }}</button>
+        <button type="button" onclick="bulkUnarchive()">{{ t('btn_unarchive') }}</button>
+        <button type="button" onclick="bulkEdit()">{{ t('btn_edit') }}</button>
+        <button type="button" onclick="bulkDelete()">{{ t('btn_delete') }}</button>
+        <button type="button" id="tag-selected-btn" onclick="tagSelectedItems()"
+            title="Tag items for moving in Folders view">Tag</button>
+    </div>
+    {% endif %}
+
+    {% if not current_folder_id or current_folder_id == active_folder_id %}
+    {% if has_old_pinned %}
+    <hr>
+    <h3 style="margin-bottom:0;margin-top:0;">{{ t('header_pinned') }} ({{ t('text_older_than') }} {{ pinned_old_days }}
+        {{ t('text_days') }})</h3>
+
+    {% for list in pinned_lists_old %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="list" data-id="{{ list.id }}"
+            data-created="{{ list.created_at_formatted }}" data-modified="{{ list.modified_at_formatted }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="list" data-id="{{ list.id }}" {% if list.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        📌
+        {% if list.is_collation %}
+        <span class="collation-dots"><span class="collation-dot on"
+                style="--collation-color: {{ list.collation_color or '#888' }}; cursor: default;"></span></span>
+        {% endif %}
+        <a
+            href="{{ request.scope.root_path }}/list/{{ list.id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
+            list.name }}</a>
+        {{ render_links(list.links) }}
+        <span class="dates" data-list-id="{{ list.id }}"
+            data-uncompleted-count="{{ uncompleted_counts.get(list.id, 0) }}">{{ uncompleted_counts.get(list.id, 0)
+            }}</span>
+        {% for hashtag in list.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+    {% for todo in pinned_todos_old %}
+    <div>
+        <input type="checkbox" class="select-item" data-type="todo" data-id="{{ todo.id }}"
+            data-created="{{ todo.created_at_formatted }}" data-modified="{{ todo.modified_at_formatted }}"
+            onchange="updateSelectionCount()">
+        <input type="checkbox" data-type="todo" data-id="{{ todo.id }}" {% if todo.completed %}checked{% endif %}
+            onchange="toggleItem(this)">
+        📌 <span
+            style="color: {% if todo.color and todo.color|lower not in ['#000000', '#ffffff'] %}{{ todo.color }}{% else %}inherit{% endif %}">{{
+            todo.title }}</span>
+        {% if todo.has_note %}<a class="note-icon" href="{{ request.scope.root_path }}/todo/{{ todo.id }}/edit"
+            title="{{ t('tip_edit_event_note') }}">📝</a>{%
+        endif %}
+        {{ render_links(todo.links) }}
+        {% for hashtag in todo.hashtags %}
+        <a href="{{ request.scope.root_path }}/hashtag/{{ hashtag.id }}" class="pill">#{{ hashtag.name }}</a>
+        {% endfor %}
+        {{ list_icon() }} <a
+            href="{{ request.scope.root_path }}/list/{{ todo.list_id }}{% if current_folder_id %}?folder_id={{ current_folder_id }}{% endif %}{% if sort and sort != 'user' %}{% if current_folder_id %}&{% else %}?{% endif %}sort={{ sort }}{% endif %}">{{
+            todo.list.name }}</a>{% if todo.parent %} &gt; {{ todo.parent.title
+        }}{% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endif %}
+    {% include "_page_render_end.html" %}
+</body>
+
+</html>

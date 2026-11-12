@@ -1,0 +1,5 @@
+{% macro account_balance(bill, root) %}
+{% if bill.ledger_enabled %}
+<a href="{{ root }}/bills/{{ bill.id }}/history#billing" class="bill-due">Credit {{ bill.currency_symbol }}{{ bill.credit_cents|cents }} · Owing {{ bill.currency_symbol }}{{ bill.outstanding_cents|cents }}</a>
+{% endif %}
+{% endmacro %}

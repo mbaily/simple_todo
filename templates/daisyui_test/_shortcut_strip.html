@@ -1,0 +1,19 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% macro chip(item, favourite) %}
+<a class="strip-chip {{ 'is-favourite' if favourite else 'is-recent' }}" href="{{ item.url }}" data-key="{{ item.key }}" title="{{ item.context ~ ' · ' if item.context else '' }}{{ item.label }}{{ '' if favourite else ' (recent)' }}"{% if strip.current and strip.current.key == item.key %} aria-current="page"{% endif %}>{{ icon(item.icon, 14) }}<span>{{ item.label }}</span></a>
+{% endmacro %}
+<nav id="shortcut-strip" class="shortcut-strip" aria-label="Favourites and recent places">
+{% if strip %}
+    <button type="button" class="btn btn-ghost btn-sm strip-jump" data-command="jump" title="Jump to a folder or list (Ctrl+K or /)" aria-haspopup="dialog">{{ icon('search', 15) }}<span>Jump to…</span></button>
+    {% if strip.current %}
+    <form class="strip-star" action="{{ strip.prototype_url }}/favourite" method="post" hx-post="{{ strip.prototype_url }}/favourite" hx-target="#shortcut-strip" hx-swap="outerMorph" hx-disable="find button">
+        <input type="hidden" name="key" value="{{ strip.current.key }}"><input type="hidden" name="at" value="{{ strip.current.url }}">{% if not strip.current_starred %}<input type="hidden" name="starred" value="true">{% endif %}
+        <button class="btn btn-ghost btn-square btn-sm" aria-pressed="{{ 'true' if strip.current_starred else 'false' }}" title="{{ 'Remove' if strip.current_starred else 'Add' }} “{{ strip.current.label }}” {{ 'from' if strip.current_starred else 'to' }} favourites" aria-label="Favourite: {{ strip.current.label }}">{{ icon('star', 17) }}</button>
+    </form>
+    {% endif %}
+    {% for item in strip.favourites %}{{ chip(item, True) }}{% endfor %}
+    {% if strip.favourites and strip.recent %}<span class="strip-divider" aria-hidden="true"></span>{% endif %}
+    {% for item in strip.recent %}{{ chip(item, False) }}{% endfor %}
+    {% if not strip.favourites and not strip.recent %}<span class="strip-hint">{% if strip.current %}← Use the star to keep “{{ strip.current.label }}” here as a favourite.{% else %}Open a folder or list: a star appears here to keep it as a favourite, and recent ones are listed.{% endif %}</span>{% endif %}
+{% endif %}
+</nav>

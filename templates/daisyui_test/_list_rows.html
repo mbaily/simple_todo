@@ -1,0 +1,61 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{% set rp = request.scope.root_path %}
+{% macro links(item) %}
+{% if item.links|length == 1 %}{% set link = item.links[0] %}<a class="btn btn-ghost btn-square btn-sm" href="{{ link.url }}" target="_blank" rel="noopener noreferrer" title="{{ link.title or link.url }}" aria-label="Open {{ link.title or link.url }}">{{ icon('link', 16) }}</a>{% elif item.links %}<details class="dropdown dropdown-end"><summary class="btn btn-ghost btn-square btn-sm" aria-label="Attached links">{{ icon('link', 16) }}</summary><ul class="dropdown-content menu row-menu">{% for link in item.links %}<li><a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.title or link.url }}</a></li>{% endfor %}</ul></details>{% endif %}
+{% endmacro %}
+
+{% macro selection(item, kind) %}
+<label class="selection-control"><input class="checkbox checkbox-sm selection-checkbox" type="checkbox" name="items" value="{{ kind }}:{{ item.id }}" form="daisy-bulk-form" data-list-id="{{ item.list_id }}" data-created="{{ item.created_at_formatted_full if kind == 'todo' else item.created_at_heading if kind == 'datetime_header' else item.created_at_formatted }}" data-modified="{{ item.modified_at_formatted_full if kind == 'todo' else item.created_at_heading if kind == 'datetime_header' else item.modified_at_formatted }}" aria-label="Select {{ item.title if kind == 'todo' else item.name or 'note' if kind == 'note' else 'date divider' }}"></label>
+{% endmacro %}
+
+{% macro note_row(note, depth=0) %}
+<li class="list-row item-row note-row" data-item-key="note:{{ note.id }}" style="--depth: {{ depth }}">
+    {{ selection(note, 'note') }}
+    <span class="note-marker">{{ icon('note', 16) }}</span>
+    <div class="item-content"><div class="note-text">{% if note.name %}<strong>{{ note.name }}: </strong>{% endif %}{{ note.text | daisy_note }}</div></div>
+    <div class="row-actions">{{ links(note) }}<a class="btn btn-ghost btn-square btn-sm" href="{{ prototype_url }}/note/{{ note.id }}/edit{{ query }}" title="Edit note" aria-label="Edit {{ note.name or 'note' }}">{{ icon('edit', 15) }}</a></div>
+</li>
+{% endmacro %}
+
+{% macro task_row(todo, depth=0, ancestors=[]) %}
+{% if todo.id not in ancestors %}
+<li id="todo-row-{{ todo.id }}" class="list-row item-row task-row {{ 'is-completed' if todo.completed else '' }} {{ 'highlighted-task' if todo.id == highlight_id else '' }}" data-item-key="todo:{{ todo.id }}" data-task-title="{{ todo.title }}" data-hashtags="{{ todo.hashtags|map(attribute='name')|join(' #') }}" data-deferred="{{ todo.delayed_until.strftime('%Y-%m-%d') if todo.delayed_until else '' }}" data-alarm-start="{{ todo.alarm_start.strftime('%Y-%m-%dT%H:%M') if todo.alarm_start else '' }}" data-alarm-end="{{ todo.alarm_end.strftime('%Y-%m-%dT%H:%M') if todo.alarm_end else '' }}" style="--depth: {{ depth }}">
+    {{ selection(todo, 'todo') }}
+    <form class="completion-form" action="{{ prototype_url }}/complete/todo/{{ todo.id }}{{ query }}" method="post" hx-post="{{ prototype_url }}/complete/todo/{{ todo.id }}{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find input">
+        <input class="checkbox checkbox-sm completion-checkbox" type="checkbox" name="completed" value="true" {% if todo.completed %}checked{% endif %} aria-label="Mark {{ todo.title }} {{ 'incomplete' if todo.completed else 'complete' }}"><noscript><button type="submit">Save</button></noscript>
+    </form>
+    <div class="item-content">
+        <div class="item-title-line">{% if todo.pinned %}<span class="row-marker" title="Pinned">{{ icon('pin', 14) }}</span>{% endif %}<span class="item-title" {% if todo.color and todo.color|lower not in ['#000000', '#ffffff', '#000', 'black'] %}style="color: {{ todo.color }}"{% endif %}>{{ todo.title }}</span>{% if todo.alarm_start %}<span title="Alarm: {{ todo.alarm_start | datetime_format }}" class="row-marker">{{ icon('bell', 14) }}</span>{% endif %}{% if todo.delayed_until %}<span class="item-context">Deferred {{ todo.delayed_until | date_format }}</span>{% endif %}</div>
+        {% if todo.list_id != list.id %}<a class="item-context" href="{{ prototype_url }}/list/{{ todo.list_id }}{{ navigation_query }}&amp;highlight={{ todo.id }}">{{ icon('list', 13) }} {{ todo.list.name }}</a>{% endif %}
+        {% if todo.hashtags %}<div class="item-tags">{% for tag in todo.hashtags %}<a class="badge badge-outline tag" href="{{ prototype_url }}/hashtag/{{ tag.id }}">#{{ tag.name }}</a>{% endfor %}</div>{% endif %}
+        {% if todo.note %}<div class="legacy-task-note">{{ todo.note }}</div>{% endif %}
+    </div>
+    <div class="row-actions">
+        {{ links(todo) }}
+        {% if enable_dokuwiki_links and list.show_dokuwiki_item_links and todo.dokuwiki_page_enabled %}<a class="btn btn-ghost btn-square btn-sm" href="{{ dokuwiki_item_link_fn('todo', todo.id) }}" target="_blank" rel="noopener noreferrer" title="Open DokuWiki page" aria-label="Open DokuWiki page for {{ todo.title }}">{{ icon('book', 16) }}</a>{% endif %}
+        {% if not list.is_collation %}{% for collation in collation_lists %}
+        {% set included = collation in todo.collation_lists %}
+        <form action="{{ detail_url }}/collation/{{ collation.id }}/{{ todo.id }}{{ query }}" method="post" hx-post="{{ detail_url }}/collation/{{ collation.id }}/{{ todo.id }}{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph"><input type="hidden" name="enabled" value="{{ 'false' if included else 'true' }}"><button class="collation-toggle {{ 'included' if included else '' }}" style="--collation-color: {{ collation.collation_color or '#aaa' }}" title="{{ 'Remove from' if included else 'Add to' }} {{ collation.name }}" aria-label="{{ 'Remove ' if included else 'Add ' }}{{ todo.title }} {{ 'from' if included else 'to' }} {{ collation.name }}" aria-pressed="{{ 'true' if included else 'false' }}"></button></form>
+        {% endfor %}{% elif todo.list_id != list.id %}
+        <form action="{{ detail_url }}/collation/{{ list.id }}/{{ todo.id }}{{ query }}" method="post" hx-post="{{ detail_url }}/collation/{{ list.id }}/{{ todo.id }}{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph"><input type="hidden" name="enabled" value="false"><button class="collation-toggle included" style="--collation-color: {{ list.collation_color or '#aaa' }}" title="Remove from {{ list.name }}" aria-label="Remove {{ todo.title }} from {{ list.name }}"></button></form>
+        {% endif %}
+        <details class="dropdown dropdown-end row-dropdown"><summary class="btn btn-ghost btn-square btn-sm" aria-label="Actions for {{ todo.title }}">{{ icon('more', 18) }}</summary><ul class="dropdown-content menu row-menu"><li><a href="{{ prototype_url }}/todo/{{ todo.id }}/edit{{ query }}">{{ icon('edit', 16) }} Edit task / notes</a></li><li><button type="button" data-command="select-item" data-key="todo:{{ todo.id }}">{{ icon('select', 16) }} Select item</button></li><li><button type="button" data-command="show-panel" data-panel="subtask" data-key="todo:{{ todo.id }}">{{ icon('plus', 16) }} Add subtask</button></li><li><button type="button" data-command="show-panel" data-panel="task-note" data-key="todo:{{ todo.id }}">{{ icon('note', 16) }} Add task note</button></li></ul></details>
+    </div>
+</li>
+{% set children = todo.children|selectattr('completed', 'false')|list if not show_completed else todo.children|list %}
+{% set children = children|sort(attribute='sort_order') if list.manual_sorting else children %}
+{% set mixed = children|concat(todo.notes|list)|sort(attribute='created_at', reverse=(not list.sort_ascending)) if not list.manual_sorting else children|concat(todo.notes|list) %}
+{% for child in mixed %}{% if child.text is defined %}{{ note_row(child, depth + 1) }}{% else %}{{ task_row(child, depth + 1, ancestors + [todo.id]) }}{% endif %}{% endfor %}
+{% endif %}
+{% endmacro %}
+
+{% macro divider_row(item) %}
+<li class="list-row item-row divider-row" {% if item.type == 'datetime_header' %}data-item-key="datetime_header:{{ item.obj.id }}"{% endif %}>
+    {% if item.type == 'datetime_header' %}{{ selection(item.obj, 'datetime_header') }}{% endif %}
+    {{ icon('calendar', 15) }}<span>{{ item.heading }}</span>
+    {% if item.dokuwiki_link and item.todo_ids %}
+    <a class="btn btn-ghost btn-square btn-sm wiki-group-link {{ 'wiki-confirmed' if item.dokuwiki_confirmed else '' }}" href="{{ item.dokuwiki_link }}" target="_blank" rel="noopener noreferrer" data-wiki-group hx-post="{{ detail_url }}/wiki/confirm{{ query }}" hx-trigger="wiki-open" hx-vals='{{ {"todo_ids": item.todo_ids}|tojson }}' hx-target="#daisy-workspace" hx-swap="outerMorph" title="Open and confirm wiki group" aria-label="Open wiki group for {{ item.heading }}">{{ icon('book', 15) }}</a>
+    {% if item.dokuwiki_confirmed %}<form action="{{ detail_url }}/wiki/unconfirm{{ query }}" method="post" hx-post="{{ detail_url }}/wiki/unconfirm{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph">{% for id in item.todo_ids %}<input type="hidden" name="todo_ids" value="{{ id }}">{% endfor %}<button class="btn btn-ghost btn-sm" title="Clear wiki group confirmation">Clear confirmation</button></form>{% endif %}
+    {% endif %}
+</li>
+{% endmacro %}
