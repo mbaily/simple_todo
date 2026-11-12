@@ -728,3 +728,4 @@ h2 { font-size: 1rem; letter-spacing: -.1px; font-weight: 600; margin: 0; }
 #task-create-options { margin-top: 6px; }
 .display-form { padding: 4px 8px 8px; }
 .display-form .page-hint { margin: 2px 0 0; }
+.display-form .page-hint + .option-checkbox { margin-top: 8px; }

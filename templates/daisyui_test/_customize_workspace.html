@@ -12,6 +12,8 @@
         <form class="display-form" action="{{ prototype_url }}/customization/display{{ query }}" method="post" hx-post="{{ prototype_url }}/customization/display{{ query }}" hx-trigger="change" hx-target="#daisy-workspace" hx-swap="outerMorph">
             <label class="option-checkbox"><input id="show-confirmations" type="checkbox" class="checkbox checkbox-xs" name="show_confirmations" value="true" {% if confirmations_on %}checked{% endif %}> Show confirmation messages, such as “Task added.”</label>
             <p class="page-hint">When this is off, the page just updates after a change. Error messages are always shown.</p>
+            <label class="option-checkbox"><input id="lists-before-folders" type="checkbox" class="checkbox checkbox-xs" name="lists_before_folders" value="true" {% if lists_first %}checked{% endif %}> Show “Your lists” above “Folders” on the overview</label>
+            <p class="page-hint">When this is off, a folder’s subfolders are listed first, then its lists.</p>
             <noscript><button class="btn btn-sm">Save</button></noscript>
         </form>
     </section>

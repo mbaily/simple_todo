@@ -35,6 +35,13 @@ def attach_customize_routes(router, *, templates, get_db, actions, feedback):
 
     templates.env.globals["show_confirmations"] = show_confirmations
 
+    def lists_before_folders(request):
+        """Template global: whether the overview shows "Your lists" above "Folders"."""
+        db = getattr(request.state, "shortcut_db", None)
+        return db is not None and (actions["settings"](db).metadata_json or {}).get("lists_before_folders") is True
+
+    templates.env.globals["lists_before_folders"] = lists_before_folders
+
     def render_customize(request, db, message=None, status_code=200):
         settings = actions["settings"](db)
         tags = db.query(Hashtag).order_by(Hashtag.name).all()
@@ -59,6 +66,7 @@ def attach_customize_routes(router, *, templates, get_db, actions, feedback):
             # An import's result is information, not just a confirmation, so it is always shown.
             message_always=imported,
             confirmations_on=(settings.metadata_json or {}).get("show_confirmations", True) is not False,
+            lists_first=(settings.metadata_json or {}).get("lists_before_folders") is True,
         )
         partial = wants_fragment(request)
         return templates.TemplateResponse(
@@ -98,14 +106,20 @@ def attach_customize_routes(router, *, templates, get_db, actions, feedback):
         return render_customize(request, db, message)
 
     @router.post("/customization/display", response_class=HTMLResponse)
-    def save_display(request: Request, show_confirmations: bool = Form(False), db: Session = Depends(get_db)):
+    def save_display(request: Request, show_confirmations: bool = Form(False),
+                     lists_before_folders: bool = Form(False), db: Session = Depends(get_db)):
         settings = actions["settings"](db)
+        previous = settings.metadata_json or {}
         # Assign a new dict: in-place changes to a JSON column are not detected.
-        settings.metadata_json = {**(settings.metadata_json or {}), "show_confirmations": show_confirmations}
+        settings.metadata_json = {**previous, "show_confirmations": show_confirmations,
+                                  "lists_before_folders": lists_before_folders}
         db.commit()
         if request.headers.get("HX-Request") != "true":
             return RedirectResponse(base(request) + "/customization", status_code=303)
-        return render_customize(request, db, "Confirmation messages are on." if show_confirmations else None)
+        message = "Confirmation messages are on." if show_confirmations else None
+        if show_confirmations and (previous.get("lists_before_folders") is True) != lists_before_folders:
+            message = f"“Your lists” now appear {'above' if lists_before_folders else 'below'} “Folders” on the overview."
+        return render_customize(request, db, message)
 
     @router.post("/customization/import")
     async def import_file(request: Request, file: UploadFile = File(...), restore_history: bool = Form(False),

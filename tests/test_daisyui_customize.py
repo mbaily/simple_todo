@@ -113,6 +113,26 @@ def test_confirmation_messages_can_be_turned_off(prototype):
     assert plain.status_code == 303 and plain.headers['location'] == '/app/customization'
 
 
+def test_lists_can_be_shown_above_folders_on_the_overview(prototype):
+    db, client, ids = prototype
+    order = lambda: [client.get('/app').text.index(mark) for mark in ('id="folders-heading"', 'id="lists-heading"')]
+    page = client.get('/app/customization')
+    assert 'id="lists-before-folders"' in page.text and not page.context['lists_first']
+    folders, lists = order()
+    assert folders < lists
+    on = client.post('/app/customization/display?view=customize', headers=HX,
+                     data={'show_confirmations': 'true', 'lists_before_folders': 'true'})
+    assert on.context['lists_first'] and on.context['confirmations_on'] and 'now appear above' in on.text
+    db.expire_all()
+    assert db.query(UserSettings).one().metadata_json['lists_before_folders'] is True
+    folders, lists = order()
+    assert lists < folders and client.get('/app').text.count('id="folders-heading"') == 1
+    off = client.post('/app/customization/display?view=customize', headers=HX, data={'show_confirmations': 'true'})
+    assert not off.context['lists_first'] and 'now appear below' in off.text
+    folders, lists = order()
+    assert folders < lists
+
+
 def test_browser_confirmation_toggle(prototype_server, page):
     origin, (_, _, ids) = prototype_server
     page.goto(origin + '/app/customization')
