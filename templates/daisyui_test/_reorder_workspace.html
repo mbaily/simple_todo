@@ -1,8 +1,10 @@
+{% from 'daisyui_test/_trail.html' import page_trail with context %}
 {% from 'daisyui_test/_icons.html' import icon %}
 {% macro move(item, to, label, symbol, disabled) %}
 <form action="{{ prototype_url }}/lists/reorder/move{{ query }}" method="post" hx-post="{{ prototype_url }}/lists/reorder/move{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><input type="hidden" name="list_id" value="{{ item.id }}"><input type="hidden" name="to" value="{{ to }}"><button class="btn btn-ghost btn-square btn-sm" aria-label="Move {{ item.name }} {{ label }}" title="Move {{ label }}" {% if disabled %}disabled{% endif %} data-reorder-key="{{ item.id }}:{{ to }}">{{ symbol }}</button></form>
 {% endmacro %}
 <div id="daisy-workspace" data-scope="reorder:{{ folder_id }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    {{ page_trail('Reorder lists', folder=folder, unfiled=True) }}
     <div class="page-heading">
         <div class="page-title"><h1>Reorder lists</h1><span class="eyebrow">{{ folder.path_name if folder else 'Unfiled lists' }} · {{ lists|length }}</span></div>
         <div class="page-heading-actions">

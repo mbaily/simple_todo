@@ -1,0 +1,9 @@
+{% from 'daisyui_test/_icons.html' import icon %}
+{# The breadcrumb: always the first thing in the workspace, directly below the toolbars.
+   folder: innermost folder to list (with its ancestors); list: a list to link after the folders;
+   unfiled: show "Top level" when there is no folder; swap: update the workspace in place. #}
+{% macro page_trail(current, folder=None, list=None, unfiled=False, sort=None, swap=False) %}
+{% macro step(url, label) %}<li><a href="{{ url }}"{% if swap %} hx-get="{{ url }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true"{% endif %}>{{ label }}</a></li>{% endmacro %}
+{% set base = prototype_url ~ '?' ~ ('sort=' ~ sort ~ '&' if sort else '') %}
+<div class="breadcrumbs page-trail" role="navigation" aria-label="Breadcrumb"><span class="trail-icon" title="Where you are: each step is a link">{{ icon('trail', 15) }}</span><ul>{{ step(prototype_url ~ ('?sort=' ~ sort if sort else ''), 'Home') }}{% for ancestor in folder_trail(folder) %}{{ step(base ~ 'folder_id=' ~ ancestor.id, ancestor.name) }}{% else %}{% if unfiled %}{{ step(base ~ 'folder_id=0', 'Top level') }}{% endif %}{% endfor %}{% if list %}{{ step(prototype_url ~ '/list/' ~ list.id, list.name) }}{% endif %}<li aria-current="page">{{ current }}</li></ul></div>
+{% endmacro %}

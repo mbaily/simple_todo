@@ -714,6 +714,9 @@ h2 { font-size: 1rem; letter-spacing: -.1px; font-weight: 600; margin: 0; }
 .breadcrumbs { display: flex; align-items: center; gap: 6px; }
 .trail-icon { display: inline-flex; flex-shrink: 0; color: var(--accent); }
 .breadcrumbs > .trail-icon { margin-left: 4px; }
+/* One breadcrumb position on every page that has one: the top of the workspace. */
+.page-trail { margin: 0 0 6px; min-width: 0; max-width: 100%; }
+.page-trail > ul { flex-wrap: wrap; row-gap: 2px; }
 /* New task: the title is always shown; "+" reveals tags and the Add button. */
 .task-capture { margin-bottom: 6px; padding: 5px 8px; }
 .task-capture-line { display: flex; align-items: center; gap: 8px; }

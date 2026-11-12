@@ -1,3 +1,4 @@
+{% from 'daisyui_test/_trail.html' import page_trail with context %}
 {% from 'daisyui_test/_icons.html' import icon %}
 {% from 'daisyui_test/_rows.html' import row, calendar_rows with context %}
 {% from 'daisyui_test/_folder_menu.html' import folder_menu with context %}
@@ -14,6 +15,7 @@
 {% endif %}
 {% endmacro %}
 <div id="daisy-workspace" data-page-title="{{ t('app_title') }}" data-edit-query="{{ query }}&amp;back=home" data-scope="home:{{ folder_param if folder_param is not none else 'default' }}" data-page-url="{{ prototype_url }}{{ query }}" data-sort="{{ sort }}" data-folder="{{ folder_param if folder_param is not none else '' }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    {{ page_trail(active_folder_name or 'Top level', folder=current_folder.parent if current_folder else None, sort=sort, swap=True) }}
     <div class="page-heading">
         <div class="page-title"><h1>{{ active_folder_name or 'Overview' }}<span class="heading-dot">.</span></h1><time class="eyebrow" datetime="{{ today.isoformat() }}">{{ today | date_format }}</time></div>
         <div class="page-heading-actions">
@@ -56,7 +58,7 @@
     {% if show_calendar_above_lists %}{{ agenda() }}{% endif %}
 
     <section class="lists-section" aria-labelledby="lists-heading">
-        <div class="scope-line"><div class="breadcrumbs" role="navigation" aria-label="Breadcrumb"><span class="trail-icon" title="Where you are: each step is a link">{{ icon('trail', 15) }}</span><ul><li><a href="{{ prototype_url }}?sort={{ sort }}" hx-get="{{ prototype_url }}?sort={{ sort }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">Home</a></li>{% if current_folder %}{% for ancestor in folder_trail(current_folder.parent) %}<li><a href="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ ancestor.id }}" hx-get="{{ prototype_url }}?sort={{ sort }}&amp;folder_id={{ ancestor.id }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-push-url="true">{{ ancestor.name }}</a></li>{% endfor %}{% endif %}<li aria-current="page">{{ active_folder_name or 'Top level' }}</li></ul></div>
+        <div class="scope-line">
             <div class="scope-actions">
                 {% if current_folder %}{{ folder_menu(current_folder, None, active_folder_id == current_folder.id, False) }}
                 {% else %}<details class="dropdown dropdown-end row-dropdown"><summary class="btn btn-ghost btn-sm">{{ icon('plus', 15) }} New folder</summary><div class="dropdown-content row-menu folder-menu"><form class="folder-menu-form" action="{{ prototype_url }}/folders{{ query }}" method="post" hx-post="{{ prototype_url }}/folders{{ query }}" hx-target="#daisy-workspace" hx-swap="outerMorph" hx-disable="find button"><input type="hidden" name="parent_id" value="0"><label for="new-top-folder">New folder at the top level</label><div class="inline-fields"><input id="new-top-folder" class="input input-sm grow-input" name="name" placeholder="Folder name" required maxlength="255" autocomplete="off"><button class="btn btn-sm">{{ icon('plus', 14) }} Add</button></div></form></div></details>{% endif %}

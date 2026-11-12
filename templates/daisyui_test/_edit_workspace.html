@@ -1,5 +1,7 @@
+{% from 'daisyui_test/_trail.html' import page_trail with context %}
 {% from 'daisyui_test/_icons.html' import icon %}
 <div id="daisy-workspace" data-scope="edit:{{ item_kind }}:{{ item.id }}" data-editor="{{ item_kind }}" data-editor-label="{{ item_label }}" data-editor-title="{{ item_title }}" data-page-title="Edit {{ item_label }}" data-page-url="{{ editor_url }}{{ query }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    {% set home = item if item_kind == 'list' else item.list %}{{ page_trail('Edit ' ~ item_label, folder=home.folder if home else None, list=home, unfiled=home is not none) }}
     <header class="page-heading editor-heading">
         <div class="page-title"><h1>Edit {{ item_label }}</h1><span class="editor-item-title">{{ item_title }}</span></div>
         <div class="detail-actions"><span id="workspace-loading" class="loading loading-spinner loading-sm htmx-indicator" role="status" aria-label="Updating"></span><button id="editor-save" type="submit" form="editor-form" class="btn btn-primary">{{ icon('check', 16) }} Save changes</button><a class="btn" href="{{ return_url }}">Cancel</a><button type="button" class="btn delete-button" data-command="delete-edit-item">{{ icon('trash', 15) }} Delete {{ item_label }}</button></div>

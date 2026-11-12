@@ -189,7 +189,7 @@ def test_overview_browses_folders_with_breadcrumbs_and_actions(prototype):
     assert '0 lists · 1 subfolder' in root.text
     inner = client.get(f'/app?folder_id={ids["child"]}&sort=created')
     assert inner.context['current_folder'].id == ids['child'] and inner.context['subfolders'] == []
-    crumbs = inner.text.split('class="breadcrumbs"')[1].split('</ul>')[0]
+    crumbs = inner.text.split('class="breadcrumbs page-trail"')[1].split('</ul>')[0]
     assert f'folder_id={ids["folder"]}' in crumbs and '>Projects<' in crumbs and '<li aria-current="page">Garden</li>' in crumbs
     assert 'aria-label="Actions for Garden"' in inner.text
     # Every breadcrumb starts with the trail icon, which nothing else uses.
@@ -211,10 +211,22 @@ def test_overview_browses_folders_with_breadcrumbs_and_actions(prototype):
     # The list page shows where the list lives, each level a link.
     db.get(List, ids['list']).folder_id = db.query(Folder).filter_by(name='Shed').one().id
     db.commit()
-    path = client.get(f'/app/list/{ids["list"]}').text.split('class="folder-path"')[1].split('</span><span>Created')[0]
-    assert path.index('>Projects<') < path.index('>Shed<') and f'folder_id={ids["folder"]}' in path
-    assert 'class="trail-icon"' in path and client.get('/app/calendar').text.count('class="trail-icon"') == 0
-    assert '>Top level<' in client.get(f'/app/list/{ids["other"]}').text.split('class="folder-path"')[1].split('</span><span>Created')[0]
+    def trail(url):
+        text = client.get(url).text
+        assert text.count('class="trail-icon"') == 1
+        # The breadcrumb is the first thing in the workspace on every page that has one.
+        assert text.split('id="daisy-workspace"')[1].split('>', 1)[1].lstrip().startswith('<div class="breadcrumbs page-trail"')
+        return text.split('class="breadcrumbs page-trail"')[1].split('</ul>')[0]
+
+    path = trail(f'/app/list/{ids["list"]}')
+    assert path.index('>Home<') < path.index('>Projects<') < path.index('>Shed<') and f'folder_id={ids["folder"]}' in path
+    assert '<li aria-current="page">A place to start</li>' in path
+    assert client.get('/app/calendar').text.count('class="trail-icon"') == 0
+    assert 'folder_id=0">Top level<' in trail(f'/app/list/{ids["other"]}')
+    assert '<li aria-current="page">Top level</li>' in trail('/app')
+    edit = trail(f'/app/todo/{ids["todo"]}/edit')
+    assert edit.index('>Shed<') < edit.index(f'/app/list/{ids["list"]}">A place to start<') < edit.index('<li aria-current="page">Edit task</li>')
+    assert '<li aria-current="page">Edit list</li>' in trail(f'/app/list/{ids["other"]}/edit')
 
 
 def test_browser_drill_into_folders_from_the_overview(prototype_server, page):
@@ -247,7 +259,7 @@ def test_browser_drill_into_folders_from_the_overview(prototype_server, page):
     expect(rows).to_have_count(0)
     # A list page links back to its folder.
     page.goto(origin + f'/app/list/{ids["other"]}')
-    page.locator('.folder-path').get_by_role('link', name='Garden', exact=True).click()
+    page.locator('.breadcrumbs').get_by_role('link', name='Garden', exact=True).click()
     expect(page.get_by_role('heading', level=1)).to_contain_text('Garden')
     page.set_viewport_size({'width': 360, 'height': 700})
     page.locator('summary[aria-label="Actions for Garden"]').click()

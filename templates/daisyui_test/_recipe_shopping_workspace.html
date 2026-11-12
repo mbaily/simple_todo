@@ -1,6 +1,8 @@
+{% from 'daisyui_test/_trail.html' import page_trail with context %}
 {% from 'daisyui_test/_icons.html' import icon %}
 {% from 'daisyui_test/_recipe_macros.html' import ingredient_row, recipe_nav, hx with context %}
 <div id="daisy-workspace" data-scope="recipe:{{ back }}" data-page-title="{{ page_title }}" data-page-url="{{ page_url }}" hx-sync:inherited="this:drop" hx-indicator:inherited="#workspace-loading">
+    {{ page_trail('Shopping list', folder=list.folder, list=list, unfiled=True) }}
     {{ recipe_nav(list) }}
     <div class="page-heading">
         <div class="page-title"><h1>Shopping list</h1><span class="eyebrow">{{ needed|length }} to buy</span></div>
