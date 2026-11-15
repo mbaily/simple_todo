@@ -1,4 +1,5 @@
 import json
+from statistics import mean, median, stdev
 from typing import Optional
 from datetime import datetime, timezone, date
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Table, Float, CheckConstraint, Index, UniqueConstraint, JSON, event
@@ -860,46 +861,56 @@ class Bill(Base):
         }
         return symbols.get(curr, "$")
 
-    @property
-    def estimated_amount(self) -> Optional[float]:
-        """
-        Calculates the best estimate for the next bill payment amount based on amount_strategy
-        and payment history.
-        - 'fixed': returns expected_amount.
-        - 'last_payment': returns the most recent valid payment's amount_paid.
-        - 'rolling_avg': calculates a recency-weighted moving average (WMA) of up to 4 recent
-          positive payments, filtering extreme outliers when >= 4 payments exist.
-          If no payment history exists, falls back to expected_amount.
-        """
-        strategy = (self.amount_strategy or "fixed").strip().lower()
-        if strategy == "fixed" and self.expected_amount is not None:
-            return self.expected_amount
-
-        if not self.payments and not self.invoices:
-            return self.expected_amount
+    def _historical_charge_amounts(self) -> list[float]:
+        """Return newest-first positive charge amounts, normalized by service period length when available."""
+        invoices = [i for i in reversed(self.ordered_invoices)
+                    if not i.is_legacy and i.amount_cents > 0]
+        if invoices:
+            period_lengths = []
+            for inv in invoices:
+                ps, pe = _to_date(inv.period_start), _to_date(inv.period_end)
+                if ps and pe and pe >= ps:
+                    period_lengths.append((pe - ps).days + 1)
+            expected_days = median(period_lengths) if period_lengths else None
+            amounts = []
+            for inv in invoices:
+                raw = inv.amount_cents / 100.0
+                if expected_days:
+                    ps, pe = _to_date(inv.period_start), _to_date(inv.period_end)
+                    if ps and pe and pe >= ps:
+                        days = (pe - ps).days + 1
+                        amounts.append(raw * (expected_days / days))
+                        continue
+                amounts.append(raw)
+            return amounts
 
         def _payment_sort_key(p):
             d = _to_date(p.due_date) or date.min
             return (d, p.id or 0)
 
-        sorted_payments = sorted(self.payments, key=_payment_sort_key, reverse=True)
-        charges = [i.amount_cents / 100 for i in reversed(self.ordered_invoices)
-                   if not i.is_legacy and i.amount_cents > 0]
-        valid_amounts = charges or [p.amount_paid for p in sorted_payments if p.amount_paid is not None and p.amount_paid > 0]
+        sorted_payments = sorted(self.payments or [], key=_payment_sort_key, reverse=True)
+        amounts = []
+        seen_unlinked = set()
+        for p in sorted_payments:
+            if p.amount_paid is None or p.amount_paid <= 0:
+                continue
+            if not self.ledger_enabled and p.invoice_id is None:
+                key = (_to_date(p.due_date), _to_date(p.paid_date), round(float(p.amount_paid), 2))
+                if key in seen_unlinked:
+                    continue
+                seen_unlinked.add(key)
+            amounts.append(float(p.amount_paid))
+        return amounts
 
-        if not valid_amounts:
-            return self.expected_amount
-
-        if strategy == "last_payment":
-            return round(float(valid_amounts[0]), 2)
-
+    def _wma_and_seasonal_estimate(self, valid_amounts: list[float]) -> float:
+        """Recency-weighted moving average with outlier filter and YoY seasonal blend."""
         k = len(valid_amounts)
         if k == 1:
-            return round(float(valid_amounts[0]), 2)
+            base_wma = float(valid_amounts[0])
         elif k == 2:
-            return round((2.0 * valid_amounts[0] + 1.0 * valid_amounts[1]) / 3.0, 2)
+            base_wma = (2.0 * valid_amounts[0] + 1.0 * valid_amounts[1]) / 3.0
         elif k == 3:
-            return round((3.0 * valid_amounts[0] + 2.0 * valid_amounts[1] + 1.0 * valid_amounts[2]) / 6.0, 2)
+            base_wma = (3.0 * valid_amounts[0] + 2.0 * valid_amounts[1] + 1.0 * valid_amounts[2]) / 6.0
         else:
             recent = valid_amounts[:4]
             sorted_recent = sorted(recent)
@@ -909,9 +920,70 @@ class Bill(Base):
                 filtered = recent
             m = len(filtered)
             weights = list(range(m, 0, -1))
-            weighted_sum = sum(w * x for w, x in zip(weights, filtered))
-            total_w = sum(weights)
-            return round(weighted_sum / float(total_w), 2)
+            base_wma = sum(w * x for w, x in zip(weights, filtered)) / float(sum(weights))
+
+        season_lag = {"monthly": 12, "bimonthly": 6, "quarterly": 4}.get(self.frequency)
+        if season_lag and k >= season_lag:
+            yoy = valid_amounts[season_lag - 1]
+            if base_wma == 0 or (0.25 * base_wma <= yoy <= 3.0 * base_wma):
+                return round(0.65 * base_wma + 0.35 * yoy, 2)
+        return round(base_wma, 2)
+
+    @property
+    def estimated_amount(self) -> Optional[float]:
+        """
+        Calculates the best estimate for the next bill payment amount based on amount_strategy
+        and payment/invoice history.
+        - 'fixed': returns expected_amount.
+        - 'last_payment': returns the most recent valid charge/payment amount.
+        - 'rolling_avg': calculates a recency-weighted moving average (WMA) of up to 4 recent
+          positive charges (period-normalized when service dates are present), filtering extreme
+          outliers when >= 4 records exist, and blending same-season prior-year data when >= 1 year exists.
+        """
+        strategy = (self.amount_strategy or "fixed").strip().lower()
+        if strategy == "fixed" and self.expected_amount is not None:
+            return self.expected_amount
+
+        valid_amounts = self._historical_charge_amounts()
+        if not valid_amounts:
+            return self.expected_amount
+
+        if strategy == "last_payment":
+            return round(float(valid_amounts[0]), 2)
+
+        return self._wma_and_seasonal_estimate(valid_amounts)
+
+    @property
+    def has_variable_history(self) -> bool:
+        """True when strategy is 'fixed' but >= 3 historical amounts vary by > 5% CV."""
+        if (self.amount_strategy or "fixed").strip().lower() != "fixed":
+            return False
+        amounts = self._historical_charge_amounts()
+        if len(amounts) < 3:
+            return False
+        avg = mean(amounts)
+        if avg <= 0:
+            return False
+        return (stdev(amounts) / avg) > 0.05
+
+    @property
+    def estimated_amount_range(self) -> Optional[tuple[float, float]]:
+        """Empirical (low, high) prediction range from recent history when >= 3 records exist."""
+        amounts = self._historical_charge_amounts()
+        if len(amounts) < 3:
+            return None
+        strategy = (self.amount_strategy or "fixed").strip().lower()
+        center = (self._wma_and_seasonal_estimate(amounts)
+                  if strategy == "fixed" else self.estimated_amount)
+        if center is None:
+            return None
+        recent = amounts[:6]
+        med = median(recent)
+        inliers = [x for x in recent if med == 0 or (0.25 * med <= x <= 3.0 * med)] or recent
+        inlier_med = median(inliers)
+        mad = median([abs(x - inlier_med) for x in inliers])
+        spread = max(1.4826 * mad, 0.05 * center)
+        return (max(0.0, round(center - spread, 2)), round(center + spread, 2))
 
     @property
     def effective_amount(self) -> Optional[float]:

@@ -1,0 +1,74 @@
+Billing Estimation & Data Quality Improvements — 2026-11-16
+=============================================================
+
+Completed Changes (zero additional user input required):
+
+1. Due-date forecasting (`billing_service.py`):
+   - Added `forecast_due_date(bill, current_due)`:
+     * Calls `advance_due_date(...)` and checks historical due dates (from non-legacy
+       `BillInvoice` records, or `BillPayment` fallback when < 2 invoices exist).
+     * When >= 2 historical due dates all fall on weekdays (Mon-Fri), Saturday/Sunday
+       forecasts are rolled forward to Monday while keeping `bill.anchor_day` unshifted.
+   - Updated `refresh_invoice_forecast` to infer/maintain `anchor_day` using the median
+     day-of-month across non-legacy historical invoices when >= 2 (>= 3 on update) exist,
+     preventing single weekend-shifted due dates from permanently pulling `anchor_day`.
+   - Updated `refresh_invoice_forecast` and `reconcile_allocations` to use
+     `forecast_due_date(bill, ...)`.
+
+2. Amount estimation (`models.py`):
+   - Added `Bill._historical_charge_amounts()`:
+     * Normalizes non-legacy `BillInvoice` amounts by service period length
+       (`expected_days / period_days`, using the bill's median recorded period length)
+       when `period_start` and `period_end` are present.
+     * Deduplicates identical `(due_date, paid_date, amount_paid)` unlinked payments
+       when `ledger_enabled` is False.
+   - Added `Bill._wma_and_seasonal_estimate(valid_amounts)`:
+     * Preserves the 4-point WMA + median outlier filter as the base estimator.
+     * Blends same-season prior-year value (`0.65 * base_wma + 0.35 * yoy`) once >= 1
+       full year of history exists (`monthly`: 12, `bimonthly`: 6, `quarterly`: 4) and
+       the YoY value is within `[0.25x, 3.0x]` of `base_wma`.
+   - Added `Bill.estimated_amount_range`:
+     * Empirical MAD-based `(low, high)` range from up to 6 recent inlier records when
+       >= 3 historical records exist.
+   - Added `Bill.has_variable_history`:
+     * True when `amount_strategy == 'fixed'` and >= 3 historical amounts have a
+       coefficient of variation > 5%.
+
+3. UI surfacing:
+   - `templates/bill_history.html`: displays `(typical low–high)` next to `Next Est`
+     for `rolling_avg` / `last_payment`, and `History varies (typical low–high)` when
+     `has_variable_history` is True on `fixed` bills.
+   - `templates/daisyui_test/_bill_history_workspace.html`: displays `Typical low–high`
+     or `Varies: low–high` in the estimate stat tile.
+
+4. Tests:
+   - Added `tests/test_billing_estimation_improvements.py` (6 tests covering weekday
+     rollover, weekend preservation, median `anchor_day`, period normalization, seasonal
+     YoY blending, duplicate unlinked payment deduplication, `has_variable_history`,
+     `estimated_amount_range`, and `/bills/{id}/history` rendering).
+   - Ran full billing test suite after final edits:
+     `python3 -m pytest tests/test_billing_estimation_improvements.py tests/test_bills.py tests/test_bills_api.py tests/test_billing_estimates_imports.py tests/test_billing_recurrence_imports.py tests/test_billing_regressions.py tests/test_daisyui_bills.py -q`
+     Result: 335 passed, 3 warnings in 26.53s.
+
+Full Billing Suite & Sandbox E2E Verification:
+5. Caught and fixed two regressions when running all 20 billing test files:
+   - `test_partial_payment_and_duplicate_do_not_advance_twice` (`tests/test_bill_credit.py`):
+     `forecast_due_date` previously counted multiple payments against the same invoice
+     as separate weekday due dates. Fixed to count distinct `_midnight(due_date)` values
+     and require >= 3 distinct weekday due dates before rolling weekends to Monday.
+   - `test_correcting_latest_due_date_updates_forecast_and_timing` (`tests/test_water_history.py`):
+     `refresh_invoice_forecast` previously overrode an explicit due-date correction
+     with the historical median `anchor_day`. Fixed so median `anchor_day` is used only
+     for initial inference (`not bill.anchor_day`), preserving explicit anchor updates.
+6. Added `tests/test_billing_sandbox_e2e.py`:
+   - Tests all 7 frequencies + leap-year/month-end anchor edge cases.
+   - Exercises full 6-cycle fake utility lifecycle in an isolated test DB: bill creation
+     via `/bills/create`, opening credit adjustment, net-after-credit invoice, split
+     payments, overpayment credit carryover, partial payment settlement, `balance_as_of`,
+     `reconcile_allocations`, `estimated_amount`, `estimated_amount_range`,
+     `forecast_due_date`, HTML/DaisyUI routes (`/bills`, `/bills/{id}/history`,
+     `/bills/{id}/edit`, `/daisyui_test/bills`, `/daisyui_test/bills/{id}`), `/api/bills`,
+     and `serialize_bill` + `import_data_from_json` roundtrip.
+7. Final verification across all 21 billing test files:
+   `python3 -m pytest tests/test_bill_credit.py tests/test_billing_accounts.py tests/test_billing_cash_corrections.py tests/test_billing_corrections.py tests/test_billing_estimates_imports.py tests/test_billing_estimation_improvements.py tests/test_billing_import_integrity.py tests/test_billing_integrity.py tests/test_billing_opening_imports.py tests/test_billing_recurrence_imports.py tests/test_billing_regressions.py tests/test_billing_reporting.py tests/test_billing_sandbox_e2e.py tests/test_billing_submissions.py tests/test_billing_validation.py tests/test_bills.py tests/test_bills_api.py tests/test_daisyui_bill_account.py tests/test_daisyui_bills.py tests/test_utility_history.py tests/test_water_history.py -q`
+   Result: 693 passed, 3 warnings in 59.23s.

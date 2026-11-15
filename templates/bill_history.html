@@ -128,11 +128,14 @@
         {% if bill.amount_strategy == 'rolling_avg' %}
             | Strategy: <strong>Variable (Rolling Avg)</strong>
             {% if bill.effective_amount is not none %} | Next Est: <strong>~{{ bill.currency_symbol }}{{ "%.2f"|format(bill.effective_amount) }}</strong>{% endif %}
+            {% if bill.estimated_amount_range %} (typical {{ bill.currency_symbol }}{{ "%.2f"|format(bill.estimated_amount_range[0]) }}–{{ bill.currency_symbol }}{{ "%.2f"|format(bill.estimated_amount_range[1]) }}){% endif %}
         {% elif bill.amount_strategy == 'last_payment' %}
             | Strategy: <strong>Variable (Last Payment)</strong>
             {% if bill.effective_amount is not none %} | Next Est: <strong>~{{ bill.currency_symbol }}{{ "%.2f"|format(bill.effective_amount) }}</strong>{% endif %}
+            {% if bill.estimated_amount_range %} (typical {{ bill.currency_symbol }}{{ "%.2f"|format(bill.estimated_amount_range[0]) }}–{{ bill.currency_symbol }}{{ "%.2f"|format(bill.estimated_amount_range[1]) }}){% endif %}
         {% else %}
             {% if bill.expected_amount is not none %} | Expected: <strong>{{ bill.currency_symbol }}{{ "%.2f"|format(bill.expected_amount) }}</strong>{% endif %}
+            {% if bill.has_variable_history and bill.estimated_amount_range %} | History varies (typical {{ bill.currency_symbol }}{{ "%.2f"|format(bill.estimated_amount_range[0]) }}–{{ bill.currency_symbol }}{{ "%.2f"|format(bill.estimated_amount_range[1]) }}){% endif %}
         {% endif %}
     </div>
 

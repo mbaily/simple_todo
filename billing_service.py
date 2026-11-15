@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timedelta
 from datetime import date as date_type
 from decimal import Decimal, InvalidOperation
+from statistics import median
 
 from sqlalchemy import or_
 from models import BillAllocation, BillInvoice, BillPayment, BillPaymentSubmission, BillAdjustmentAllocation, utcnow
@@ -42,10 +43,14 @@ def refresh_invoice_forecast(bill, invoice, previous_due):
             or bill.ordered_invoices[-1] != invoice or bill.is_due_date_confirmed):
         return
     if invoice.due_date:
-        if not bill.anchor_day or (previous_due and bill.anchor_day == previous_due.day):
+        historical_days = [i.due_date.day for i in bill.ordered_invoices
+                           if not i.is_legacy and i.due_date]
+        if not bill.anchor_day:
+            bill.anchor_day = (round(median(historical_days))
+                               if len(historical_days) >= 2 else invoice.due_date.day)
+        elif previous_due and bill.anchor_day == previous_due.day:
             bill.anchor_day = invoice.due_date.day
-        bill.next_due_date = advance_due_date(invoice.due_date, bill.frequency,
-                                              bill.frequency_days, bill.anchor_day)
+        bill.next_due_date = forecast_due_date(bill, invoice.due_date)
     else:
         bill.next_due_date = None
     bill.modified_at = utcnow()
@@ -180,6 +185,23 @@ def advance_due_date(current_due, frequency, frequency_days=None, anchor_day=Non
         raise ValueError('The billing recurrence advances beyond the supported date range.')
     anchor = anchor_day if anchor_day and 1 <= anchor_day <= 31 else current_due.day
     return datetime(year, month, min(anchor, calendar.monthrange(year, month)[1]))
+
+
+def forecast_due_date(bill, current_due):
+    """Advance due date and roll weekends to Monday when history is weekday-only."""
+    candidate = advance_due_date(current_due, bill.frequency, bill.frequency_days, bill.anchor_day)
+    if candidate.weekday() < 5:
+        return candidate
+    historical_dues = {_midnight(i.due_date) for i in bill.ordered_invoices if not i.is_legacy and i.due_date}
+    if len(historical_dues) < 3:
+        historical_dues |= {_midnight(p.due_date) for p in (bill.payments or []) if p.due_date}
+    if len(historical_dues) >= 3 and all(d.weekday() < 5 for d in historical_dues):
+        shift = 7 - candidate.weekday()  # Sat (5) -> +2, Sun (6) -> +1
+        try:
+            return candidate + timedelta(days=shift)
+        except OverflowError:
+            return candidate
+    return candidate
 
 
 def validate_recurrence_settings(frequency, interval, anchor, due=None, label='Bill recurrence'):
@@ -390,8 +412,7 @@ def reconcile_allocations(db, bill, update_schedule=True):
             invoice_due_dates = {i.due_date for i in invoices}
             if (latest in newly_settled or not bill.is_due_date_confirmed
                     or bill.next_due_date in invoice_due_dates):
-                bill.next_due_date = advance_due_date(latest.due_date, bill.frequency, bill.frequency_days,
-                                                    bill.anchor_day) if latest.due_date else None
+                bill.next_due_date = forecast_due_date(bill, latest.due_date) if latest.due_date else None
                 bill.is_due_date_confirmed = False
         bill.modified_at = utcnow()
 
