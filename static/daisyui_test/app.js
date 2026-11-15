@@ -572,24 +572,34 @@
         event.target.querySelector('[data-close-day]').click();
     }, true);
 
-    // Day menus sit in narrow calendar columns (and a scrolling month grid), so
-    // pin the open one to the viewport beside its button instead of the column.
-    function placeDayMenu(details) {
-        const menu = details.querySelector('.dropdown-content');
-        const button = details.querySelector('summary').getBoundingClientRect();
-        Object.assign(menu.style, { position: 'fixed', margin: '0', inset: 'auto', left: '0px', top: '0px' });
-        const width = menu.offsetWidth, height = menu.offsetHeight, edge = 8;
-        const left = Math.max(edge, Math.min(button.right - width, window.innerWidth - width - edge));
-        const below = button.bottom + 4;
-        const top = below + height <= window.innerHeight - edge ? below : Math.max(edge, button.top - height - 4);
+    // Dropdown menus can open from anywhere on screen (a bottom row, a narrow
+    // calendar column, a scrolled toolbar), so pin the open one to the viewport
+    // beside its button: below when it fits, otherwise above, and always inside
+    // the screen edges. End-aligned menus line up with the button's right edge.
+    const DROPDOWN = 'details.dropdown';
+    function placeDropdown(details) {
+        const menu = details.querySelector(':scope > .dropdown-content');
+        if (!menu) return;
+        const button = details.querySelector(':scope > summary').getBoundingClientRect();
+        Object.assign(menu.style, { position: 'fixed', margin: '0', inset: 'auto', left: '0px', top: '0px', maxHeight: '' });
+        const width = menu.offsetWidth, height = menu.offsetHeight, edge = 8, gap = 4;
+        const preferred = details.classList.contains('dropdown-end') ? button.right - width : button.left;
+        const left = Math.max(edge, Math.min(preferred, window.innerWidth - width - edge));
+        const roomBelow = window.innerHeight - edge - (button.bottom + gap);
+        const roomAbove = button.top - gap - edge;
+        // Too tall for either side: use the roomier side and let the menu scroll,
+        // rather than covering the button that opened it.
+        const useBelow = height <= roomBelow || (height > roomAbove && roomBelow >= roomAbove);
+        if (height > (useBelow ? roomBelow : roomAbove)) menu.style.maxHeight = Math.max(0, useBelow ? roomBelow : roomAbove) + 'px';
+        const top = useBelow ? button.bottom + gap : button.top - gap - menu.offsetHeight;
         menu.style.left = left + 'px';
-        menu.style.top = top + 'px';
+        menu.style.top = Math.max(edge, top) + 'px';
     }
     document.addEventListener('toggle', event => {
-        if (event.target.matches?.('details.day-menu') && event.target.open) placeDayMenu(event.target);
+        if (event.target.matches?.(DROPDOWN) && event.target.open) placeDropdown(event.target);
     }, true);
     ['scroll', 'resize'].forEach(name => window.addEventListener(name, () => {
-        document.querySelectorAll('details.day-menu[open]').forEach(placeDayMenu);
+        document.querySelectorAll(DROPDOWN + '[open]').forEach(placeDropdown);
     }, { passive: true, capture: true }));
 
     document.addEventListener('click', event => {

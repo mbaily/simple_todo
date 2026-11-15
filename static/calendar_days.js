@@ -40,7 +40,11 @@ function showCalendarDayMenu(button) {
     const anchor = button.getBoundingClientRect();
     const size = menu.getBoundingClientRect();
     menu.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - size.width - 8))}px`;
-    menu.style.top = `${Math.max(8, Math.min(anchor.bottom + 3, window.innerHeight - size.height - 8))}px`;
+    // Below the button when it fits, otherwise above it, and always on screen.
+    const above = anchor.top - size.height - 3;
+    const top = anchor.bottom + 3 + size.height <= window.innerHeight - 8 ? anchor.bottom + 3
+        : above >= 8 ? above : Math.max(8, window.innerHeight - size.height - 8);
+    menu.style.top = `${top}px`;
     menu.querySelector('button').focus();
 }
 
