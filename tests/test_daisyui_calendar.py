@@ -181,7 +181,7 @@ def test_browser_jump_to_today_scrolls_and_only_loads_when_needed(prototype_serv
     page.evaluate('window.calendarDocument = true')
     requests = []
     page.on('request', lambda request: requests.append(request.url) if request.url.split('?')[0] == origin + '/app/calendar' else None)
-    jump = page.get_by_role('link', name='Jump to today', exact=True)
+    jump = page.locator('#daisy-workspace').get_by_role('link', name='Jump to today', exact=True)
     expect(page.get_by_role('link', name='Today', exact=True)).to_have_text('Today')
     assert jump.inner_text() == ''
     assert jump.locator('svg').count() == 1
@@ -228,7 +228,7 @@ def test_browser_jump_to_today_with_no_agenda_events_today(prototype_server, pag
     page.goto(origin + '/app/calendar')
     requests = []
     page.on('request', lambda request: requests.append(request.url))
-    page.get_by_role('link', name='Jump to today').click()
+    page.locator('#daisy-workspace').get_by_role('link', name='Jump to today').click()
     tomorrow = (today + timedelta(days=1)).strftime('%Y-%m-%d')
     target = page.locator(f'[data-calendar-date="{tomorrow}"]')
     assert abs(target.bounding_box()['y'] - page.locator('.topbar').bounding_box()['height'] - 8) < 2
@@ -242,7 +242,7 @@ def test_browser_jump_to_today_aligns_today_even_on_short_pages(prototype_server
     page.set_viewport_size({'width': 1200, 'height': 1100})
     page.goto(origin + '/app')
     page.locator('.toolbar-navigation').get_by_role('link', name='Calendar').click()
-    page.get_by_role('link', name='Jump to today', exact=True).click()
+    page.locator('#daisy-workspace').get_by_role('link', name='Jump to today', exact=True).click()
     page.wait_for_function('''() => {
         const root = document.getElementById('daisy-workspace');
         const today = root.querySelector(`[data-calendar-date="${root.dataset.calendarToday}"]`);

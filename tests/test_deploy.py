@@ -31,6 +31,8 @@ def test_non_root_deployment_stops_before_writing(tmp_path, monkeypatch, capsys)
 def test_paths_use_machine_defaults_and_allow_overrides(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv('SIMPLE_TODO_DATA_DIR', raising=False)
+    # Ignore any real installation at /opt/simple_todo on the test machine.
+    monkeypatch.setattr(deploy, 'installed_data_directory', lambda target: None)
     source = tmp_path / 'source'
     default = deploy.deployment_paths(source=source)
     assert default.target == Path('/opt/simple_todo').resolve()
