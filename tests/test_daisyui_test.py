@@ -75,6 +75,17 @@ def test_document_fragments_and_home_parity(prototype):
     assert "daisyui-5.7.50.css" in full.text and "https://cdn" not in full.text
 
 
+def test_full_page_holds_first_paint_until_its_end_is_parsed(prototype):
+    # Without this, a reload paints the top of a partly received page and then
+    # jumps to the restored scroll position.
+    db, client, ids = prototype
+    page = client.get("/app").text
+    assert '<link rel="expect" href="#page-end" blocking="render">' in page
+    head, body = page.split("</head>", 1)
+    assert 'rel="expect"' in head
+    assert body.rstrip().endswith('<div id="page-end" hidden></div>\n</body>\n</html>')
+
+
 def test_create_list_reuses_tags_and_explicit_unfiled_overrides_active_folder(prototype):
     db, client, ids = prototype
     db.add(UserSettings(active_folder_id=ids["folder"]))

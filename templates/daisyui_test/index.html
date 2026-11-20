@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
     <title>{% if results_page or folders_page or smart_page or hashtags_page or texttags_page or calendar_page or pages_page or customize_page or bills_page or expenses_page or recipe_page or reorder_page or uncompleted_page or categories_page %}{{ page_title }} · {{ t('app_title') }}{% else %}{% if editor_page %}Edit {{ item_label }} · {% elif list_page %}{{ list.name }} · {% endif %}{{ t('app_title') }}{% endif %}</title>
+    {# Hold the first paint until the whole page is parsed. Otherwise a reload paints the
+       top of a partly received page and then jumps to the restored scroll position. #}
+    <link rel="expect" href="#page-end" blocking="render">
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/daisyui_test/daisyui-5.7.50.css">
     <link rel="stylesheet" href="{{ request.scope.root_path }}/static/daisyui_test/style.css?v=63">
     <script src="{{ request.scope.root_path }}/static/urls.js?v=20261021"></script>
@@ -80,5 +83,6 @@
     <form method="dialog" class="modal-backdrop"><button aria-label="Close confirmation">Close</button></form>
 </dialog>
 <div id="toast" class="toast toast-end" role="status" aria-live="polite" hidden></div>
+<div id="page-end" hidden></div>
 </body>
 </html>
